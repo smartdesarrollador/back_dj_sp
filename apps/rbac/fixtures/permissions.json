@@ -1,0 +1,808 @@
+
+{
+  "model": "rbac.permission",
+  "pk": "069d3bba-a357-43bf-a1ab-a83227849252",
+  "fields": {
+    "created_at": "2026-02-27T23:48:50.232Z",
+    "updated_at": "2026-02-27T23:48:50.232Z",
+    "codename": "audit.read",
+    "name": "Ver Auditoría",
+    "description": "Ver logs de auditoría del tenant",
+    "resource": "audit",
+    "action": "read"
+  }
+},
+{
+  "model": "rbac.permission",
+  "pk": "0a88892e-1eae-4eee-8abb-853327717376",
+  "fields": {
+    "created_at": "2026-02-27T23:48:50.130Z",
+    "updated_at": "2026-02-27T23:48:50.130Z",
+    "codename": "digital_services.portfolio",
+    "name": "Portfolio Digital",
+    "description": "Gestionar portfolio digital",
+    "resource": "digital_services",
+    "action": "portfolio"
+  }
+},
+{
+  "model": "rbac.permission",
+  "pk": "0c6a982f-a8d0-47f0-a5c9-a6b8ca7825b5",
+  "fields": {
+    "created_at": "2026-02-27T23:48:50.033Z",
+    "updated_at": "2026-02-27T23:48:50.033Z",
+    "codename": "calendar.update",
+    "name": "Editar Eventos",
+    "description": "Editar eventos existentes",
+    "resource": "calendar",
+    "action": "update"
+  }
+},
+{
+  "model": "rbac.permission",
+  "pk": "0fb4b3b5-f337-4058-8739-028a42d2b686",
+  "fields": {
+    "created_at": "2026-02-27T23:48:50.097Z",
+    "updated_at": "2026-02-27T23:48:50.097Z",
+    "codename": "credentials.manage",
+    "name": "Gestionar Credenciales",
+    "description": "Crear y editar credenciales almacenadas",
+    "resource": "credentials",
+    "action": "manage"
+  }
+},
+{
+  "model": "rbac.permission",
+  "pk": "10aa33d6-f6a2-475a-a7e1-bda137612e9c",
+  "fields": {
+    "created_at": "2026-02-27T23:48:50.012Z",
+    "updated_at": "2026-02-27T23:48:50.012Z",
+    "codename": "boards.admin",
+    "name": "Administrar Tableros",
+    "description": "Crear, editar y eliminar tableros Kanban",
+    "resource": "boards",
+    "action": "admin"
+  }
+},
+{
+  "model": "rbac.permission",
+  "pk": "14e05653-8a33-40f1-a03e-dede66e30396",
+  "fields": {
+    "created_at": "2026-02-27T23:48:50.159Z",
+    "updated_at": "2026-02-27T23:48:50.159Z",
+    "codename": "promotions.manage",
+    "name": "Gestionar Promociones",
+    "description": "Crear y aplicar códigos promocionales",
+    "resource": "promotions",
+    "action": "manage"
+  }
+},
+{
+  "model": "rbac.permission",
+  "pk": "1c51b9c0-1004-4e89-891e-0cd7d4651cae",
+  "fields": {
+    "created_at": "2026-02-27T23:48:50.067Z",
+    "updated_at": "2026-02-27T23:48:50.067Z",
+    "codename": "branding.update",
+    "name": "Editar Branding",
+    "description": "Modificar logo, colores y branding del tenant",
+    "resource": "branding",
+    "action": "update"
+  }
+},
+{
+  "model": "rbac.permission",
+  "pk": "227f3d43-61e9-4cb1-af70-8ba01e0eaaf9",
+  "fields": {
+    "created_at": "2026-02-27T23:48:50.190Z",
+    "updated_at": "2026-02-27T23:48:50.191Z",
+    "codename": "customers.analytics",
+    "name": "Analíticas Clientes",
+    "description": "Ver analíticas y métricas de clientes",
+    "resource": "customers",
+    "action": "analytics"
+  }
+},
+{
+  "model": "rbac.permission",
+  "pk": "2e23b198-0522-4f39-9103-dea766c55c3e",
+  "fields": {
+    "created_at": "2026-02-27T23:48:49.965Z",
+    "updated_at": "2026-02-27T23:48:49.965Z",
+    "codename": "roles.read",
+    "name": "Ver Roles",
+    "description": "Ver roles disponibles y sus permisos",
+    "resource": "roles",
+    "action": "read"
+  }
+},
+{
+  "model": "rbac.permission",
+  "pk": "2e8d0eec-e042-465d-bd2a-5a53d2dc84c0",
+  "fields": {
+    "created_at": "2026-02-27T23:48:50.170Z",
+    "updated_at": "2026-02-27T23:48:50.170Z",
+    "codename": "customers.create",
+    "name": "Crear Clientes",
+    "description": "Registrar nuevos clientes",
+    "resource": "customers",
+    "action": "create"
+  }
+},
+{
+  "model": "rbac.permission",
+  "pk": "3067b09c-d3b1-41c9-b3ab-e8cd582ea3b2",
+  "fields": {
+    "created_at": "2026-02-27T23:48:50.216Z",
+    "updated_at": "2026-02-27T23:48:50.216Z",
+    "codename": "analytics.export",
+    "name": "Exportar Analíticas",
+    "description": "Exportar datos de analíticas",
+    "resource": "analytics",
+    "action": "export"
+  }
+},
+{
+  "model": "rbac.permission",
+  "pk": "324bf959-efd6-484a-a5a0-97a4b7732e0d",
+  "fields": {
+    "created_at": "2026-02-27T23:48:50.201Z",
+    "updated_at": "2026-02-27T23:48:50.201Z",
+    "codename": "subscriptions.manage",
+    "name": "Gestionar Suscripciones",
+    "description": "Administrar suscripciones de clientes",
+    "resource": "subscriptions",
+    "action": "manage"
+  }
+},
+{
+  "model": "rbac.permission",
+  "pk": "34fb4247-7c7a-4922-a69e-35a7388731e0",
+  "fields": {
+    "created_at": "2026-02-27T23:48:50.196Z",
+    "updated_at": "2026-02-27T23:48:50.196Z",
+    "codename": "customers.export",
+    "name": "Exportar Clientes",
+    "description": "Exportar datos de clientes a CSV/Excel",
+    "resource": "customers",
+    "action": "export"
+  }
+},
+{
+  "model": "rbac.permission",
+  "pk": "38978c49-df3b-4266-b2b3-0c7fb0e4f45c",
+  "fields": {
+    "created_at": "2026-02-27T23:48:50.154Z",
+    "updated_at": "2026-02-27T23:48:50.154Z",
+    "codename": "billing.upgrade",
+    "name": "Cambiar Plan",
+    "description": "Actualizar o degradar plan de suscripción",
+    "resource": "billing",
+    "action": "upgrade"
+  }
+},
+{
+  "model": "rbac.permission",
+  "pk": "3d085463-e4fe-4a4f-861f-a0886b85a1df",
+  "fields": {
+    "created_at": "2026-02-27T23:48:50.175Z",
+    "updated_at": "2026-02-27T23:48:50.175Z",
+    "codename": "customers.update",
+    "name": "Editar Clientes",
+    "description": "Editar datos de clientes",
+    "resource": "customers",
+    "action": "update"
+  }
+},
+{
+  "model": "rbac.permission",
+  "pk": "3e8fc81a-7387-4103-97f8-a94906ad35c2",
+  "fields": {
+    "created_at": "2026-02-27T23:48:49.949Z",
+    "updated_at": "2026-02-27T23:48:49.949Z",
+    "codename": "users.delete",
+    "name": "Eliminar Usuarios",
+    "description": "Eliminar usuarios del tenant",
+    "resource": "users",
+    "action": "delete"
+  }
+},
+{
+  "model": "rbac.permission",
+  "pk": "41b2f34b-83d3-49c2-b9a3-49bacabd3488",
+  "fields": {
+    "created_at": "2026-02-27T23:48:50.123Z",
+    "updated_at": "2026-02-27T23:48:50.123Z",
+    "codename": "digital_services.cv",
+    "name": "CV Digital",
+    "description": "Gestionar currículum digital",
+    "resource": "digital_services",
+    "action": "cv"
+  }
+},
+{
+  "model": "rbac.permission",
+  "pk": "4864dd0a-2363-4062-bbe3-9b244a270294",
+  "fields": {
+    "created_at": "2026-02-27T23:48:50.042Z",
+    "updated_at": "2026-02-27T23:48:50.042Z",
+    "codename": "calendar.share",
+    "name": "Compartir Calendario",
+    "description": "Compartir calendario con otros",
+    "resource": "calendar",
+    "action": "share"
+  }
+},
+{
+  "model": "rbac.permission",
+  "pk": "4ca46241-61a2-4014-b9f5-93ba59868ed9",
+  "fields": {
+    "created_at": "2026-02-27T23:48:50.052Z",
+    "updated_at": "2026-02-27T23:48:50.052Z",
+    "codename": "landing.create",
+    "name": "Crear Landing Pages",
+    "description": "Crear nuevas landing pages",
+    "resource": "landing",
+    "action": "create"
+  }
+},
+{
+  "model": "rbac.permission",
+  "pk": "5155e8b7-ea1c-468c-bf1e-39d5e63a6425",
+  "fields": {
+    "created_at": "2026-02-27T23:48:50.112Z",
+    "updated_at": "2026-02-27T23:48:50.112Z",
+    "codename": "digital_services.tarjeta",
+    "name": "Tarjeta Digital",
+    "description": "Gestionar tarjeta digital",
+    "resource": "digital_services",
+    "action": "tarjeta"
+  }
+},
+{
+  "model": "rbac.permission",
+  "pk": "531b7fc5-f242-431c-812e-8ed8f8a6dd1d",
+  "fields": {
+    "created_at": "2026-02-27T23:48:49.945Z",
+    "updated_at": "2026-02-27T23:48:49.945Z",
+    "codename": "users.update",
+    "name": "Editar Usuarios",
+    "description": "Editar datos de usuarios existentes",
+    "resource": "users",
+    "action": "update"
+  }
+},
+{
+  "model": "rbac.permission",
+  "pk": "5505d988-6483-4219-9b7d-f789195524bf",
+  "fields": {
+    "created_at": "2026-02-27T23:48:50.037Z",
+    "updated_at": "2026-02-27T23:48:50.037Z",
+    "codename": "calendar.delete",
+    "name": "Eliminar Eventos",
+    "description": "Eliminar eventos del calendario",
+    "resource": "calendar",
+    "action": "delete"
+  }
+},
+{
+  "model": "rbac.permission",
+  "pk": "558c86d5-2038-419b-a3a9-3f007f9fd2b3",
+  "fields": {
+    "created_at": "2026-02-27T23:48:49.970Z",
+    "updated_at": "2026-02-27T23:48:49.970Z",
+    "codename": "roles.update",
+    "name": "Editar Roles",
+    "description": "Modificar roles existentes",
+    "resource": "roles",
+    "action": "update"
+  }
+},
+{
+  "model": "rbac.permission",
+  "pk": "56863625-2d9f-4fdb-93ea-becec13fc74c",
+  "fields": {
+    "created_at": "2026-02-27T23:48:50.221Z",
+    "updated_at": "2026-02-27T23:48:50.222Z",
+    "codename": "settings.read",
+    "name": "Ver Configuración",
+    "description": "Ver configuración del tenant",
+    "resource": "settings",
+    "action": "read"
+  }
+},
+{
+  "model": "rbac.permission",
+  "pk": "57fb25eb-376d-458b-8038-f56c8250f301",
+  "fields": {
+    "created_at": "2026-02-27T23:48:50.077Z",
+    "updated_at": "2026-02-27T23:48:50.077Z",
+    "codename": "projects.read",
+    "name": "Ver Proyectos",
+    "description": "Ver proyectos y sus elementos",
+    "resource": "projects",
+    "action": "read"
+  }
+},
+{
+  "model": "rbac.permission",
+  "pk": "5c31c526-d6e2-42f8-93e9-8cd6830185a9",
+  "fields": {
+    "created_at": "2026-02-27T23:48:50.070Z",
+    "updated_at": "2026-02-27T23:48:50.070Z",
+    "codename": "forms.manage",
+    "name": "Gestionar Formularios",
+    "description": "Crear, editar y eliminar formularios",
+    "resource": "forms",
+    "action": "manage"
+  }
+},
+{
+  "model": "rbac.permission",
+  "pk": "606a33ba-afe4-4aa5-9628-85c246e81d6a",
+  "fields": {
+    "created_at": "2026-02-27T23:48:50.185Z",
+    "updated_at": "2026-02-27T23:48:50.185Z",
+    "codename": "customers.suspend",
+    "name": "Suspender Clientes",
+    "description": "Suspender o reactivar clientes",
+    "resource": "customers",
+    "action": "suspend"
+  }
+},
+{
+  "model": "rbac.permission",
+  "pk": "65f883bc-e72f-4706-9563-b96d610004d8",
+  "fields": {
+    "created_at": "2026-02-27T23:48:50.148Z",
+    "updated_at": "2026-02-27T23:48:50.148Z",
+    "codename": "billing.manage",
+    "name": "Gestionar Facturación",
+    "description": "Cambiar método de pago y datos de facturación",
+    "resource": "billing",
+    "action": "manage"
+  }
+},
+{
+  "model": "rbac.permission",
+  "pk": "667c8984-05e5-43fd-a311-066e5c2df6e8",
+  "fields": {
+    "created_at": "2026-02-27T23:48:50.086Z",
+    "updated_at": "2026-02-27T23:48:50.086Z",
+    "codename": "projects.delete",
+    "name": "Eliminar Proyectos",
+    "description": "Eliminar proyectos",
+    "resource": "projects",
+    "action": "delete"
+  }
+},
+{
+  "model": "rbac.permission",
+  "pk": "6b67db87-355e-4c79-bb1d-c3de4bf250bb",
+  "fields": {
+    "created_at": "2026-02-27T23:48:50.107Z",
+    "updated_at": "2026-02-27T23:48:50.107Z",
+    "codename": "portfolio.publish",
+    "name": "Publicar Portfolio",
+    "description": "Publicar y gestionar portfolio público",
+    "resource": "portfolio",
+    "action": "publish"
+  }
+},
+{
+  "model": "rbac.permission",
+  "pk": "75838e48-d8a1-4587-b56e-3f19a85bd429",
+  "fields": {
+    "created_at": "2026-02-27T23:48:50.206Z",
+    "updated_at": "2026-02-27T23:48:50.206Z",
+    "codename": "subscriptions.cancel",
+    "name": "Cancelar Suscripciones",
+    "description": "Cancelar suscripciones activas",
+    "resource": "subscriptions",
+    "action": "cancel"
+  }
+},
+{
+  "model": "rbac.permission",
+  "pk": "7ab942e8-84f2-4131-8ab1-35ec706684af",
+  "fields": {
+    "created_at": "2026-02-27T23:48:50.164Z",
+    "updated_at": "2026-02-27T23:48:50.164Z",
+    "codename": "customers.read",
+    "name": "Ver Clientes",
+    "description": "Ver lista y detalle de clientes",
+    "resource": "customers",
+    "action": "read"
+  }
+},
+{
+  "model": "rbac.permission",
+  "pk": "7eee809c-4125-4459-bd0e-572164ce3de9",
+  "fields": {
+    "created_at": "2026-02-27T23:48:49.998Z",
+    "updated_at": "2026-02-27T23:48:49.998Z",
+    "codename": "tasks.update",
+    "name": "Editar Tareas",
+    "description": "Editar tareas existentes",
+    "resource": "tasks",
+    "action": "update"
+  }
+},
+{
+  "model": "rbac.permission",
+  "pk": "8268423a-d8d2-4266-baec-a6df4388250a",
+  "fields": {
+    "created_at": "2026-02-27T23:48:50.226Z",
+    "updated_at": "2026-02-27T23:48:50.226Z",
+    "codename": "settings.update",
+    "name": "Editar Configuración",
+    "description": "Modificar configuración del tenant",
+    "resource": "settings",
+    "action": "update"
+  }
+},
+{
+  "model": "rbac.permission",
+  "pk": "88cc7084-ee82-44a7-a61f-9451cf49e1a7",
+  "fields": {
+    "created_at": "2026-02-27T23:48:50.211Z",
+    "updated_at": "2026-02-27T23:48:50.211Z",
+    "codename": "analytics.read",
+    "name": "Ver Analíticas",
+    "description": "Ver dashboards y reportes de analíticas",
+    "resource": "analytics",
+    "action": "read"
+  }
+},
+{
+  "model": "rbac.permission",
+  "pk": "890323a1-af9e-466b-ad44-b069598265a2",
+  "fields": {
+    "created_at": "2026-02-27T23:48:49.976Z",
+    "updated_at": "2026-02-27T23:48:49.976Z",
+    "codename": "roles.delete",
+    "name": "Eliminar Roles",
+    "description": "Eliminar roles personalizados",
+    "resource": "roles",
+    "action": "delete"
+  }
+},
+{
+  "model": "rbac.permission",
+  "pk": "8b5ea53b-e66c-472c-9f1e-9eab3044caf8",
+  "fields": {
+    "created_at": "2026-02-27T23:48:50.117Z",
+    "updated_at": "2026-02-27T23:48:50.117Z",
+    "codename": "digital_services.landing",
+    "name": "Landing Personal",
+    "description": "Gestionar landing page personal",
+    "resource": "digital_services",
+    "action": "landing"
+  }
+},
+{
+  "model": "rbac.permission",
+  "pk": "90c9d2b2-8ee0-4f54-a168-45f85243e3f4",
+  "fields": {
+    "created_at": "2026-02-27T23:48:50.073Z",
+    "updated_at": "2026-02-27T23:48:50.074Z",
+    "codename": "projects.create",
+    "name": "Crear Proyectos",
+    "description": "Crear nuevos proyectos",
+    "resource": "projects",
+    "action": "create"
+  }
+},
+{
+  "model": "rbac.permission",
+  "pk": "942d06d8-16c0-4563-a818-326cf62515ba",
+  "fields": {
+    "created_at": "2026-02-27T23:48:50.059Z",
+    "updated_at": "2026-02-27T23:48:50.059Z",
+    "codename": "landing.edit",
+    "name": "Editar Landing Pages",
+    "description": "Editar contenido de landing pages",
+    "resource": "landing",
+    "action": "edit"
+  }
+},
+{
+  "model": "rbac.permission",
+  "pk": "94f0c90b-833b-4b2d-a6a7-dc5df51736a3",
+  "fields": {
+    "created_at": "2026-02-27T23:48:50.008Z",
+    "updated_at": "2026-02-27T23:48:50.008Z",
+    "codename": "tasks.assign",
+    "name": "Asignar Tareas",
+    "description": "Asignar tareas a otros usuarios",
+    "resource": "tasks",
+    "action": "assign"
+  }
+},
+{
+  "model": "rbac.permission",
+  "pk": "99101626-fcfa-4716-a04a-9898b3f96827",
+  "fields": {
+    "created_at": "2026-02-27T23:48:50.056Z",
+    "updated_at": "2026-02-27T23:48:50.056Z",
+    "codename": "landing.read",
+    "name": "Ver Landing Pages",
+    "description": "Ver landing pages del tenant",
+    "resource": "landing",
+    "action": "read"
+  }
+},
+{
+  "model": "rbac.permission",
+  "pk": "9d1aef33-2512-41ca-b845-b53e63bbeb7d",
+  "fields": {
+    "created_at": "2026-02-27T23:48:50.017Z",
+    "updated_at": "2026-02-27T23:48:50.018Z",
+    "codename": "boards.reorder",
+    "name": "Reordenar Tableros",
+    "description": "Reordenar columnas y tarjetas",
+    "resource": "boards",
+    "action": "reorder"
+  }
+},
+{
+  "model": "rbac.permission",
+  "pk": "a5f6f596-cfef-4ca8-95f5-a15c5d796bf3",
+  "fields": {
+    "created_at": "2026-02-27T23:48:50.237Z",
+    "updated_at": "2026-02-27T23:48:50.237Z",
+    "codename": "audit.export",
+    "name": "Exportar Auditoría",
+    "description": "Exportar logs de auditoría",
+    "resource": "audit",
+    "action": "export"
+  }
+},
+{
+  "model": "rbac.permission",
+  "pk": "a6b825af-62f4-4091-9808-42a4b9542bf5",
+  "fields": {
+    "created_at": "2026-02-27T23:48:49.986Z",
+    "updated_at": "2026-02-27T23:48:49.986Z",
+    "codename": "tasks.create",
+    "name": "Crear Tareas",
+    "description": "Crear nuevas tareas",
+    "resource": "tasks",
+    "action": "create"
+  }
+},
+{
+  "model": "rbac.permission",
+  "pk": "ab2f3cf1-42ed-46e3-917f-36bf5505f9a0",
+  "fields": {
+    "created_at": "2026-02-27T23:48:50.023Z",
+    "updated_at": "2026-02-27T23:48:50.023Z",
+    "codename": "calendar.create",
+    "name": "Crear Eventos",
+    "description": "Crear nuevos eventos de calendario",
+    "resource": "calendar",
+    "action": "create"
+  }
+},
+{
+  "model": "rbac.permission",
+  "pk": "afac080c-bc33-4d96-a262-11fec79f7657",
+  "fields": {
+    "created_at": "2026-02-27T23:48:50.243Z",
+    "updated_at": "2026-02-27T23:48:50.243Z",
+    "codename": "dashboard.read",
+    "name": "Ver Dashboard",
+    "description": "Acceder al dashboard principal",
+    "resource": "dashboard",
+    "action": "read"
+  }
+},
+{
+  "model": "rbac.permission",
+  "pk": "b2dd1be9-084e-4636-a1b5-c8570f857baa",
+  "fields": {
+    "created_at": "2026-02-27T23:48:50.141Z",
+    "updated_at": "2026-02-27T23:48:50.141Z",
+    "codename": "billing.read",
+    "name": "Ver Facturación",
+    "description": "Ver facturas y estado de suscripción",
+    "resource": "billing",
+    "action": "read"
+  }
+},
+{
+  "model": "rbac.permission",
+  "pk": "b9e98338-4350-44bc-a33b-ed1b644be911",
+  "fields": {
+    "created_at": "2026-02-27T23:48:50.135Z",
+    "updated_at": "2026-02-27T23:48:50.135Z",
+    "codename": "public_profiles.analytics",
+    "name": "Analíticas Perfil",
+    "description": "Ver analíticas de perfiles públicos",
+    "resource": "public_profiles",
+    "action": "analytics"
+  }
+},
+{
+  "model": "rbac.permission",
+  "pk": "be4fe1d0-0d56-4368-9573-9a22ec1eab1d",
+  "fields": {
+    "created_at": "2026-02-27T23:48:50.063Z",
+    "updated_at": "2026-02-27T23:48:50.063Z",
+    "codename": "landing.publish",
+    "name": "Publicar Landing Pages",
+    "description": "Publicar o despublicar landing pages",
+    "resource": "landing",
+    "action": "publish"
+  }
+},
+{
+  "model": "rbac.permission",
+  "pk": "bfb1b6e2-ea15-4749-bb2c-fb5135809df4",
+  "fields": {
+    "created_at": "2026-02-27T23:48:50.003Z",
+    "updated_at": "2026-02-27T23:48:50.003Z",
+    "codename": "tasks.delete",
+    "name": "Eliminar Tareas",
+    "description": "Eliminar tareas",
+    "resource": "tasks",
+    "action": "delete"
+  }
+},
+{
+  "model": "rbac.permission",
+  "pk": "c3949913-67b0-4121-a3fb-528a12edb6d0",
+  "fields": {
+    "created_at": "2026-02-27T23:48:49.954Z",
+    "updated_at": "2026-02-27T23:48:49.954Z",
+    "codename": "users.invite",
+    "name": "Invitar Usuarios",
+    "description": "Enviar invitaciones a nuevos usuarios",
+    "resource": "users",
+    "action": "invite"
+  }
+},
+{
+  "model": "rbac.permission",
+  "pk": "c5481e72-ea4b-4d6f-9ff8-b0aa28ac5f8a",
+  "fields": {
+    "created_at": "2026-02-27T23:48:50.180Z",
+    "updated_at": "2026-02-27T23:48:50.180Z",
+    "codename": "customers.delete",
+    "name": "Eliminar Clientes",
+    "description": "Eliminar clientes del sistema",
+    "resource": "customers",
+    "action": "delete"
+  }
+},
+{
+  "model": "rbac.permission",
+  "pk": "c769fed2-e256-4513-8ba8-b8830c7be5ad",
+  "fields": {
+    "created_at": "2026-02-27T23:48:49.931Z",
+    "updated_at": "2026-02-27T23:48:49.931Z",
+    "codename": "users.create",
+    "name": "Crear Usuarios",
+    "description": "Crear nuevos usuarios en el tenant",
+    "resource": "users",
+    "action": "create"
+  }
+},
+{
+  "model": "rbac.permission",
+  "pk": "c83d165d-7311-4b4e-9f93-470891a8250c",
+  "fields": {
+    "created_at": "2026-02-27T23:48:50.102Z",
+    "updated_at": "2026-02-27T23:48:50.102Z",
+    "codename": "credentials.reveal",
+    "name": "Revelar Contraseñas",
+    "description": "Ver contraseñas y secretos en texto plano",
+    "resource": "credentials",
+    "action": "reveal"
+  }
+},
+{
+  "model": "rbac.permission",
+  "pk": "c94cd23c-e91e-4cf6-a9d7-2569685cc3d7",
+  "fields": {
+    "created_at": "2026-02-27T23:48:49.959Z",
+    "updated_at": "2026-02-27T23:48:49.959Z",
+    "codename": "roles.create",
+    "name": "Crear Roles",
+    "description": "Crear nuevos roles personalizados",
+    "resource": "roles",
+    "action": "create"
+  }
+},
+{
+  "model": "rbac.permission",
+  "pk": "ce936a41-4cfb-48df-a198-a595122ea888",
+  "fields": {
+    "created_at": "2026-02-27T23:48:50.082Z",
+    "updated_at": "2026-02-27T23:48:50.082Z",
+    "codename": "projects.update",
+    "name": "Editar Proyectos",
+    "description": "Editar proyectos existentes",
+    "resource": "projects",
+    "action": "update"
+  }
+},
+{
+  "model": "rbac.permission",
+  "pk": "e09aa348-15db-475d-9f20-0a5b7200cc9d",
+  "fields": {
+    "created_at": "2026-02-27T23:48:50.092Z",
+    "updated_at": "2026-02-27T23:48:50.092Z",
+    "codename": "projects.sections",
+    "name": "Gestionar Secciones",
+    "description": "Crear y eliminar secciones en proyectos",
+    "resource": "projects",
+    "action": "sections"
+  }
+},
+{
+  "model": "rbac.permission",
+  "pk": "e0e06738-d35e-45ab-ad24-ff6f8e8eb099",
+  "fields": {
+    "created_at": "2026-02-27T23:48:50.048Z",
+    "updated_at": "2026-02-27T23:48:50.048Z",
+    "codename": "calendar.sync",
+    "name": "Sincronizar Calendario",
+    "description": "Sincronizar con Google Calendar / iCal",
+    "resource": "calendar",
+    "action": "sync"
+  }
+},
+{
+  "model": "rbac.permission",
+  "pk": "e6a65243-f1b6-4f7e-9bb3-f20a31031da5",
+  "fields": {
+    "created_at": "2026-02-27T23:48:49.940Z",
+    "updated_at": "2026-02-27T23:48:49.940Z",
+    "codename": "users.read",
+    "name": "Ver Usuarios",
+    "description": "Ver lista y detalle de usuarios",
+    "resource": "users",
+    "action": "read"
+  }
+},
+{
+  "model": "rbac.permission",
+  "pk": "efe1b80d-c211-4523-952a-a99cb6fa597e",
+  "fields": {
+    "created_at": "2026-02-27T23:48:49.992Z",
+    "updated_at": "2026-02-27T23:48:49.992Z",
+    "codename": "tasks.read",
+    "name": "Ver Tareas",
+    "description": "Ver tareas propias y del equipo",
+    "resource": "tasks",
+    "action": "read"
+  }
+},
+{
+  "model": "rbac.permission",
+  "pk": "f7327550-957a-49f2-a739-e7bc89296c58",
+  "fields": {
+    "created_at": "2026-02-27T23:48:49.981Z",
+    "updated_at": "2026-02-27T23:48:49.981Z",
+    "codename": "roles.assign",
+    "name": "Asignar Roles",
+    "description": "Asignar o revocar roles a usuarios",
+    "resource": "roles",
+    "action": "assign"
+  }
+},
+{
+  "model": "rbac.permission",
+  "pk": "fab44583-5042-4ffd-9b83-03ee5e1578ed",
+  "fields": {
+    "created_at": "2026-02-27T23:48:50.028Z",
+    "updated_at": "2026-02-27T23:48:50.028Z",
+    "codename": "calendar.read",
+    "name": "Ver Calendario",
+    "description": "Ver eventos del calendario",
+    "resource": "calendar",
+    "action": "read"
+  }
+}
+]

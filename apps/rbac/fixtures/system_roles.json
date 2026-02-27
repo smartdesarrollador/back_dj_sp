@@ -1,0 +1,1671 @@
+
+{
+  "model": "rbac.role",
+  "pk": "26d83497-2658-4a9b-bf7e-4d261167cd79",
+  "fields": {
+    "created_at": "2026-02-27T23:48:53.188Z",
+    "updated_at": "2026-02-27T23:48:53.188Z",
+    "tenant": null,
+    "name": "Viewer",
+    "description": "Usuario de solo lectura. Puede ver recursos pero no modificarlos.",
+    "is_system_role": true,
+    "inherits_from": null
+  }
+},
+{
+  "model": "rbac.role",
+  "pk": "6432e0be-dd32-4036-877d-1d0728d479a5",
+  "fields": {
+    "created_at": "2026-02-27T23:48:50.692Z",
+    "updated_at": "2026-02-27T23:48:50.692Z",
+    "tenant": null,
+    "name": "Service Manager",
+    "description": "Gestión operativa del tenant. Sin acceso a facturación crítica ni configuración global.",
+    "is_system_role": true,
+    "inherits_from": null
+  }
+},
+{
+  "model": "rbac.role",
+  "pk": "e296c4b9-2097-40e7-afdb-242ad5d76fe9",
+  "fields": {
+    "created_at": "2026-02-27T23:48:53.034Z",
+    "updated_at": "2026-02-27T23:48:53.034Z",
+    "tenant": null,
+    "name": "Member",
+    "description": "Usuario operativo estándar. Acceso a tareas, calendario, proyectos y servicios digitales.",
+    "is_system_role": true,
+    "inherits_from": null
+  }
+},
+{
+  "model": "rbac.role",
+  "pk": "e813d436-0689-41e8-a207-4648631e6dba",
+  "fields": {
+    "created_at": "2026-02-27T23:48:50.254Z",
+    "updated_at": "2026-02-27T23:48:50.254Z",
+    "tenant": null,
+    "name": "Owner",
+    "description": "Control total del tenant. Acceso a todos los recursos y configuraciones.",
+    "is_system_role": true,
+    "inherits_from": null
+  }
+,
+{
+  "model": "rbac.rolepermission",
+  "pk": "014a941a-663c-4143-a07c-8b1d2a964135",
+  "fields": {
+    "created_at": "2026-02-27T23:48:50.697Z",
+    "updated_at": "2026-02-27T23:48:50.697Z",
+    "role": "6432e0be-dd32-4036-877d-1d0728d479a5",
+    "permission": "c769fed2-e256-4513-8ba8-b8830c7be5ad",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "05eb2e43-b356-44ef-9378-20fbb849d3c0",
+  "fields": {
+    "created_at": "2026-02-27T23:48:53.039Z",
+    "updated_at": "2026-02-27T23:48:53.039Z",
+    "role": "e296c4b9-2097-40e7-afdb-242ad5d76fe9",
+    "permission": "afac080c-bc33-4d96-a262-11fec79f7657",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "06e356eb-1772-465f-a065-c5824d07b526",
+  "fields": {
+    "created_at": "2026-02-27T23:48:50.818Z",
+    "updated_at": "2026-02-27T23:48:50.818Z",
+    "role": "6432e0be-dd32-4036-877d-1d0728d479a5",
+    "permission": "fab44583-5042-4ffd-9b83-03ee5e1578ed",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "078fc80d-7934-4e92-9d71-d243b8da6d3d",
+  "fields": {
+    "created_at": "2026-02-27T23:48:50.667Z",
+    "updated_at": "2026-02-27T23:48:50.667Z",
+    "role": "e813d436-0689-41e8-a207-4648631e6dba",
+    "permission": "8268423a-d8d2-4266-baec-a6df4388250a",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "07c69504-42ac-402e-a70f-72d9b3f64522",
+  "fields": {
+    "created_at": "2026-02-27T23:48:50.352Z",
+    "updated_at": "2026-02-27T23:48:50.352Z",
+    "role": "e813d436-0689-41e8-a207-4648631e6dba",
+    "permission": "7eee809c-4125-4459-bd0e-572164ce3de9",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "0a29aab6-1045-4ad4-ab23-cbdc941f0d64",
+  "fields": {
+    "created_at": "2026-02-27T23:48:52.998Z",
+    "updated_at": "2026-02-27T23:48:52.998Z",
+    "role": "6432e0be-dd32-4036-877d-1d0728d479a5",
+    "permission": "324bf959-efd6-484a-a5a0-97a4b7732e0d",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "0b4394b6-c397-4e58-b672-aa7c622d0563",
+  "fields": {
+    "created_at": "2026-02-27T23:48:53.003Z",
+    "updated_at": "2026-02-27T23:48:53.003Z",
+    "role": "6432e0be-dd32-4036-877d-1d0728d479a5",
+    "permission": "88cc7084-ee82-44a7-a61f-9451cf49e1a7",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "12c2ab17-d204-4c26-8316-bfe03b7d2c23",
+  "fields": {
+    "created_at": "2026-02-27T23:48:50.685Z",
+    "updated_at": "2026-02-27T23:48:50.685Z",
+    "role": "e813d436-0689-41e8-a207-4648631e6dba",
+    "permission": "afac080c-bc33-4d96-a262-11fec79f7657",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "12d2c695-e24a-4d1e-9db4-b3fb0fa706e6",
+  "fields": {
+    "created_at": "2026-02-27T23:48:53.169Z",
+    "updated_at": "2026-02-27T23:48:53.169Z",
+    "role": "e296c4b9-2097-40e7-afdb-242ad5d76fe9",
+    "permission": "b9e98338-4350-44bc-a33b-ed1b644be911",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "132a77d5-b035-4074-92b9-25c21ac02194",
+  "fields": {
+    "created_at": "2026-02-27T23:48:52.985Z",
+    "updated_at": "2026-02-27T23:48:52.985Z",
+    "role": "6432e0be-dd32-4036-877d-1d0728d479a5",
+    "permission": "227f3d43-61e9-4cb1-af70-8ba01e0eaaf9",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "14bebb16-e02f-48ed-89a1-9f68723870f6",
+  "fields": {
+    "created_at": "2026-02-27T23:48:50.265Z",
+    "updated_at": "2026-02-27T23:48:50.265Z",
+    "role": "e813d436-0689-41e8-a207-4648631e6dba",
+    "permission": "c769fed2-e256-4513-8ba8-b8830c7be5ad",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "155bad23-a1e1-48d4-95f6-a72f7b004196",
+  "fields": {
+    "created_at": "2026-02-27T23:48:53.194Z",
+    "updated_at": "2026-02-27T23:48:53.194Z",
+    "role": "26d83497-2658-4a9b-bf7e-4d261167cd79",
+    "permission": "afac080c-bc33-4d96-a262-11fec79f7657",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "1764e99d-8017-427f-a559-fee56afb8f0c",
+  "fields": {
+    "created_at": "2026-02-27T23:48:50.832Z",
+    "updated_at": "2026-02-27T23:48:50.833Z",
+    "role": "6432e0be-dd32-4036-877d-1d0728d479a5",
+    "permission": "5505d988-6483-4219-9b7d-f789195524bf",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "179528b2-a81a-4e5a-9e14-6291fd13c182",
+  "fields": {
+    "created_at": "2026-02-27T23:48:50.811Z",
+    "updated_at": "2026-02-27T23:48:50.811Z",
+    "role": "6432e0be-dd32-4036-877d-1d0728d479a5",
+    "permission": "ab2f3cf1-42ed-46e3-917f-36bf5505f9a0",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "18a77daf-bb8f-4af1-86a8-dbbf23f73f12",
+  "fields": {
+    "created_at": "2026-02-27T23:48:50.550Z",
+    "updated_at": "2026-02-27T23:48:50.550Z",
+    "role": "e813d436-0689-41e8-a207-4648631e6dba",
+    "permission": "8b5ea53b-e66c-472c-9f1e-9eab3044caf8",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "1b6758b1-8ddb-4b49-964c-8c48311b8504",
+  "fields": {
+    "created_at": "2026-02-27T23:48:53.175Z",
+    "updated_at": "2026-02-27T23:48:53.175Z",
+    "role": "e296c4b9-2097-40e7-afdb-242ad5d76fe9",
+    "permission": "b2dd1be9-084e-4636-a1b5-c8570f857baa",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "1c4fa3fd-97e8-4753-bb8f-feffc34aad5d",
+  "fields": {
+    "created_at": "2026-02-27T23:48:52.991Z",
+    "updated_at": "2026-02-27T23:48:52.991Z",
+    "role": "6432e0be-dd32-4036-877d-1d0728d479a5",
+    "permission": "34fb4247-7c7a-4922-a69e-35a7388731e0",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "1c65561b-4d85-42b2-8cde-9b7f3f27dda5",
+  "fields": {
+    "created_at": "2026-02-27T23:48:51.720Z",
+    "updated_at": "2026-02-27T23:48:51.720Z",
+    "role": "6432e0be-dd32-4036-877d-1d0728d479a5",
+    "permission": "c83d165d-7311-4b4e-9f93-470891a8250c",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "1d686a6f-e637-4e9c-96c5-163658b6bd66",
+  "fields": {
+    "created_at": "2026-02-27T23:48:50.752Z",
+    "updated_at": "2026-02-27T23:48:50.752Z",
+    "role": "6432e0be-dd32-4036-877d-1d0728d479a5",
+    "permission": "890323a1-af9e-466b-ad44-b069598265a2",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "20090bae-d115-4afa-98b9-95f123f2abf7",
+  "fields": {
+    "created_at": "2026-02-27T23:48:50.655Z",
+    "updated_at": "2026-02-27T23:48:50.655Z",
+    "role": "e813d436-0689-41e8-a207-4648631e6dba",
+    "permission": "3067b09c-d3b1-41c9-b3ab-e8cd582ea3b2",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "24c332b2-6a63-4548-8312-b336180c8060",
+  "fields": {
+    "created_at": "2026-02-27T23:48:50.774Z",
+    "updated_at": "2026-02-27T23:48:50.774Z",
+    "role": "6432e0be-dd32-4036-877d-1d0728d479a5",
+    "permission": "efe1b80d-c211-4523-952a-a99cb6fa597e",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "24c81990-86df-4cf2-a2ce-23e32b35e0e3",
+  "fields": {
+    "created_at": "2026-02-27T23:48:50.625Z",
+    "updated_at": "2026-02-27T23:48:50.625Z",
+    "role": "e813d436-0689-41e8-a207-4648631e6dba",
+    "permission": "227f3d43-61e9-4cb1-af70-8ba01e0eaaf9",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "261ece43-5f5d-4ccf-9eee-a6e7f1fe376f",
+  "fields": {
+    "created_at": "2026-02-27T23:48:50.339Z",
+    "updated_at": "2026-02-27T23:48:50.339Z",
+    "role": "e813d436-0689-41e8-a207-4648631e6dba",
+    "permission": "a6b825af-62f4-4091-9808-42a4b9542bf5",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "26979715-382b-41a3-8afa-af1dd66e71e5",
+  "fields": {
+    "created_at": "2026-02-27T23:48:50.281Z",
+    "updated_at": "2026-02-27T23:48:50.281Z",
+    "role": "e813d436-0689-41e8-a207-4648631e6dba",
+    "permission": "531b7fc5-f242-431c-812e-8ed8f8a6dd1d",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "2729850f-6bf5-4c05-8f31-669fc7d89241",
+  "fields": {
+    "created_at": "2026-02-27T23:48:50.567Z",
+    "updated_at": "2026-02-27T23:48:50.567Z",
+    "role": "e813d436-0689-41e8-a207-4648631e6dba",
+    "permission": "b9e98338-4350-44bc-a33b-ed1b644be911",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "284da87d-5530-4ddd-857a-f4a3771b0f6a",
+  "fields": {
+    "created_at": "2026-02-27T23:48:50.662Z",
+    "updated_at": "2026-02-27T23:48:50.662Z",
+    "role": "e813d436-0689-41e8-a207-4648631e6dba",
+    "permission": "56863625-2d9f-4fdb-93ea-becec13fc74c",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "28ca250a-9cee-468c-ab90-0db3a8ff501c",
+  "fields": {
+    "created_at": "2026-02-27T23:48:53.091Z",
+    "updated_at": "2026-02-27T23:48:53.091Z",
+    "role": "e296c4b9-2097-40e7-afdb-242ad5d76fe9",
+    "permission": "fab44583-5042-4ffd-9b83-03ee5e1578ed",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "2b9ea5a6-f9c0-468f-aa17-83161287063f",
+  "fields": {
+    "created_at": "2026-02-27T23:48:53.149Z",
+    "updated_at": "2026-02-27T23:48:53.149Z",
+    "role": "e296c4b9-2097-40e7-afdb-242ad5d76fe9",
+    "permission": "8b5ea53b-e66c-472c-9f1e-9eab3044caf8",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "2baa5938-2d55-424d-a4d9-cd881d034c65",
+  "fields": {
+    "created_at": "2026-02-27T23:48:53.246Z",
+    "updated_at": "2026-02-27T23:48:53.247Z",
+    "role": "26d83497-2658-4a9b-bf7e-4d261167cd79",
+    "permission": "b9e98338-4350-44bc-a33b-ed1b644be911",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "2bc7a5cc-c497-45b8-98f3-a5f3bf02a52c",
+  "fields": {
+    "created_at": "2026-02-27T23:48:50.632Z",
+    "updated_at": "2026-02-27T23:48:50.632Z",
+    "role": "e813d436-0689-41e8-a207-4648631e6dba",
+    "permission": "34fb4247-7c7a-4922-a69e-35a7388731e0",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "304ec448-5d66-4a43-a186-a33d6684ae36",
+  "fields": {
+    "created_at": "2026-02-27T23:48:50.618Z",
+    "updated_at": "2026-02-27T23:48:50.619Z",
+    "role": "e813d436-0689-41e8-a207-4648631e6dba",
+    "permission": "606a33ba-afe4-4aa5-9628-85c246e81d6a",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "31dd8c81-d2d5-415b-84de-6a23b39dab42",
+  "fields": {
+    "created_at": "2026-02-27T23:48:53.109Z",
+    "updated_at": "2026-02-27T23:48:53.109Z",
+    "role": "e296c4b9-2097-40e7-afdb-242ad5d76fe9",
+    "permission": "90c9d2b2-8ee0-4f54-a168-45f85243e3f4",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "337d9ae0-7c2c-48e9-a122-d0e1cd1aeac3",
+  "fields": {
+    "created_at": "2026-02-27T23:48:50.703Z",
+    "updated_at": "2026-02-27T23:48:50.703Z",
+    "role": "6432e0be-dd32-4036-877d-1d0728d479a5",
+    "permission": "e6a65243-f1b6-4f7e-9bb3-f20a31031da5",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "341b7f2d-7de2-4a22-a2c0-33e91644a331",
+  "fields": {
+    "created_at": "2026-02-27T23:48:50.332Z",
+    "updated_at": "2026-02-27T23:48:50.332Z",
+    "role": "e813d436-0689-41e8-a207-4648631e6dba",
+    "permission": "f7327550-957a-49f2-a739-e7bc89296c58",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "365da3d7-b5a3-433d-8f5a-f72707ecd2a8",
+  "fields": {
+    "created_at": "2026-02-27T23:48:53.200Z",
+    "updated_at": "2026-02-27T23:48:53.200Z",
+    "role": "26d83497-2658-4a9b-bf7e-4d261167cd79",
+    "permission": "efe1b80d-c211-4523-952a-a99cb6fa597e",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "379fda7d-f393-4d94-84b2-3657ab41feea",
+  "fields": {
+    "created_at": "2026-02-27T23:48:53.117Z",
+    "updated_at": "2026-02-27T23:48:53.117Z",
+    "role": "e296c4b9-2097-40e7-afdb-242ad5d76fe9",
+    "permission": "57fb25eb-376d-458b-8038-f56c8250f301",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "37e07b2a-4835-4e7f-b49f-9d2108e30656",
+  "fields": {
+    "created_at": "2026-02-27T23:48:53.212Z",
+    "updated_at": "2026-02-27T23:48:53.212Z",
+    "role": "26d83497-2658-4a9b-bf7e-4d261167cd79",
+    "permission": "57fb25eb-376d-458b-8038-f56c8250f301",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "3e15b21e-2ee4-4223-9a16-49d10045a4dd",
+  "fields": {
+    "created_at": "2026-02-27T23:48:53.129Z",
+    "updated_at": "2026-02-27T23:48:53.129Z",
+    "role": "e296c4b9-2097-40e7-afdb-242ad5d76fe9",
+    "permission": "0fb4b3b5-f337-4058-8739-028a42d2b686",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "3ee4303c-2b08-47c9-9ddf-2021e408e563",
+  "fields": {
+    "created_at": "2026-02-27T23:48:50.738Z",
+    "updated_at": "2026-02-27T23:48:50.738Z",
+    "role": "6432e0be-dd32-4036-877d-1d0728d479a5",
+    "permission": "2e23b198-0522-4f39-9103-dea766c55c3e",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "4009662c-c27b-4bb3-b6c1-a6bd65004980",
+  "fields": {
+    "created_at": "2026-02-27T23:48:53.182Z",
+    "updated_at": "2026-02-27T23:48:53.182Z",
+    "role": "e296c4b9-2097-40e7-afdb-242ad5d76fe9",
+    "permission": "56863625-2d9f-4fdb-93ea-becec13fc74c",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "40550287-a3a9-409a-9813-882442995fca",
+  "fields": {
+    "created_at": "2026-02-27T23:48:50.377Z",
+    "updated_at": "2026-02-27T23:48:50.377Z",
+    "role": "e813d436-0689-41e8-a207-4648631e6dba",
+    "permission": "9d1aef33-2512-41ca-b845-b53e63bbeb7d",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "40d86cd6-b6ac-490d-b7c2-712136cd5f2a",
+  "fields": {
+    "created_at": "2026-02-27T23:48:51.625Z",
+    "updated_at": "2026-02-27T23:48:51.625Z",
+    "role": "6432e0be-dd32-4036-877d-1d0728d479a5",
+    "permission": "4864dd0a-2363-4062-bbe3-9b244a270294",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "41d03b36-7981-4603-ae71-437c637b5e6e",
+  "fields": {
+    "created_at": "2026-02-27T23:48:53.103Z",
+    "updated_at": "2026-02-27T23:48:53.103Z",
+    "role": "e296c4b9-2097-40e7-afdb-242ad5d76fe9",
+    "permission": "5505d988-6483-4219-9b7d-f789195524bf",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "42e7fcfa-944b-4270-b01c-7769196a556f",
+  "fields": {
+    "created_at": "2026-02-27T23:48:53.045Z",
+    "updated_at": "2026-02-27T23:48:53.045Z",
+    "role": "e296c4b9-2097-40e7-afdb-242ad5d76fe9",
+    "permission": "a6b825af-62f4-4091-9808-42a4b9542bf5",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "43ce9b86-a70e-42dc-9eb0-d441dea77634",
+  "fields": {
+    "created_at": "2026-02-27T23:48:51.647Z",
+    "updated_at": "2026-02-27T23:48:51.647Z",
+    "role": "6432e0be-dd32-4036-877d-1d0728d479a5",
+    "permission": "99101626-fcfa-4716-a04a-9898b3f96827",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "44272383-b238-402e-95e6-0f6741c50959",
+  "fields": {
+    "created_at": "2026-02-27T23:48:50.607Z",
+    "updated_at": "2026-02-27T23:48:50.607Z",
+    "role": "e813d436-0689-41e8-a207-4648631e6dba",
+    "permission": "3d085463-e4fe-4a4f-861f-a0886b85a1df",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "45642839-16b3-4f12-b803-28128639952f",
+  "fields": {
+    "created_at": "2026-02-27T23:48:50.745Z",
+    "updated_at": "2026-02-27T23:48:50.745Z",
+    "role": "6432e0be-dd32-4036-877d-1d0728d479a5",
+    "permission": "558c86d5-2038-419b-a3a9-3f007f9fd2b3",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "4625f403-ba34-4fbb-a9dd-8246c3712356",
+  "fields": {
+    "created_at": "2026-02-27T23:48:50.562Z",
+    "updated_at": "2026-02-27T23:48:50.562Z",
+    "role": "e813d436-0689-41e8-a207-4648631e6dba",
+    "permission": "0a88892e-1eae-4eee-8abb-853327717376",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "46512e04-225b-480b-9102-e1cfb7628024",
+  "fields": {
+    "created_at": "2026-02-27T23:48:50.804Z",
+    "updated_at": "2026-02-27T23:48:50.804Z",
+    "role": "6432e0be-dd32-4036-877d-1d0728d479a5",
+    "permission": "9d1aef33-2512-41ca-b845-b53e63bbeb7d",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "47060326-f6a6-4e25-ac49-e27e6ad38b77",
+  "fields": {
+    "created_at": "2026-02-27T23:48:51.632Z",
+    "updated_at": "2026-02-27T23:48:51.632Z",
+    "role": "6432e0be-dd32-4036-877d-1d0728d479a5",
+    "permission": "e0e06738-d35e-45ab-ad24-ff6f8e8eb099",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "478a3dc0-cd5a-4c03-8f87-e51ee8f168b6",
+  "fields": {
+    "created_at": "2026-02-27T23:48:50.429Z",
+    "updated_at": "2026-02-27T23:48:50.429Z",
+    "role": "e813d436-0689-41e8-a207-4648631e6dba",
+    "permission": "e0e06738-d35e-45ab-ad24-ff6f8e8eb099",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "48026c4c-ccd1-477c-b2f9-ea20e0512bb8",
+  "fields": {
+    "created_at": "2026-02-27T23:48:52.963Z",
+    "updated_at": "2026-02-27T23:48:52.963Z",
+    "role": "6432e0be-dd32-4036-877d-1d0728d479a5",
+    "permission": "b9e98338-4350-44bc-a33b-ed1b644be911",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "48aeb19e-f117-45e6-827e-951e83c4142f",
+  "fields": {
+    "created_at": "2026-02-27T23:48:51.682Z",
+    "updated_at": "2026-02-27T23:48:51.682Z",
+    "role": "6432e0be-dd32-4036-877d-1d0728d479a5",
+    "permission": "90c9d2b2-8ee0-4f54-a168-45f85243e3f4",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "497a7732-7efa-4664-bd63-9eb0139b037e",
+  "fields": {
+    "created_at": "2026-02-27T23:48:50.295Z",
+    "updated_at": "2026-02-27T23:48:50.295Z",
+    "role": "e813d436-0689-41e8-a207-4648631e6dba",
+    "permission": "c3949913-67b0-4121-a3fb-528a12edb6d0",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "4b9c2397-a794-46d7-819d-dfb54b80d393",
+  "fields": {
+    "created_at": "2026-02-27T23:48:53.223Z",
+    "updated_at": "2026-02-27T23:48:53.223Z",
+    "role": "26d83497-2658-4a9b-bf7e-4d261167cd79",
+    "permission": "5155e8b7-ea1c-468c-bf1e-39d5e63a6425",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "4c5b5639-5cda-4a1c-a354-ac86a3106f18",
+  "fields": {
+    "created_at": "2026-02-27T23:48:50.310Z",
+    "updated_at": "2026-02-27T23:48:50.310Z",
+    "role": "e813d436-0689-41e8-a207-4648631e6dba",
+    "permission": "2e23b198-0522-4f39-9103-dea766c55c3e",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "4f40aaa9-172c-4d46-8942-28bde5cc39a8",
+  "fields": {
+    "created_at": "2026-02-27T23:48:50.303Z",
+    "updated_at": "2026-02-27T23:48:50.303Z",
+    "role": "e813d436-0689-41e8-a207-4648631e6dba",
+    "permission": "c94cd23c-e91e-4cf6-a9d7-2569685cc3d7",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "4ff7ed9e-a873-44ad-a30d-b2942b6c6b60",
+  "fields": {
+    "created_at": "2026-02-27T23:48:50.572Z",
+    "updated_at": "2026-02-27T23:48:50.572Z",
+    "role": "e813d436-0689-41e8-a207-4648631e6dba",
+    "permission": "b2dd1be9-084e-4636-a1b5-c8570f857baa",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "5294c683-6c86-4b0c-aca9-60e2096f07aa",
+  "fields": {
+    "created_at": "2026-02-27T23:48:53.022Z",
+    "updated_at": "2026-02-27T23:48:53.022Z",
+    "role": "6432e0be-dd32-4036-877d-1d0728d479a5",
+    "permission": "069d3bba-a357-43bf-a1ab-a83227849252",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "5303df05-236a-457f-a5e9-cd1697f2cdab",
+  "fields": {
+    "created_at": "2026-02-27T23:48:50.730Z",
+    "updated_at": "2026-02-27T23:48:50.730Z",
+    "role": "6432e0be-dd32-4036-877d-1d0728d479a5",
+    "permission": "c94cd23c-e91e-4cf6-a9d7-2569685cc3d7",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "53361611-9693-465c-a988-a832f1949647",
+  "fields": {
+    "created_at": "2026-02-27T23:48:50.499Z",
+    "updated_at": "2026-02-27T23:48:50.499Z",
+    "role": "e813d436-0689-41e8-a207-4648631e6dba",
+    "permission": "57fb25eb-376d-458b-8038-f56c8250f301",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "548d899f-cce0-4277-b304-bb5018daea51",
+  "fields": {
+    "created_at": "2026-02-27T23:48:53.057Z",
+    "updated_at": "2026-02-27T23:48:53.057Z",
+    "role": "e296c4b9-2097-40e7-afdb-242ad5d76fe9",
+    "permission": "7eee809c-4125-4459-bd0e-572164ce3de9",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "5b5edced-884c-4ab0-bce8-713dc27b6cc3",
+  "fields": {
+    "created_at": "2026-02-27T23:48:50.533Z",
+    "updated_at": "2026-02-27T23:48:50.533Z",
+    "role": "e813d436-0689-41e8-a207-4648631e6dba",
+    "permission": "c83d165d-7311-4b4e-9f93-470891a8250c",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "6031b3c7-01f3-485e-ad7b-818eb4913e9b",
+  "fields": {
+    "created_at": "2026-02-27T23:48:53.234Z",
+    "updated_at": "2026-02-27T23:48:53.234Z",
+    "role": "26d83497-2658-4a9b-bf7e-4d261167cd79",
+    "permission": "41b2f34b-83d3-49c2-b9a3-49bacabd3488",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "6072a984-7850-4745-b5bb-bfcc95c2c7cf",
+  "fields": {
+    "created_at": "2026-02-27T23:48:50.785Z",
+    "updated_at": "2026-02-27T23:48:50.785Z",
+    "role": "6432e0be-dd32-4036-877d-1d0728d479a5",
+    "permission": "bfb1b6e2-ea15-4749-bb2c-fb5135809df4",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "618a48a8-9de7-488a-bbce-f3e1f7592de0",
+  "fields": {
+    "created_at": "2026-02-27T23:48:51.688Z",
+    "updated_at": "2026-02-27T23:48:51.688Z",
+    "role": "6432e0be-dd32-4036-877d-1d0728d479a5",
+    "permission": "57fb25eb-376d-458b-8038-f56c8250f301",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "63478e8e-0dbc-490d-95d2-6f46d15bd5d4",
+  "fields": {
+    "created_at": "2026-02-27T23:48:52.944Z",
+    "updated_at": "2026-02-27T23:48:52.944Z",
+    "role": "6432e0be-dd32-4036-877d-1d0728d479a5",
+    "permission": "8b5ea53b-e66c-472c-9f1e-9eab3044caf8",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "6a83c9b9-812f-46f9-b47f-e3aedee0c6e1",
+  "fields": {
+    "created_at": "2026-02-27T23:48:53.052Z",
+    "updated_at": "2026-02-27T23:48:53.052Z",
+    "role": "e296c4b9-2097-40e7-afdb-242ad5d76fe9",
+    "permission": "efe1b80d-c211-4523-952a-a99cb6fa597e",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "6cee6777-3236-47a3-b1ac-5d9efc083deb",
+  "fields": {
+    "created_at": "2026-02-27T23:48:50.766Z",
+    "updated_at": "2026-02-27T23:48:50.766Z",
+    "role": "6432e0be-dd32-4036-877d-1d0728d479a5",
+    "permission": "a6b825af-62f4-4091-9808-42a4b9542bf5",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "6d20b462-946b-42a2-9072-72c9bb77f191",
+  "fields": {
+    "created_at": "2026-02-27T23:48:53.069Z",
+    "updated_at": "2026-02-27T23:48:53.069Z",
+    "role": "e296c4b9-2097-40e7-afdb-242ad5d76fe9",
+    "permission": "94f0c90b-833b-4b2d-a6a7-dc5df51736a3",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "6eab8574-bc61-442b-9dbb-1a3bc1745293",
+  "fields": {
+    "created_at": "2026-02-27T23:48:50.273Z",
+    "updated_at": "2026-02-27T23:48:50.273Z",
+    "role": "e813d436-0689-41e8-a207-4648631e6dba",
+    "permission": "e6a65243-f1b6-4f7e-9bb3-f20a31031da5",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "6ee85175-b6f1-402c-b35d-10788c77149b",
+  "fields": {
+    "created_at": "2026-02-27T23:48:53.136Z",
+    "updated_at": "2026-02-27T23:48:53.136Z",
+    "role": "e296c4b9-2097-40e7-afdb-242ad5d76fe9",
+    "permission": "c83d165d-7311-4b4e-9f93-470891a8250c",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "6fb0712f-cb56-4c92-9766-aac04bbe885f",
+  "fields": {
+    "created_at": "2026-02-27T23:48:50.386Z",
+    "updated_at": "2026-02-27T23:48:50.386Z",
+    "role": "e813d436-0689-41e8-a207-4648631e6dba",
+    "permission": "ab2f3cf1-42ed-46e3-917f-36bf5505f9a0",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "72695856-0bde-4629-bdb1-bd305035eb01",
+  "fields": {
+    "created_at": "2026-02-27T23:48:52.979Z",
+    "updated_at": "2026-02-27T23:48:52.979Z",
+    "role": "6432e0be-dd32-4036-877d-1d0728d479a5",
+    "permission": "7ab942e8-84f2-4131-8ab1-35ec706684af",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "74106c24-3793-4a4f-b6cb-900c3a9efcbd",
+  "fields": {
+    "created_at": "2026-02-27T23:48:51.675Z",
+    "updated_at": "2026-02-27T23:48:51.675Z",
+    "role": "6432e0be-dd32-4036-877d-1d0728d479a5",
+    "permission": "5c31c526-d6e2-42f8-93e9-8cd6830185a9",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "74428478-4b0a-4d5b-ac5a-66a01ee4ab56",
+  "fields": {
+    "created_at": "2026-02-27T23:48:50.365Z",
+    "updated_at": "2026-02-27T23:48:50.365Z",
+    "role": "e813d436-0689-41e8-a207-4648631e6dba",
+    "permission": "94f0c90b-833b-4b2d-a6a7-dc5df51736a3",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "75da0de1-420d-40ae-98d8-970c77a52d07",
+  "fields": {
+    "created_at": "2026-02-27T23:48:50.464Z",
+    "updated_at": "2026-02-27T23:48:50.464Z",
+    "role": "e813d436-0689-41e8-a207-4648631e6dba",
+    "permission": "be4fe1d0-0d56-4368-9573-9a22ec1eab1d",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "777f9b2c-2b21-48cf-be8e-587791db1847",
+  "fields": {
+    "created_at": "2026-02-27T23:48:50.720Z",
+    "updated_at": "2026-02-27T23:48:50.720Z",
+    "role": "6432e0be-dd32-4036-877d-1d0728d479a5",
+    "permission": "3e8fc81a-7387-4103-97f8-a94906ad35c2",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "7d2719d2-c6e2-4856-8056-097b1454addf",
+  "fields": {
+    "created_at": "2026-02-27T23:48:50.779Z",
+    "updated_at": "2026-02-27T23:48:50.779Z",
+    "role": "6432e0be-dd32-4036-877d-1d0728d479a5",
+    "permission": "7eee809c-4125-4459-bd0e-572164ce3de9",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "7d9da9f8-8ff2-452e-a95f-7d4eb64ad46f",
+  "fields": {
+    "created_at": "2026-02-27T23:48:50.556Z",
+    "updated_at": "2026-02-27T23:48:50.556Z",
+    "role": "e813d436-0689-41e8-a207-4648631e6dba",
+    "permission": "41b2f34b-83d3-49c2-b9a3-49bacabd3488",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "8173998b-e4b6-48be-ac69-bc30b8558a9b",
+  "fields": {
+    "created_at": "2026-02-27T23:48:53.142Z",
+    "updated_at": "2026-02-27T23:48:53.142Z",
+    "role": "e296c4b9-2097-40e7-afdb-242ad5d76fe9",
+    "permission": "5155e8b7-ea1c-468c-bf1e-39d5e63a6425",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "82f14078-ec39-4a2a-b8c6-c5e3075a3775",
+  "fields": {
+    "created_at": "2026-02-27T23:48:50.490Z",
+    "updated_at": "2026-02-27T23:48:50.490Z",
+    "role": "e813d436-0689-41e8-a207-4648631e6dba",
+    "permission": "90c9d2b2-8ee0-4f54-a168-45f85243e3f4",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "83c980df-8fa3-4a19-9b93-d2c73c6af61e",
+  "fields": {
+    "created_at": "2026-02-27T23:48:50.680Z",
+    "updated_at": "2026-02-27T23:48:50.680Z",
+    "role": "e813d436-0689-41e8-a207-4648631e6dba",
+    "permission": "a5f6f596-cfef-4ca8-95f5-a15c5d796bf3",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "844bb597-0226-4e9c-af65-33dd1b94b1ed",
+  "fields": {
+    "created_at": "2026-02-27T23:48:50.506Z",
+    "updated_at": "2026-02-27T23:48:50.507Z",
+    "role": "e813d436-0689-41e8-a207-4648631e6dba",
+    "permission": "ce936a41-4cfb-48df-a198-a595122ea888",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "84cb26fa-bac4-4fb5-90a6-ed6b8aa2d9b3",
+  "fields": {
+    "created_at": "2026-02-27T23:48:50.455Z",
+    "updated_at": "2026-02-27T23:48:50.455Z",
+    "role": "e813d436-0689-41e8-a207-4648631e6dba",
+    "permission": "942d06d8-16c0-4563-a818-326cf62515ba",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "8537d3bf-f215-40d3-a6ae-cf54a4d2c5bb",
+  "fields": {
+    "created_at": "2026-02-27T23:48:51.663Z",
+    "updated_at": "2026-02-27T23:48:51.663Z",
+    "role": "6432e0be-dd32-4036-877d-1d0728d479a5",
+    "permission": "be4fe1d0-0d56-4368-9573-9a22ec1eab1d",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "8656edf0-a4ff-44f8-a59a-95749ca73705",
+  "fields": {
+    "created_at": "2026-02-27T23:48:51.694Z",
+    "updated_at": "2026-02-27T23:48:51.694Z",
+    "role": "6432e0be-dd32-4036-877d-1d0728d479a5",
+    "permission": "ce936a41-4cfb-48df-a198-a595122ea888",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "86a73e33-2a2f-47f1-9525-2e09b0963db9",
+  "fields": {
+    "created_at": "2026-02-27T23:48:50.613Z",
+    "updated_at": "2026-02-27T23:48:50.613Z",
+    "role": "e813d436-0689-41e8-a207-4648631e6dba",
+    "permission": "c5481e72-ea4b-4d6f-9ff8-b0aa28ac5f8a",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "88d34aae-5399-4264-ba45-64cd11385a22",
+  "fields": {
+    "created_at": "2026-02-27T23:48:53.218Z",
+    "updated_at": "2026-02-27T23:48:53.218Z",
+    "role": "26d83497-2658-4a9b-bf7e-4d261167cd79",
+    "permission": "99101626-fcfa-4716-a04a-9898b3f96827",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "8a52fcbf-a963-44da-9682-95f9ade3c5c0",
+  "fields": {
+    "created_at": "2026-02-27T23:48:50.482Z",
+    "updated_at": "2026-02-27T23:48:50.482Z",
+    "role": "e813d436-0689-41e8-a207-4648631e6dba",
+    "permission": "5c31c526-d6e2-42f8-93e9-8cd6830185a9",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "8d0deef9-fd14-412e-9e8e-65163062375a",
+  "fields": {
+    "created_at": "2026-02-27T23:48:50.797Z",
+    "updated_at": "2026-02-27T23:48:50.797Z",
+    "role": "6432e0be-dd32-4036-877d-1d0728d479a5",
+    "permission": "10aa33d6-f6a2-475a-a7e1-bda137612e9c",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "8d91faad-aa7f-4e5e-a7ef-a84b4ea7cbd1",
+  "fields": {
+    "created_at": "2026-02-27T23:48:51.638Z",
+    "updated_at": "2026-02-27T23:48:51.638Z",
+    "role": "6432e0be-dd32-4036-877d-1d0728d479a5",
+    "permission": "4ca46241-61a2-4014-b9f5-93ba59868ed9",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "8e6a4674-4a2f-45c7-9e4e-fdf9ed336946",
+  "fields": {
+    "created_at": "2026-02-27T23:48:53.162Z",
+    "updated_at": "2026-02-27T23:48:53.162Z",
+    "role": "e296c4b9-2097-40e7-afdb-242ad5d76fe9",
+    "permission": "0a88892e-1eae-4eee-8abb-853327717376",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "8eb48ebb-a5fa-4084-a9cd-308747d1923f",
+  "fields": {
+    "created_at": "2026-02-27T23:48:50.538Z",
+    "updated_at": "2026-02-27T23:48:50.538Z",
+    "role": "e813d436-0689-41e8-a207-4648631e6dba",
+    "permission": "6b67db87-355e-4c79-bb1d-c3de4bf250bb",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "8ed3df42-3956-4c04-a8ab-8c068842f5ea",
+  "fields": {
+    "created_at": "2026-02-27T23:48:52.949Z",
+    "updated_at": "2026-02-27T23:48:52.949Z",
+    "role": "6432e0be-dd32-4036-877d-1d0728d479a5",
+    "permission": "41b2f34b-83d3-49c2-b9a3-49bacabd3488",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "94e66325-e621-498c-a3ef-733ec9846f5d",
+  "fields": {
+    "created_at": "2026-02-27T23:48:50.791Z",
+    "updated_at": "2026-02-27T23:48:50.791Z",
+    "role": "6432e0be-dd32-4036-877d-1d0728d479a5",
+    "permission": "94f0c90b-833b-4b2d-a6a7-dc5df51736a3",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "96c6b660-c347-4d28-93b9-de53a30dc270",
+  "fields": {
+    "created_at": "2026-02-27T23:48:53.064Z",
+    "updated_at": "2026-02-27T23:48:53.064Z",
+    "role": "e296c4b9-2097-40e7-afdb-242ad5d76fe9",
+    "permission": "bfb1b6e2-ea15-4749-bb2c-fb5135809df4",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "9844faa1-1022-4537-bb9f-fcc73907e5d2",
+  "fields": {
+    "created_at": "2026-02-27T23:48:50.544Z",
+    "updated_at": "2026-02-27T23:48:50.544Z",
+    "role": "e813d436-0689-41e8-a207-4648631e6dba",
+    "permission": "5155e8b7-ea1c-468c-bf1e-39d5e63a6425",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "9a672c2c-daae-419c-b21b-9ffc21410a18",
+  "fields": {
+    "created_at": "2026-02-27T23:48:51.669Z",
+    "updated_at": "2026-02-27T23:48:51.669Z",
+    "role": "6432e0be-dd32-4036-877d-1d0728d479a5",
+    "permission": "1c51b9c0-1004-4e89-891e-0cd7d4651cae",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "9b418340-722b-4824-b265-29f7cf8d0cf0",
+  "fields": {
+    "created_at": "2026-02-27T23:48:50.725Z",
+    "updated_at": "2026-02-27T23:48:50.725Z",
+    "role": "6432e0be-dd32-4036-877d-1d0728d479a5",
+    "permission": "c3949913-67b0-4121-a3fb-528a12edb6d0",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "a05fcb1e-dc39-4092-b69e-3efe4a712f49",
+  "fields": {
+    "created_at": "2026-02-27T23:48:50.473Z",
+    "updated_at": "2026-02-27T23:48:50.473Z",
+    "role": "e813d436-0689-41e8-a207-4648631e6dba",
+    "permission": "1c51b9c0-1004-4e89-891e-0cd7d4651cae",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "a1558689-86be-44f3-be07-2ebc233e3329",
+  "fields": {
+    "created_at": "2026-02-27T23:48:50.447Z",
+    "updated_at": "2026-02-27T23:48:50.447Z",
+    "role": "e813d436-0689-41e8-a207-4648631e6dba",
+    "permission": "99101626-fcfa-4716-a04a-9898b3f96827",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "a1ce2cbf-f702-4924-8e5c-7f963213ff7a",
+  "fields": {
+    "created_at": "2026-02-27T23:48:51.713Z",
+    "updated_at": "2026-02-27T23:48:51.713Z",
+    "role": "6432e0be-dd32-4036-877d-1d0728d479a5",
+    "permission": "0fb4b3b5-f337-4058-8739-028a42d2b686",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "a78d6462-255a-4ced-ba50-6df9e754ab9d",
+  "fields": {
+    "created_at": "2026-02-27T23:48:50.404Z",
+    "updated_at": "2026-02-27T23:48:50.404Z",
+    "role": "e813d436-0689-41e8-a207-4648631e6dba",
+    "permission": "0c6a982f-a8d0-47f0-a5c9-a6b8ca7825b5",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "a7fb1d38-9bf6-4215-b91f-85f64f81a163",
+  "fields": {
+    "created_at": "2026-02-27T23:48:53.084Z",
+    "updated_at": "2026-02-27T23:48:53.084Z",
+    "role": "e296c4b9-2097-40e7-afdb-242ad5d76fe9",
+    "permission": "ab2f3cf1-42ed-46e3-917f-36bf5505f9a0",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "ac354ea4-2c05-4909-afdf-d70b909e274c",
+  "fields": {
+    "created_at": "2026-02-27T23:48:50.358Z",
+    "updated_at": "2026-02-27T23:48:50.358Z",
+    "role": "e813d436-0689-41e8-a207-4648631e6dba",
+    "permission": "bfb1b6e2-ea15-4749-bb2c-fb5135809df4",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "aeecacb7-d750-424e-a74f-06c2127fb4fd",
+  "fields": {
+    "created_at": "2026-02-27T23:48:50.578Z",
+    "updated_at": "2026-02-27T23:48:50.578Z",
+    "role": "e813d436-0689-41e8-a207-4648631e6dba",
+    "permission": "65f883bc-e72f-4706-9563-b96d610004d8",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "b0963325-513c-43e2-9157-9fc5f1b09897",
+  "fields": {
+    "created_at": "2026-02-27T23:48:50.650Z",
+    "updated_at": "2026-02-27T23:48:50.650Z",
+    "role": "e813d436-0689-41e8-a207-4648631e6dba",
+    "permission": "88cc7084-ee82-44a7-a61f-9451cf49e1a7",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "b21a9aad-2d9d-4067-8b01-65bed3a9b5be",
+  "fields": {
+    "created_at": "2026-02-27T23:48:53.206Z",
+    "updated_at": "2026-02-27T23:48:53.206Z",
+    "role": "26d83497-2658-4a9b-bf7e-4d261167cd79",
+    "permission": "fab44583-5042-4ffd-9b83-03ee5e1578ed",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "b3ad398d-fcaa-4b3d-9c56-7a09435168f7",
+  "fields": {
+    "created_at": "2026-02-27T23:48:53.016Z",
+    "updated_at": "2026-02-27T23:48:53.016Z",
+    "role": "6432e0be-dd32-4036-877d-1d0728d479a5",
+    "permission": "56863625-2d9f-4fdb-93ea-becec13fc74c",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "b4311c82-b690-456e-bdd7-0d5821bb081b",
+  "fields": {
+    "created_at": "2026-02-27T23:48:53.229Z",
+    "updated_at": "2026-02-27T23:48:53.229Z",
+    "role": "26d83497-2658-4a9b-bf7e-4d261167cd79",
+    "permission": "8b5ea53b-e66c-472c-9f1e-9eab3044caf8",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "b5002bba-75bb-48c8-aceb-3374899e6261",
+  "fields": {
+    "created_at": "2026-02-27T23:48:53.124Z",
+    "updated_at": "2026-02-27T23:48:53.124Z",
+    "role": "e296c4b9-2097-40e7-afdb-242ad5d76fe9",
+    "permission": "ce936a41-4cfb-48df-a198-a595122ea888",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "b7d9de40-8249-4f9a-b354-017d4a6e23a4",
+  "fields": {
+    "created_at": "2026-02-27T23:48:50.318Z",
+    "updated_at": "2026-02-27T23:48:50.318Z",
+    "role": "e813d436-0689-41e8-a207-4648631e6dba",
+    "permission": "558c86d5-2038-419b-a3a9-3f007f9fd2b3",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "b8342706-7f82-4dcc-809c-e2925fe58b8d",
+  "fields": {
+    "created_at": "2026-02-27T23:48:50.412Z",
+    "updated_at": "2026-02-27T23:48:50.412Z",
+    "role": "e813d436-0689-41e8-a207-4648631e6dba",
+    "permission": "5505d988-6483-4219-9b7d-f789195524bf",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "bcb466e6-f4b1-4a6b-9d70-ebd97a941c18",
+  "fields": {
+    "created_at": "2026-02-27T23:48:50.674Z",
+    "updated_at": "2026-02-27T23:48:50.674Z",
+    "role": "e813d436-0689-41e8-a207-4648631e6dba",
+    "permission": "069d3bba-a357-43bf-a1ab-a83227849252",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "bd99cb07-de0b-4c75-866e-4efb11dbd043",
+  "fields": {
+    "created_at": "2026-02-27T23:48:53.240Z",
+    "updated_at": "2026-02-27T23:48:53.240Z",
+    "role": "26d83497-2658-4a9b-bf7e-4d261167cd79",
+    "permission": "0a88892e-1eae-4eee-8abb-853327717376",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "bfcf0d36-b181-421b-b9af-253a03989c1d",
+  "fields": {
+    "created_at": "2026-02-27T23:48:50.527Z",
+    "updated_at": "2026-02-27T23:48:50.527Z",
+    "role": "e813d436-0689-41e8-a207-4648631e6dba",
+    "permission": "0fb4b3b5-f337-4058-8739-028a42d2b686",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "c16859a0-e9c0-4c20-a4e7-4acacc6f89b0",
+  "fields": {
+    "created_at": "2026-02-27T23:48:50.596Z",
+    "updated_at": "2026-02-27T23:48:50.596Z",
+    "role": "e813d436-0689-41e8-a207-4648631e6dba",
+    "permission": "7ab942e8-84f2-4131-8ab1-35ec706684af",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "c4353947-dd77-40fe-bfd7-93e0161aeb38",
+  "fields": {
+    "created_at": "2026-02-27T23:48:50.826Z",
+    "updated_at": "2026-02-27T23:48:50.826Z",
+    "role": "6432e0be-dd32-4036-877d-1d0728d479a5",
+    "permission": "0c6a982f-a8d0-47f0-a5c9-a6b8ca7825b5",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "c92e0575-1260-4ea6-ac6e-acf073b42bab",
+  "fields": {
+    "created_at": "2026-02-27T23:48:50.584Z",
+    "updated_at": "2026-02-27T23:48:50.584Z",
+    "role": "e813d436-0689-41e8-a207-4648631e6dba",
+    "permission": "38978c49-df3b-4266-b2b3-0c7fb0e4f45c",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "ca8038a3-71ff-40ef-b0ff-5aee29dadb34",
+  "fields": {
+    "created_at": "2026-02-27T23:48:53.027Z",
+    "updated_at": "2026-02-27T23:48:53.027Z",
+    "role": "6432e0be-dd32-4036-877d-1d0728d479a5",
+    "permission": "afac080c-bc33-4d96-a262-11fec79f7657",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "ca9407ab-b858-486e-b9fc-4e485d79518b",
+  "fields": {
+    "created_at": "2026-02-27T23:48:52.971Z",
+    "updated_at": "2026-02-27T23:48:52.971Z",
+    "role": "6432e0be-dd32-4036-877d-1d0728d479a5",
+    "permission": "b2dd1be9-084e-4636-a1b5-c8570f857baa",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "cb37b482-a5c4-4f04-8d18-feb3e1d6a15c",
+  "fields": {
+    "created_at": "2026-02-27T23:48:50.601Z",
+    "updated_at": "2026-02-27T23:48:50.601Z",
+    "role": "e813d436-0689-41e8-a207-4648631e6dba",
+    "permission": "2e8d0eec-e042-465d-bd2a-5a53d2dc84c0",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "cc76029f-48c6-409e-954c-fbcadbcd4fcf",
+  "fields": {
+    "created_at": "2026-02-27T23:48:53.010Z",
+    "updated_at": "2026-02-27T23:48:53.010Z",
+    "role": "6432e0be-dd32-4036-877d-1d0728d479a5",
+    "permission": "3067b09c-d3b1-41c9-b3ab-e8cd582ea3b2",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "d585a2cb-ff3b-4835-ae51-0f5480d38bd4",
+  "fields": {
+    "created_at": "2026-02-27T23:48:51.708Z",
+    "updated_at": "2026-02-27T23:48:51.708Z",
+    "role": "6432e0be-dd32-4036-877d-1d0728d479a5",
+    "permission": "e09aa348-15db-475d-9f20-0a5b7200cc9d",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "d6ec03fd-8b5d-40b9-afd8-a3437dbb4129",
+  "fields": {
+    "created_at": "2026-02-27T23:48:51.701Z",
+    "updated_at": "2026-02-27T23:48:51.701Z",
+    "role": "6432e0be-dd32-4036-877d-1d0728d479a5",
+    "permission": "667c8984-05e5-43fd-a311-066e5c2df6e8",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "d7128062-652a-4c9c-9f62-ede928bd485a",
+  "fields": {
+    "created_at": "2026-02-27T23:48:50.288Z",
+    "updated_at": "2026-02-27T23:48:50.288Z",
+    "role": "e813d436-0689-41e8-a207-4648631e6dba",
+    "permission": "3e8fc81a-7387-4103-97f8-a94906ad35c2",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "d9b9f575-98f8-450e-8fd1-565cf9fe7bde",
+  "fields": {
+    "created_at": "2026-02-27T23:48:52.938Z",
+    "updated_at": "2026-02-27T23:48:52.938Z",
+    "role": "6432e0be-dd32-4036-877d-1d0728d479a5",
+    "permission": "5155e8b7-ea1c-468c-bf1e-39d5e63a6425",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "da7d9922-381a-440c-ac15-9885525112f9",
+  "fields": {
+    "created_at": "2026-02-27T23:48:50.326Z",
+    "updated_at": "2026-02-27T23:48:50.326Z",
+    "role": "e813d436-0689-41e8-a207-4648631e6dba",
+    "permission": "890323a1-af9e-466b-ad44-b069598265a2",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "dcc244b7-b722-42a6-a083-15129b7e7717",
+  "fields": {
+    "created_at": "2026-02-27T23:48:53.076Z",
+    "updated_at": "2026-02-27T23:48:53.076Z",
+    "role": "e296c4b9-2097-40e7-afdb-242ad5d76fe9",
+    "permission": "9d1aef33-2512-41ca-b845-b53e63bbeb7d",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "dd384adc-1673-4dee-8b57-fd8f3acf03a8",
+  "fields": {
+    "created_at": "2026-02-27T23:48:50.371Z",
+    "updated_at": "2026-02-27T23:48:50.371Z",
+    "role": "e813d436-0689-41e8-a207-4648631e6dba",
+    "permission": "10aa33d6-f6a2-475a-a7e1-bda137612e9c",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "dd587ae5-52a3-4fd0-9b66-c366cfbd57da",
+  "fields": {
+    "created_at": "2026-02-27T23:48:50.395Z",
+    "updated_at": "2026-02-27T23:48:50.395Z",
+    "role": "e813d436-0689-41e8-a207-4648631e6dba",
+    "permission": "fab44583-5042-4ffd-9b83-03ee5e1578ed",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "e7707e1f-667f-4df6-8ca7-8b8c4ec848c4",
+  "fields": {
+    "created_at": "2026-02-27T23:48:53.097Z",
+    "updated_at": "2026-02-27T23:48:53.097Z",
+    "role": "e296c4b9-2097-40e7-afdb-242ad5d76fe9",
+    "permission": "0c6a982f-a8d0-47f0-a5c9-a6b8ca7825b5",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "e9020e54-a0ea-4ced-856f-529d23186f2c",
+  "fields": {
+    "created_at": "2026-02-27T23:48:50.346Z",
+    "updated_at": "2026-02-27T23:48:50.346Z",
+    "role": "e813d436-0689-41e8-a207-4648631e6dba",
+    "permission": "efe1b80d-c211-4523-952a-a99cb6fa597e",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "e99bc761-84f3-4faf-bdc9-caf50413d7ed",
+  "fields": {
+    "created_at": "2026-02-27T23:48:50.644Z",
+    "updated_at": "2026-02-27T23:48:50.644Z",
+    "role": "e813d436-0689-41e8-a207-4648631e6dba",
+    "permission": "75838e48-d8a1-4587-b56e-3f19a85bd429",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "ecbb180b-6109-4ec1-9460-e66a183aca9f",
+  "fields": {
+    "created_at": "2026-02-27T23:48:50.713Z",
+    "updated_at": "2026-02-27T23:48:50.713Z",
+    "role": "6432e0be-dd32-4036-877d-1d0728d479a5",
+    "permission": "531b7fc5-f242-431c-812e-8ed8f8a6dd1d",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "ee6208e3-6d74-4acc-a5d4-ecfb999e2d58",
+  "fields": {
+    "created_at": "2026-02-27T23:48:50.520Z",
+    "updated_at": "2026-02-27T23:48:50.520Z",
+    "role": "e813d436-0689-41e8-a207-4648631e6dba",
+    "permission": "e09aa348-15db-475d-9f20-0a5b7200cc9d",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "eff8725c-90a2-4828-8781-afdaa512c786",
+  "fields": {
+    "created_at": "2026-02-27T23:48:51.727Z",
+    "updated_at": "2026-02-27T23:48:51.727Z",
+    "role": "6432e0be-dd32-4036-877d-1d0728d479a5",
+    "permission": "6b67db87-355e-4c79-bb1d-c3de4bf250bb",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "f13eade3-5022-4731-ba8a-107be3f24bdd",
+  "fields": {
+    "created_at": "2026-02-27T23:48:50.438Z",
+    "updated_at": "2026-02-27T23:48:50.438Z",
+    "role": "e813d436-0689-41e8-a207-4648631e6dba",
+    "permission": "4ca46241-61a2-4014-b9f5-93ba59868ed9",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "f4762998-a170-4312-a34a-055da08635b9",
+  "fields": {
+    "created_at": "2026-02-27T23:48:53.155Z",
+    "updated_at": "2026-02-27T23:48:53.155Z",
+    "role": "e296c4b9-2097-40e7-afdb-242ad5d76fe9",
+    "permission": "41b2f34b-83d3-49c2-b9a3-49bacabd3488",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "f962940d-a097-43dd-bd51-c2d329793094",
+  "fields": {
+    "created_at": "2026-02-27T23:48:50.759Z",
+    "updated_at": "2026-02-27T23:48:50.759Z",
+    "role": "6432e0be-dd32-4036-877d-1d0728d479a5",
+    "permission": "f7327550-957a-49f2-a739-e7bc89296c58",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "f9b55bf8-f4d0-4207-a5fb-9deb510c5e23",
+  "fields": {
+    "created_at": "2026-02-27T23:48:51.655Z",
+    "updated_at": "2026-02-27T23:48:51.655Z",
+    "role": "6432e0be-dd32-4036-877d-1d0728d479a5",
+    "permission": "942d06d8-16c0-4563-a818-326cf62515ba",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "fa439518-9aaa-4576-869b-b73a452eb720",
+  "fields": {
+    "created_at": "2026-02-27T23:48:50.638Z",
+    "updated_at": "2026-02-27T23:48:50.638Z",
+    "role": "e813d436-0689-41e8-a207-4648631e6dba",
+    "permission": "324bf959-efd6-484a-a5a0-97a4b7732e0d",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "fbb82f31-5159-4ef6-abf7-360095a40c80",
+  "fields": {
+    "created_at": "2026-02-27T23:48:52.955Z",
+    "updated_at": "2026-02-27T23:48:52.955Z",
+    "role": "6432e0be-dd32-4036-877d-1d0728d479a5",
+    "permission": "0a88892e-1eae-4eee-8abb-853327717376",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "fe8c3654-8966-4abc-aefa-ba049e3a1f4c",
+  "fields": {
+    "created_at": "2026-02-27T23:48:50.514Z",
+    "updated_at": "2026-02-27T23:48:50.514Z",
+    "role": "e813d436-0689-41e8-a207-4648631e6dba",
+    "permission": "667c8984-05e5-43fd-a311-066e5c2df6e8",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "fe93cf83-c3f0-43da-844e-a9c664aae78d",
+  "fields": {
+    "created_at": "2026-02-27T23:48:50.589Z",
+    "updated_at": "2026-02-27T23:48:50.589Z",
+    "role": "e813d436-0689-41e8-a207-4648631e6dba",
+    "permission": "14e05653-8a33-40f1-a03e-dede66e30396",
+    "scope": "all"
+  }
+},
+{
+  "model": "rbac.rolepermission",
+  "pk": "ff4f1e14-116c-48f9-b972-49605b3f8955",
+  "fields": {
+    "created_at": "2026-02-27T23:48:50.421Z",
+    "updated_at": "2026-02-27T23:48:50.421Z",
+    "role": "e813d436-0689-41e8-a207-4648631e6dba",
+    "permission": "4864dd0a-2363-4062-bbe3-9b244a270294",
+    "scope": "all"
+  }
+}
+]
