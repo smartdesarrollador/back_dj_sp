@@ -1,0 +1,25 @@
+-r base.txt
+
+# Testing
+pytest==8.1.1
+pytest-django==4.8.0
+pytest-cov==5.0.0
+factory-boy==3.3.0
+faker==23.3.0
+
+# Debug toolbar
+django-debug-toolbar==4.3.0
+
+# Linting / Formatting
+ruff==0.3.3
+mypy==1.9.0
+django-stubs==4.2.7
+
+# API Documentation
+drf-spectacular==0.27.1
+drf-spectacular[sidecar]==0.27.1
+
+# Development utilities
+ipython==8.22.2
+django-extensions==3.2.3
+watchdog==4.0.0

@@ -1,0 +1,14 @@
+-r base.txt
+
+# WSGI server
+gunicorn==21.2.0
+
+# Static files
+whitenoise==6.6.0
+
+# Monitoring / Logging
+sentry-sdk==1.42.0
+django-prometheus==2.3.1
+
+# Security
+django-cors-headers==4.3.1

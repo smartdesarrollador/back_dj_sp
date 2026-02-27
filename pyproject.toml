@@ -1,0 +1,42 @@
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+select = ["E", "F", "W", "I", "N", "B", "UP"]
+ignore = ["E501", "B008", "N818"]
+exclude = [
+    ".git",
+    "__pycache__",
+    "migrations",
+    ".venv",
+]
+
+[tool.ruff.per-file-ignores]
+"config/settings/*.py" = ["F403", "F405"]
+"*/tests/*.py" = ["S101"]
+
+[tool.mypy]
+python_version = "3.11"
+ignore_missing_imports = true
+strict_optional = true
+warn_unused_ignores = true
+exclude = ["migrations/", "tests/"]
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "config.settings.dev"
+python_files = ["test_*.py", "*_test.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "--reuse-db -v"
+
+[tool.coverage.run]
+source = ["."]
+omit = [
+    "*/migrations/*",
+    "*/tests/*",
+    "manage.py",
+    "config/settings/*",
+]
+
+[tool.coverage.report]
+min_coverage = 80
+show_missing = true

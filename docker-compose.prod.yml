@@ -1,0 +1,65 @@
+version: '3.9'
+
+# ─────────────────────────────────────────────────────────────
+# Production docker-compose
+# Adds: nginx reverse proxy, production Django build, health checks
+# Usage: docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+# ─────────────────────────────────────────────────────────────
+
+services:
+  # Override django service to use prod build
+  django:
+    build:
+      context: .
+      target: prod
+    command: gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 4 --timeout 120
+    environment:
+      DJANGO_SETTINGS_MODULE: config.settings.prod
+    volumes:
+      - static_files:/app/staticfiles
+      - media_files:/app/media
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # Override celery worker for production
+  celery-worker:
+    build:
+      context: .
+      target: prod
+    command: celery -A config.celery worker --loglevel=warning --concurrency=4
+    environment:
+      DJANGO_SETTINGS_MODULE: config.settings.prod
+
+  celery-beat:
+    build:
+      context: .
+      target: prod
+    environment:
+      DJANGO_SETTINGS_MODULE: config.settings.prod
+
+  # ── Nginx Reverse Proxy ───────────────────────────────────
+  nginx:
+    image: nginx:1.25-alpine
+    container_name: rbac_nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - static_files:/static:ro
+      - media_files:/media:ro
+    depends_on:
+      - django
+    healthcheck:
+      test: ["CMD", "nginx", "-t"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  static_files:
+  media_files:
