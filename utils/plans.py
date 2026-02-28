@@ -1,0 +1,137 @@
+"""
+Configuración de planes y feature gates.
+
+Define los límites de recursos (max_*) y los flags de funcionalidades (bool)
+para cada plan: free, starter, professional, enterprise.
+"""
+from typing import Any
+
+PLAN_FEATURES: dict[str, dict[str, Any]] = {
+    'free': {
+        # Límites de recursos (None = ilimitado)
+        'max_users': 5,
+        'max_projects': 2,
+        'max_notes': 10,
+        'max_contacts': 25,
+        'max_bookmarks': 20,
+        'max_custom_roles': 0,
+        'max_ssh_keys': 0,
+        'max_ssl_certs': 0,
+        'max_snippets': 10,
+        'max_env_vars': 0,
+        'audit_log_days': 7,
+        'storage_gb': 1,
+        'api_calls_per_month': 1000,
+        # Feature flags
+        'custom_roles': False,
+        'mfa': False,
+        'sso': False,
+        'batch_operations': False,
+        'webhooks': False,
+        'custom_branding': False,
+        'temporal_delegation': False,
+        'sharing': False,
+        'pdf_export': False,
+        'full_text_search': False,
+    },
+    'starter': {
+        'max_users': 10,
+        'max_projects': 10,
+        'max_notes': 100,
+        'max_contacts': 100,
+        'max_bookmarks': 100,
+        'max_custom_roles': 3,
+        'max_ssh_keys': 5,
+        'max_ssl_certs': 10,
+        'max_snippets': 50,
+        'max_env_vars': 50,
+        'audit_log_days': 30,
+        'storage_gb': 5,
+        'api_calls_per_month': 10000,
+        'custom_roles': True,
+        'mfa': False,
+        'sso': False,
+        'batch_operations': False,
+        'webhooks': False,
+        'custom_branding': False,
+        'temporal_delegation': False,
+        'sharing': True,
+        'pdf_export': False,
+        'full_text_search': False,
+    },
+    'professional': {
+        'max_users': 25,
+        'max_projects': None,
+        'max_notes': 1000,
+        'max_contacts': None,
+        'max_bookmarks': None,
+        'max_custom_roles': 10,
+        'max_ssh_keys': None,
+        'max_ssl_certs': None,
+        'max_snippets': None,
+        'max_env_vars': None,
+        'audit_log_days': 365,
+        'storage_gb': 20,
+        'api_calls_per_month': 100000,
+        'custom_roles': True,
+        'mfa': True,
+        'sso': False,
+        'batch_operations': True,
+        'webhooks': True,
+        'custom_branding': True,
+        'temporal_delegation': True,
+        'sharing': True,
+        'pdf_export': True,
+        'full_text_search': True,
+    },
+    'enterprise': {
+        'max_users': None,
+        'max_projects': None,
+        'max_notes': None,
+        'max_contacts': None,
+        'max_bookmarks': None,
+        'max_custom_roles': None,
+        'max_ssh_keys': None,
+        'max_ssl_certs': None,
+        'max_snippets': None,
+        'max_env_vars': None,
+        'audit_log_days': 2555,
+        'storage_gb': None,
+        'api_calls_per_month': None,
+        'custom_roles': True,
+        'mfa': True,
+        'sso': True,
+        'batch_operations': True,
+        'webhooks': True,
+        'custom_branding': True,
+        'temporal_delegation': True,
+        'sharing': True,
+        'pdf_export': True,
+        'full_text_search': True,
+    },
+}
+
+
+def get_plan_limit(plan: str, resource: str) -> int | None:
+    """
+    Retorna el límite numérico para un recurso en un plan.
+    None significa ilimitado.
+
+    Args:
+        plan: 'free' | 'starter' | 'professional' | 'enterprise'
+        resource: nombre del recurso sin prefijo 'max_' (ej. 'projects', 'users')
+    """
+    plan_config = PLAN_FEATURES.get(plan, PLAN_FEATURES['free'])
+    return plan_config.get(f'max_{resource}')
+
+
+def plan_has_feature(plan: str, feature: str) -> bool:
+    """
+    Retorna True si el plan incluye la feature dada.
+
+    Args:
+        plan: 'free' | 'starter' | 'professional' | 'enterprise'
+        feature: nombre del feature flag (ej. 'custom_roles', 'mfa', 'sso')
+    """
+    plan_config = PLAN_FEATURES.get(plan, PLAN_FEATURES['free'])
+    return bool(plan_config.get(feature, False))

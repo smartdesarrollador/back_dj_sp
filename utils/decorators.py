@@ -1,55 +1,97 @@
 """
 Utility decorators for RBAC permission and plan checks.
-Stubs — full implementation in PASO 6.
+Funciona en métodos de APIView (self, request, *args, **kwargs).
 """
 import functools
-from typing import Any, Callable
+from typing import Callable
+
+from rest_framework.exceptions import NotAuthenticated, PermissionDenied
 
 
 def require_permission(codename: str) -> Callable:
     """
     Decorator: requires user to have the given permission codename.
-    Usage: @require_permission('projects.create')
 
-    Full implementation added in PASO 6 (RBAC middleware).
+    Usage:
+        class MyView(APIView):
+            @require_permission('projects.create')
+            def post(self, request):
+                ...
     """
-    def decorator(func: Callable) -> Callable:
-        @functools.wraps(func)
-        def wrapper(*args: Any, **kwargs: Any) -> Any:
-            return func(*args, **kwargs)
+    def decorator(view_method: Callable) -> Callable:
+        @functools.wraps(view_method)
+        def wrapper(view_instance, request, *args, **kwargs):
+            if not request.user or not request.user.is_authenticated:
+                raise NotAuthenticated()
+
+            # Importación tardía para evitar ciclos circulares
+            from apps.rbac.permissions import _user_has_permission
+            if not _user_has_permission(request.user, codename):
+                raise PermissionDenied({
+                    'code': 'permission_denied',
+                    'message': f'Permission required: {codename}',
+                    'required_permission': codename,
+                })
+            return view_method(view_instance, request, *args, **kwargs)
+
         wrapper._required_permission = codename
         return wrapper
     return decorator
 
 
-def require_feature(feature_codename: str) -> Callable:
+def require_feature(feature: str) -> Callable:
     """
-    Decorator: requires tenant to have the given plan feature.
-    Usage: @require_feature('custom_roles')
+    Decorator: requires tenant to have the given plan feature enabled.
 
-    Full implementation added in PASO 6.
+    Usage:
+        class MyView(APIView):
+            @require_feature('custom_roles')
+            def post(self, request):
+                ...
     """
-    def decorator(func: Callable) -> Callable:
-        @functools.wraps(func)
-        def wrapper(*args: Any, **kwargs: Any) -> Any:
-            return func(*args, **kwargs)
-        wrapper._required_feature = feature_codename
+    def decorator(view_method: Callable) -> Callable:
+        @functools.wraps(view_method)
+        def wrapper(view_instance, request, *args, **kwargs):
+            tenant = getattr(request, 'tenant', None)
+            if tenant is not None:
+                from utils.plans import plan_has_feature
+                from core.exceptions import FeatureNotAvailable
+                if not plan_has_feature(tenant.plan, feature):
+                    raise FeatureNotAvailable(
+                        detail=(
+                            f'La funcionalidad "{feature}" no está disponible en el '
+                            f'plan {tenant.plan}. Actualiza tu plan para acceder.'
+                        )
+                    )
+            return view_method(view_instance, request, *args, **kwargs)
+
+        wrapper._required_feature = feature
         return wrapper
     return decorator
 
 
-def check_plan_limit(resource: str, max_values: dict) -> Callable:
+def check_plan_limit(resource: str, count_fn: Callable) -> Callable:
     """
     Decorator: checks plan-based resource limits before allowing creation.
-    Usage: @check_plan_limit('projects', {'free': 2, 'starter': 10})
 
-    Full implementation added in PASO 6.
+    Args:
+        resource: nombre del recurso sin prefijo 'max_' (ej. 'projects')
+        count_fn: callable que recibe request y retorna el conteo actual (int)
+
+    Usage:
+        class MyView(APIView):
+            @check_plan_limit('projects', lambda req: Project.objects.filter(tenant=req.tenant).count())
+            def post(self, request):
+                ...
     """
-    def decorator(func: Callable) -> Callable:
-        @functools.wraps(func)
-        def wrapper(*args: Any, **kwargs: Any) -> Any:
-            return func(*args, **kwargs)
+    def decorator(view_method: Callable) -> Callable:
+        @functools.wraps(view_method)
+        def wrapper(view_instance, request, *args, **kwargs):
+            current = count_fn(request)
+            from apps.rbac.permissions import check_plan_limit as _check_plan_limit
+            _check_plan_limit(request.user, resource, current)
+            return view_method(view_instance, request, *args, **kwargs)
+
         wrapper._plan_limit_resource = resource
-        wrapper._plan_limit_values = max_values
         return wrapper
     return decorator

@@ -1,18 +1,16 @@
 """
 DRF ViewSet mixins for tenant-aware views.
-Stubs — full implementation in PASO 6.
 """
 from rest_framework.viewsets import ModelViewSet
 
 
 class TenantModelViewSet(ModelViewSet):
     """
-    Base ViewSet that:
-    - Filters all querysets by request.tenant automatically
-    - Injects tenant into object creation automatically
-    - Prevents cross-tenant data leaks
-
-    Full implementation added in PASO 6 (RBAC middleware).
+    Base ViewSet que:
+    - Filtra todos los querysets por request.tenant automáticamente
+    - Inyecta tenant en la creación de objetos automáticamente
+    - Previene fugas de datos cross-tenant
+    - Incluye request.tenant en el contexto del serializer
     """
 
     def get_queryset(self):
@@ -26,3 +24,9 @@ class TenantModelViewSet(ModelViewSet):
             serializer.save(tenant=self.request.tenant)
         else:
             serializer.save()
+
+    def get_serializer_context(self):
+        ctx = super().get_serializer_context()
+        if hasattr(self.request, 'tenant'):
+            ctx['tenant'] = self.request.tenant
+        return ctx

@@ -20,6 +20,7 @@ from drf_spectacular.views import (
     SpectacularRedocView,
 )
 from core.views import health_check
+from apps.rbac.views import FeaturesView
 
 urlpatterns = [
     # Django admin
@@ -59,6 +60,9 @@ urlpatterns = [
 
     # Support
     path('api/v1/support/', include('apps.support.urls')),
+
+    # Plan features
+    path('api/v1/features/', FeaturesView.as_view(), name='plan-features'),
 
     # Health check
     path('api/health/', health_check, name='health_check'),
