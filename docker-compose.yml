@@ -24,16 +24,18 @@ services:
   db:
     image: postgres:15-alpine
     container_name: rbac_db
+    env_file:
+      - .env
     environment:
-      POSTGRES_DB: rbac_db
-      POSTGRES_USER: rbac_user
-      POSTGRES_PASSWORD: rbac_pass
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
       - "5432:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U rbac_user -d rbac_db"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 5s
       timeout: 5s
       retries: 5
