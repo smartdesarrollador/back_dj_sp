@@ -222,6 +222,22 @@ STRIPE_SECRET_KEY = env('STRIPE_SECRET_KEY', default='')
 STRIPE_PUBLISHABLE_KEY = env('STRIPE_PUBLISHABLE_KEY', default='')
 STRIPE_WEBHOOK_SECRET = env('STRIPE_WEBHOOK_SECRET', default='')
 
+# Stripe Price IDs per plan and billing cycle
+STRIPE_PLAN_PRICES: dict[str, dict[str, str]] = {
+    'starter': {
+        'monthly': env('STRIPE_PRICE_STARTER_MONTHLY', default=''),
+        'annual':  env('STRIPE_PRICE_STARTER_ANNUAL',  default=''),
+    },
+    'professional': {
+        'monthly': env('STRIPE_PRICE_PRO_MONTHLY', default=''),
+        'annual':  env('STRIPE_PRICE_PRO_ANNUAL',  default=''),
+    },
+    'enterprise': {
+        'monthly': env('STRIPE_PRICE_ENT_MONTHLY', default=''),
+        'annual':  env('STRIPE_PRICE_ENT_ANNUAL',  default=''),
+    },
+}
+
 # ─── Encryption ───────────────────────────────────────────────────────────────
 ENCRYPTION_KEY = env('ENCRYPTION_KEY', default='')
 

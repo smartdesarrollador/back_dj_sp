@@ -34,6 +34,7 @@ urlpatterns = [
         path('users/', include('apps.auth_app.admin_urls')),
         path('roles/', include('apps.rbac.urls')),
         path('billing/', include('apps.subscriptions.urls')),
+        path('subscriptions/', include('apps.subscriptions.subscription_urls')),
         path('audit-logs/', include('apps.audit.urls')),
     ])),
 
