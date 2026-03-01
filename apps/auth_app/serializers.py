@@ -179,3 +179,23 @@ class InviteUserSerializer(serializers.Serializer):
 
 class UserRoleAssignSerializer(serializers.Serializer):
     role_id = serializers.UUIDField()
+
+
+# ─── MFA serializers ──────────────────────────────────────────────────────────
+
+class MFAVerifySetupSerializer(serializers.Serializer):
+    totp_code = serializers.CharField(max_length=6)
+
+
+class MFAValidateSerializer(serializers.Serializer):
+    mfa_token = serializers.CharField()
+    totp_code = serializers.CharField(max_length=6)
+
+
+class MFADisableSerializer(serializers.Serializer):
+    password = serializers.CharField(write_only=True)
+
+
+class MFARecoverySerializer(serializers.Serializer):
+    mfa_token = serializers.CharField()
+    recovery_code = serializers.CharField()

@@ -7,6 +7,7 @@ AbstractBaseUser provee: password, last_login.
 """
 import uuid
 
+from django.contrib.auth.hashers import make_password
 from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
 from django.db import models
 
@@ -103,3 +104,17 @@ class User(AbstractBaseUser, PermissionsMixin):
 
     def __str__(self) -> str:
         return f"{self.email}"
+
+
+class MFARecoveryCode(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='mfa_recovery_codes')
+    code_hash = models.CharField(max_length=128)
+    is_used = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'mfa_recovery_codes'
+
+    def __str__(self) -> str:
+        return f"RecoveryCode({self.user_id}, used={self.is_used})"

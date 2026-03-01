@@ -6,6 +6,7 @@ from rest_framework_simplejwt.tokens import RefreshToken as BaseRefreshToken
 
 EMAIL_VERIFY_TTL = 86400   # 24h
 PASSWORD_RESET_TTL = 3600  # 1h
+MFA_SESSION_TTL = 600      # 10 min
 
 
 class TenantRefreshToken(BaseRefreshToken):
@@ -41,4 +42,17 @@ def verify_password_reset_token(token: str) -> str | None:
     user_id = cache.get(f'password_reset:{token}')
     if user_id:
         cache.delete(f'password_reset:{token}')
+    return user_id
+
+
+def create_mfa_session_token(user_id: str) -> str:
+    token = secrets.token_urlsafe(32)
+    cache.set(f'mfa_session:{token}', user_id, timeout=MFA_SESSION_TTL)
+    return token
+
+
+def verify_mfa_session_token(token: str) -> str | None:
+    user_id = cache.get(f'mfa_session:{token}')
+    if user_id:
+        cache.delete(f'mfa_session:{token}')
     return user_id
