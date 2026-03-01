@@ -73,3 +73,11 @@ SIMPLE_JWT = {  # noqa: F405
     'ACCESS_TOKEN_LIFETIME': timedelta(hours=1),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=30),
 }
+
+# Throttle rates permisivos en desarrollo local
+REST_FRAMEWORK['DEFAULT_THROTTLE_RATES'].update({  # noqa: F405
+    'login': '100/minute',
+    'register': '100/hour',
+    'mfa': '100/minute',
+    'forgot_password': '100/hour',
+})

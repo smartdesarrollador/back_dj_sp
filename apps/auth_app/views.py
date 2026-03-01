@@ -19,6 +19,12 @@ from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from core.exceptions import InvalidToken
+from utils.throttles import (
+    ForgotPasswordRateThrottle,
+    LoginRateThrottle,
+    MFARateThrottle,
+    RegisterRateThrottle,
+)
 from .models import MFARecoveryCode
 from .serializers import (
     ForgotPasswordSerializer,
@@ -59,6 +65,7 @@ def _build_token_response(user) -> dict:
 
 class RegisterView(APIView):
     permission_classes = [AllowAny]
+    throttle_classes = [RegisterRateThrottle]
 
     @extend_schema(
         tags=['auth'],
@@ -96,6 +103,7 @@ class RegisterView(APIView):
 
 class LoginView(APIView):
     permission_classes = [AllowAny]
+    throttle_classes = [LoginRateThrottle]
 
     @extend_schema(
         tags=['auth'],
@@ -197,6 +205,7 @@ class VerifyEmailView(APIView):
 
 class ForgotPasswordView(APIView):
     permission_classes = [AllowAny]
+    throttle_classes = [ForgotPasswordRateThrottle]
 
     @extend_schema(
         tags=['auth'],
@@ -228,6 +237,7 @@ class ForgotPasswordView(APIView):
 
 class ResetPasswordView(APIView):
     permission_classes = [AllowAny]
+    throttle_classes = [ForgotPasswordRateThrottle]
 
     @extend_schema(
         tags=['auth'],
@@ -327,6 +337,7 @@ class MFAVerifySetupView(APIView):
 
 class MFAValidateView(APIView):
     permission_classes = [AllowAny]
+    throttle_classes = [MFARateThrottle]
 
     @extend_schema(
         tags=['auth'],
@@ -387,6 +398,7 @@ class MFADisableView(APIView):
 
 class MFARecoveryView(APIView):
     permission_classes = [AllowAny]
+    throttle_classes = [MFARateThrottle]
 
     @extend_schema(
         tags=['auth'],

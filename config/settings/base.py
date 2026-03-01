@@ -167,11 +167,15 @@ REST_FRAMEWORK = {
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
     'DEFAULT_THROTTLE_CLASSES': [
         'rest_framework.throttling.AnonRateThrottle',
-        'rest_framework.throttling.UserRateThrottle',
+        'utils.throttles.PlanBasedUserThrottle',
     ],
     'DEFAULT_THROTTLE_RATES': {
         'anon': '60/minute',
-        'user': '1000/hour',
+        # Rates nombrados por endpoint sensible
+        'login': '5/minute',
+        'register': '3/hour',
+        'mfa': '5/minute',
+        'forgot_password': '5/hour',
     },
     'EXCEPTION_HANDLER': 'core.exceptions.custom_exception_handler',
 }
@@ -257,6 +261,7 @@ FRONTEND_URL = env('FRONTEND_URL', default='http://localhost:5173')
 # ─── Security Headers ─────────────────────────────────────────────────────────
 SECURE_BROWSER_XSS_FILTER = True
 X_FRAME_OPTIONS = 'DENY'
+SECURE_REFERRER_POLICY = 'strict-origin-when-cross-origin'
 SECURE_CONTENT_TYPE_NOSNIFF = True
 
 # ─── OpenAPI / Spectacular ────────────────────────────────────────────────────
