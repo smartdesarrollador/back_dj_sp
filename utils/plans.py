@@ -37,6 +37,10 @@ PLAN_FEATURES: dict[str, dict[str, Any]] = {
         'audit_logs': False,
         'pdf_export': False,
         'full_text_search': False,
+        'contact_groups': False,
+        'contact_export': False,
+        'bookmark_collections': False,
+        'bookmark_export': False,
     },
     'starter': {
         'max_users': 10,
@@ -66,6 +70,10 @@ PLAN_FEATURES: dict[str, dict[str, Any]] = {
         'audit_logs': False,
         'pdf_export': False,
         'full_text_search': False,
+        'contact_groups': True,
+        'contact_export': True,
+        'bookmark_collections': True,
+        'bookmark_export': False,
     },
     'professional': {
         'max_users': 25,
@@ -95,6 +103,10 @@ PLAN_FEATURES: dict[str, dict[str, Any]] = {
         'audit_logs': True,
         'pdf_export': True,
         'full_text_search': True,
+        'contact_groups': True,
+        'contact_export': True,
+        'bookmark_collections': True,
+        'bookmark_export': True,
     },
     'enterprise': {
         'max_users': None,
@@ -124,6 +136,10 @@ PLAN_FEATURES: dict[str, dict[str, Any]] = {
         'audit_logs': True,
         'pdf_export': True,
         'full_text_search': True,
+        'contact_groups': True,
+        'contact_export': True,
+        'bookmark_collections': True,
+        'bookmark_export': True,
     },
 }
 
