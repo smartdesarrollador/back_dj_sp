@@ -11,6 +11,8 @@ PLAN_FEATURES: dict[str, dict[str, Any]] = {
         # Límites de recursos (None = ilimitado)
         'max_users': 5,
         'max_projects': 2,
+        'max_sections_per_project': 3,
+        'max_items_per_project': 50,
         'max_notes': 10,
         'max_contacts': 25,
         'max_bookmarks': 20,
@@ -37,6 +39,8 @@ PLAN_FEATURES: dict[str, dict[str, Any]] = {
     'starter': {
         'max_users': 10,
         'max_projects': 10,
+        'max_sections_per_project': 10,
+        'max_items_per_project': 200,
         'max_notes': 100,
         'max_contacts': 100,
         'max_bookmarks': 100,
@@ -62,6 +66,8 @@ PLAN_FEATURES: dict[str, dict[str, Any]] = {
     'professional': {
         'max_users': 25,
         'max_projects': None,
+        'max_sections_per_project': None,
+        'max_items_per_project': None,
         'max_notes': 1000,
         'max_contacts': None,
         'max_bookmarks': None,
@@ -87,6 +93,8 @@ PLAN_FEATURES: dict[str, dict[str, Any]] = {
     'enterprise': {
         'max_users': None,
         'max_projects': None,
+        'max_sections_per_project': None,
+        'max_items_per_project': None,
         'max_notes': None,
         'max_contacts': None,
         'max_bookmarks': None,
