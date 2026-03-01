@@ -1,4 +1,8 @@
 from django.urls import path
 
-# Stub — endpoints implemented in corresponding PASO
-urlpatterns = []
+from apps.snippets.views import CodeSnippetDetailView, CodeSnippetListCreateView
+
+urlpatterns = [
+    path('', CodeSnippetListCreateView.as_view(), name='snippet-list-create'),
+    path('<uuid:pk>/', CodeSnippetDetailView.as_view(), name='snippet-detail'),
+]
