@@ -26,11 +26,17 @@ class AuditLog(BaseModel):
     resource_type = models.CharField(max_length=100)   # e.g. 'ProjectItemField'
     resource_id = models.CharField(max_length=50, blank=True)
     ip_address = models.GenericIPAddressField(null=True, blank=True)
+    user_agent = models.TextField(blank=True)
     extra = models.JSONField(default=dict, blank=True)
 
     class Meta:
         db_table = 'audit_logs'
         ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['tenant', 'created_at']),
+            models.Index(fields=['user', 'created_at']),
+            models.Index(fields=['resource_type', 'resource_id']),
+        ]
 
     def __str__(self) -> str:
         return f'{self.action} by {self.user_id} on {self.resource_type}:{self.resource_id}'

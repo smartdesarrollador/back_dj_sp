@@ -208,6 +208,15 @@ CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = TIME_ZONE
 CELERY_BEAT_SCHEDULER = 'django_celery_beat.schedulers:DatabaseScheduler'
 
+from celery.schedules import crontab  # noqa: E402
+
+CELERY_BEAT_SCHEDULE = {
+    'purge-old-audit-logs': {
+        'task': 'apps.audit.tasks.purge_old_audit_logs',
+        'schedule': crontab(hour=2, minute=0),  # Daily at 2:00 AM UTC
+    },
+}
+
 # ─── Email ────────────────────────────────────────────────────────────────────
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 EMAIL_HOST = env('EMAIL_HOST', default='smtp.gmail.com')
