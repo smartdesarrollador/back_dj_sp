@@ -135,3 +135,47 @@ class ResetPasswordSerializer(serializers.Serializer):
         except Exception as exc:
             raise serializers.ValidationError(str(exc)) from exc
         return value
+
+
+# ─── Admin serializers ────────────────────────────────────────────────────────
+
+class AdminUserListSerializer(serializers.ModelSerializer):
+    roles = serializers.SerializerMethodField()
+
+    class Meta:
+        model = User
+        fields = ['id', 'email', 'name', 'is_active', 'email_verified', 'roles', 'created_at']
+
+    def get_roles(self, obj) -> list[str]:
+        return list(obj.user_roles.values_list('role__name', flat=True))
+
+
+class AdminUserCreateSerializer(serializers.ModelSerializer):
+    password = serializers.CharField(write_only=True, min_length=8)
+
+    class Meta:
+        model = User
+        fields = ['email', 'name', 'password']
+
+    def create(self, validated_data: dict) -> 'User':
+        return User.objects.create_user(
+            email=validated_data['email'],
+            name=validated_data['name'],
+            password=validated_data['password'],
+            tenant=self.context['request'].tenant,
+        )
+
+
+class AdminUserUpdateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ['name', 'email']
+
+
+class InviteUserSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+    role_id = serializers.UUIDField(required=False)
+
+
+class UserRoleAssignSerializer(serializers.Serializer):
+    role_id = serializers.UUIDField()

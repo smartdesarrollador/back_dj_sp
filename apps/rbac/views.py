@@ -2,12 +2,29 @@
 RBAC views.
 
 Endpoints:
-  GET /api/v1/features/  → Features y límites del plan activo del tenant
+  GET  /api/v1/features/                         → Plan features and limits
+  GET  /api/v1/admin/roles/                      → List roles
+  POST /api/v1/admin/roles/create/               → Create custom role
+  GET  /api/v1/admin/roles/<pk>/                 → Role detail
+  PATCH /api/v1/admin/roles/<pk>/update/         → Update custom role
+  DELETE /api/v1/admin/roles/<pk>/delete/        → Delete custom role
+  PUT  /api/v1/admin/roles/<pk>/permissions/     → Replace role permissions
+  GET  /api/v1/admin/permissions/                → List all permissions
 """
+from django.db import transaction
+from django.db.models import Q
+from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.rbac.models import Permission, Role, RolePermission
+from apps.rbac.permissions import HasFeature, HasPermission, check_plan_limit
+from apps.rbac.serializers import (
+    PermissionSerializer,
+    RoleCreateUpdateSerializer,
+    RoleSerializer,
+)
 from utils.plans import PLAN_FEATURES
 
 # Claves que son límites operacionales (no feature flags booleanos)
@@ -55,3 +72,152 @@ class FeaturesView(APIView):
         }
 
         return Response({'plan': plan, 'features': feature_flags, 'limits': limits})
+
+
+# ─── Admin Role Views ──────────────────────────────────────────────────────────
+
+class RoleListView(APIView):
+    permission_classes = [HasPermission('roles.read')]
+
+    def get(self, request):
+        roles = Role.objects.filter(
+            Q(is_system_role=True) | Q(tenant=request.tenant)
+        ).prefetch_related('role_permissions__permission', 'user_roles')
+        return Response({'roles': RoleSerializer(roles, many=True).data})
+
+
+class RoleCreateView(APIView):
+    permission_classes = [HasPermission('roles.create'), HasFeature('custom_roles')]
+
+    def post(self, request):
+        custom_count = Role.objects.filter(tenant=request.tenant, is_system_role=False).count()
+        check_plan_limit(request.user, 'custom_roles', custom_count)
+
+        serializer = RoleCreateUpdateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        permission_ids = serializer.validated_data.pop('permission_ids', [])
+
+        role = Role.objects.create(
+            tenant=request.tenant,
+            is_system_role=False,
+            **serializer.validated_data,
+        )
+
+        if permission_ids:
+            perms = Permission.objects.filter(id__in=permission_ids)
+            RolePermission.objects.bulk_create([
+                RolePermission(role=role, permission=p) for p in perms
+            ])
+
+        return Response(
+            RoleSerializer(role).data,
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class RoleDetailView(APIView):
+    permission_classes = [HasPermission('roles.read')]
+
+    def get(self, request, pk):
+        try:
+            role = Role.objects.prefetch_related(
+                'role_permissions__permission', 'user_roles'
+            ).get(pk=pk)
+        except Role.DoesNotExist:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+
+        if not role.is_system_role and role.tenant_id != request.tenant.id:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+
+        return Response(RoleSerializer(role).data)
+
+
+class RoleUpdateView(APIView):
+    permission_classes = [HasPermission('roles.update')]
+
+    def patch(self, request, pk):
+        try:
+            role = Role.objects.get(pk=pk)
+        except Role.DoesNotExist:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+
+        if role.is_system_role:
+            return Response(
+                {'detail': 'Cannot modify system roles.'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        if role.tenant_id != request.tenant.id:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+
+        serializer = RoleCreateUpdateSerializer(role, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.validated_data.pop('permission_ids', None)
+        serializer.save()
+        role.refresh_from_db()
+        return Response(RoleSerializer(role).data)
+
+
+class RoleDeleteView(APIView):
+    permission_classes = [HasPermission('roles.delete')]
+
+    def delete(self, request, pk):
+        try:
+            role = Role.objects.get(pk=pk)
+        except Role.DoesNotExist:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+
+        if role.is_system_role:
+            return Response(
+                {'detail': 'Cannot delete system roles.'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        if role.tenant_id != request.tenant.id:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+
+        role.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class RolePermissionsUpdateView(APIView):
+    permission_classes = [HasPermission('roles.update')]
+
+    def put(self, request, pk):
+        try:
+            role = Role.objects.get(pk=pk)
+        except Role.DoesNotExist:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+
+        if role.is_system_role:
+            return Response(
+                {'detail': 'Cannot modify system roles.'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        if role.tenant_id != request.tenant.id:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+
+        permission_ids = request.data.get('permission_ids', [])
+        perms = list(Permission.objects.filter(id__in=permission_ids))
+        if len(perms) != len(permission_ids):
+            return Response(
+                {'detail': 'One or more permission IDs not found.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        with transaction.atomic():
+            RolePermission.objects.filter(role=role).delete()
+            RolePermission.objects.bulk_create([
+                RolePermission(role=role, permission=p) for p in perms
+            ])
+
+        role.refresh_from_db()
+        return Response(RoleSerializer(role).data)
+
+
+# ─── Admin Permission Views ────────────────────────────────────────────────────
+
+class PermissionListView(APIView):
+    permission_classes = [HasPermission('roles.read')]
+
+    def get(self, request):
+        perms = Permission.objects.all().order_by('resource', 'codename')
+        return Response({'permissions': PermissionSerializer(perms, many=True).data})

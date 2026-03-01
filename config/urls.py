@@ -33,6 +33,7 @@ urlpatterns = [
     path('api/v1/admin/', include([
         path('users/', include('apps.auth_app.admin_urls')),
         path('roles/', include('apps.rbac.urls')),
+        path('permissions/', include('apps.rbac.permission_urls')),
         path('billing/', include('apps.subscriptions.urls')),
         path('subscriptions/', include('apps.subscriptions.subscription_urls')),
         path('audit-logs/', include('apps.audit.urls')),
