@@ -52,6 +52,15 @@ PLAN_FEATURES: dict[str, dict[str, Any]] = {
         'max_calendar_events': 50,
         'task_assign': False,
         'calendar_attendees': False,
+        # Digital Services
+        'digital_card': True,
+        'landing_page': False,
+        'portfolio': False,
+        'cv_pdf_export': False,
+        'custom_domain': False,
+        'digital_analytics': False,
+        'qr_vcard_export': False,
+        'max_portfolio_items': 0,
     },
     'starter': {
         'max_users': 10,
@@ -96,6 +105,15 @@ PLAN_FEATURES: dict[str, dict[str, Any]] = {
         'max_calendar_events': 200,
         'task_assign': True,
         'calendar_attendees': True,
+        # Digital Services
+        'digital_card': True,
+        'landing_page': True,
+        'portfolio': False,
+        'cv_pdf_export': True,
+        'custom_domain': False,
+        'digital_analytics': True,
+        'qr_vcard_export': True,
+        'max_portfolio_items': 0,
     },
     'professional': {
         'max_users': 25,
@@ -140,6 +158,15 @@ PLAN_FEATURES: dict[str, dict[str, Any]] = {
         'max_calendar_events': None,
         'task_assign': True,
         'calendar_attendees': True,
+        # Digital Services
+        'digital_card': True,
+        'landing_page': True,
+        'portfolio': True,
+        'cv_pdf_export': True,
+        'custom_domain': False,
+        'digital_analytics': True,
+        'qr_vcard_export': True,
+        'max_portfolio_items': None,
     },
     'enterprise': {
         'max_users': None,
@@ -184,6 +211,15 @@ PLAN_FEATURES: dict[str, dict[str, Any]] = {
         'max_calendar_events': None,
         'task_assign': True,
         'calendar_attendees': True,
+        # Digital Services
+        'digital_card': True,
+        'landing_page': True,
+        'portfolio': True,
+        'cv_pdf_export': True,
+        'custom_domain': True,
+        'digital_analytics': True,
+        'qr_vcard_export': True,
+        'max_portfolio_items': None,
     },
 }
 
