@@ -13,6 +13,7 @@ Endpoints:
 """
 from django.db import transaction
 from django.db.models import Q
+from drf_spectacular.utils import OpenApiResponse, extend_schema
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -53,6 +54,7 @@ class FeaturesView(APIView):
     """
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(tags=['app-features'], summary='Get plan features and limits')
     def get(self, request):
         tenant = getattr(request, 'tenant', None)
         plan = tenant.plan if tenant else 'free'
@@ -79,6 +81,7 @@ class FeaturesView(APIView):
 class RoleListView(APIView):
     permission_classes = [HasPermission('roles.read')]
 
+    @extend_schema(tags=['admin-roles'], summary='List roles')
     def get(self, request):
         roles = Role.objects.filter(
             Q(is_system_role=True) | Q(tenant=request.tenant)
@@ -89,6 +92,14 @@ class RoleListView(APIView):
 class RoleCreateView(APIView):
     permission_classes = [HasPermission('roles.create'), HasFeature('custom_roles')]
 
+    @extend_schema(
+        tags=['admin-roles'],
+        summary='Create custom role',
+        responses={
+            201: OpenApiResponse(description='Role created'),
+            402: OpenApiResponse(description='Plan limit exceeded'),
+        },
+    )
     def post(self, request):
         custom_count = Role.objects.filter(tenant=request.tenant, is_system_role=False).count()
         check_plan_limit(request.user, 'custom_roles', custom_count)
@@ -118,6 +129,7 @@ class RoleCreateView(APIView):
 class RoleDetailView(APIView):
     permission_classes = [HasPermission('roles.read')]
 
+    @extend_schema(tags=['admin-roles'], summary='Get role detail')
     def get(self, request, pk):
         try:
             role = Role.objects.prefetch_related(
@@ -135,6 +147,7 @@ class RoleDetailView(APIView):
 class RoleUpdateView(APIView):
     permission_classes = [HasPermission('roles.update')]
 
+    @extend_schema(tags=['admin-roles'], summary='Update custom role')
     def patch(self, request, pk):
         try:
             role = Role.objects.get(pk=pk)
@@ -160,6 +173,7 @@ class RoleUpdateView(APIView):
 class RoleDeleteView(APIView):
     permission_classes = [HasPermission('roles.delete')]
 
+    @extend_schema(tags=['admin-roles'], summary='Delete custom role')
     def delete(self, request, pk):
         try:
             role = Role.objects.get(pk=pk)
@@ -181,6 +195,7 @@ class RoleDeleteView(APIView):
 class RolePermissionsUpdateView(APIView):
     permission_classes = [HasPermission('roles.update')]
 
+    @extend_schema(tags=['admin-roles'], summary='Replace role permissions')
     def put(self, request, pk):
         try:
             role = Role.objects.get(pk=pk)
@@ -218,6 +233,7 @@ class RolePermissionsUpdateView(APIView):
 class PermissionListView(APIView):
     permission_classes = [HasPermission('roles.read')]
 
+    @extend_schema(tags=['admin-roles'], summary='List all permissions')
     def get(self, request):
         perms = Permission.objects.all().order_by('resource', 'codename')
         return Response({'permissions': PermissionSerializer(perms, many=True).data})

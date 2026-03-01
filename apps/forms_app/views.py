@@ -20,6 +20,8 @@ import io
 from django.db import transaction
 from django.db.models import F
 from django.http import HttpResponse
+from drf_spectacular.utils import OpenApiParameter, extend_schema
+from drf_spectacular.types import OpenApiTypes
 from rest_framework import status
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
@@ -65,6 +67,14 @@ def _create_questions(form, questions_data):
 class FormListCreateView(APIView):
     permission_classes = [HasPermission('forms.read')]
 
+    @extend_schema(
+        tags=['app-forms'],
+        summary='List forms',
+        parameters=[
+            OpenApiParameter('status', OpenApiTypes.STR, description='Filter by status (draft/active/closed)'),
+            OpenApiParameter('search', OpenApiTypes.STR, description='Search by title'),
+        ],
+    )
     def get(self, request):
         qs = Form.objects.filter(tenant=request.tenant, user=request.user)
         status_filter = request.query_params.get('status')
@@ -75,6 +85,7 @@ class FormListCreateView(APIView):
             qs = qs.filter(title__icontains=search)
         return Response({'forms': FormSerializer(qs, many=True).data})
 
+    @extend_schema(tags=['app-forms'], summary='Create form with questions')
     def post(self, request):
         if not request.user.has_perm('forms.create'):
             from rest_framework.exceptions import PermissionDenied
@@ -102,12 +113,14 @@ class FormListCreateView(APIView):
 class FormDetailView(APIView):
     permission_classes = [HasPermission('forms.read')]
 
+    @extend_schema(tags=['app-forms'], summary='Get form detail')
     def get(self, request, pk):
         form = _get_form(pk, request.tenant, request.user)
         if not form:
             return _NOT_FOUND
         return Response({'form': FormSerializer(form).data})
 
+    @extend_schema(tags=['app-forms'], summary='Update form')
     def patch(self, request, pk):
         if not request.user.has_perm('forms.update'):
             from rest_framework.exceptions import PermissionDenied
@@ -127,6 +140,7 @@ class FormDetailView(APIView):
                 _create_questions(form, questions_data)
         return Response({'form': FormSerializer(form).data})
 
+    @extend_schema(tags=['app-forms'], summary='Delete form')
     def delete(self, request, pk):
         if not request.user.has_perm('forms.delete'):
             from rest_framework.exceptions import PermissionDenied
@@ -141,6 +155,7 @@ class FormDetailView(APIView):
 class FormActivateView(APIView):
     permission_classes = [HasPermission('forms.activate')]
 
+    @extend_schema(tags=['app-forms'], summary='Activate form (change status to active)')
     def post(self, request, pk):
         form = _get_form(pk, request.tenant, request.user)
         if not form:
@@ -153,6 +168,7 @@ class FormActivateView(APIView):
 class FormResponsesView(APIView):
     permission_classes = [HasPermission('forms.read')]
 
+    @extend_schema(tags=['app-forms'], summary='List form responses')
     def get(self, request, pk):
         form = _get_form(pk, request.tenant, request.user)
         if not form:
@@ -164,6 +180,7 @@ class FormResponsesView(APIView):
 class FormExportView(APIView):
     permission_classes = [HasPermission('forms.read'), HasFeature('form_export_csv')]
 
+    @extend_schema(tags=['app-forms'], summary='Export form responses as CSV')
     def get(self, request, pk):
         form = _get_form(pk, request.tenant, request.user)
         if not form:
@@ -188,6 +205,11 @@ class PublicFormSubmitView(APIView):
     permission_classes = [AllowAny]
     authentication_classes = []
 
+    @extend_schema(
+        tags=['public'],
+        summary='Submit public form response',
+        auth=[],
+    )
     def post(self, request, slug):
         try:
             form = Form.objects.get(public_url_slug=slug, status='active')

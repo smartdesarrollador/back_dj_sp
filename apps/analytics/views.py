@@ -14,6 +14,8 @@ from datetime import timedelta
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
 from django.utils import timezone
+from drf_spectacular.utils import OpenApiParameter, extend_schema
+from drf_spectacular.types import OpenApiTypes
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -92,6 +94,13 @@ def _compute_trends(tenant) -> list:
 class SummaryView(APIView):
     permission_classes = [HasPermission('reports.read'), HasFeature('analytics')]
 
+    @extend_schema(
+        tags=['reports'],
+        summary='Get tenant metrics summary',
+        parameters=[
+            OpenApiParameter('period', OpenApiTypes.INT, description='Period in days (default: 30, max: 365)'),
+        ],
+    )
     def get(self, request):
         try:
             period_days = min(int(request.query_params.get('period', 30)), 365)
@@ -109,6 +118,7 @@ class SummaryView(APIView):
 class UsageView(APIView):
     permission_classes = [HasPermission('reports.read'), HasFeature('analytics')]
 
+    @extend_schema(tags=['reports'], summary='Get resource usage vs plan limits')
     def get(self, request):
         cache_key = f'reports:usage:{request.tenant.pk}'
         data = cache.get(cache_key)
@@ -121,6 +131,7 @@ class UsageView(APIView):
 class TrendsView(APIView):
     permission_classes = [HasPermission('reports.read'), HasFeature('analytics_trends')]
 
+    @extend_schema(tags=['reports'], summary='Get daily audit event trends (last 30 days)')
     def get(self, request):
         cache_key = f'reports:trends:{request.tenant.pk}'
         trends = cache.get(cache_key)
@@ -133,6 +144,13 @@ class TrendsView(APIView):
 class ReportExportView(APIView):
     permission_classes = [HasPermission('reports.read'), HasFeature('pdf_export')]
 
+    @extend_schema(
+        tags=['reports'],
+        summary='Export executive report as JSON',
+        parameters=[
+            OpenApiParameter('period', OpenApiTypes.INT, description='Period in days (default: 30, max: 365)'),
+        ],
+    )
     def get(self, request):
         try:
             period_days = min(int(request.query_params.get('period', 30)), 365)

@@ -18,6 +18,8 @@ Endpoints:
 import csv
 
 from django.http import HttpResponse
+from drf_spectacular.utils import OpenApiParameter, extend_schema
+from drf_spectacular.types import OpenApiTypes
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -52,6 +54,14 @@ def _get_group(pk, tenant, user):
 class ContactListCreateView(APIView):
     permission_classes = [HasPermission('contacts.read')]
 
+    @extend_schema(
+        tags=['app-contacts'],
+        summary='List contacts',
+        parameters=[
+            OpenApiParameter('group', OpenApiTypes.UUID, description='Filter by group'),
+            OpenApiParameter('search', OpenApiTypes.STR, description='Search by name/email'),
+        ],
+    )
     def get(self, request):
         qs = Contact.objects.filter(tenant=request.tenant, user=request.user)
         group = request.query_params.get('group')
@@ -67,6 +77,7 @@ class ContactListCreateView(APIView):
             qs = qs.distinct()
         return Response({'contacts': ContactSerializer(qs, many=True).data})
 
+    @extend_schema(tags=['app-contacts'], summary='Create contact')
     def post(self, request):
         if not request.user.has_perm('contacts.create'):
             from rest_framework.exceptions import PermissionDenied
@@ -92,12 +103,14 @@ class ContactListCreateView(APIView):
 class ContactDetailView(APIView):
     permission_classes = [HasPermission('contacts.read')]
 
+    @extend_schema(tags=['app-contacts'], summary='Get contact detail')
     def get(self, request, pk):
         contact = _get_contact(pk, request.tenant, request.user)
         if not contact:
             return _NOT_FOUND
         return Response({'contact': ContactSerializer(contact).data})
 
+    @extend_schema(tags=['app-contacts'], summary='Update contact')
     def patch(self, request, pk):
         if not request.user.has_perm('contacts.update'):
             from rest_framework.exceptions import PermissionDenied
@@ -116,6 +129,7 @@ class ContactDetailView(APIView):
         contact.save()
         return Response(ContactSerializer(contact).data)
 
+    @extend_schema(tags=['app-contacts'], summary='Delete contact')
     def delete(self, request, pk):
         if not request.user.has_perm('contacts.delete'):
             from rest_framework.exceptions import PermissionDenied
@@ -130,10 +144,12 @@ class ContactDetailView(APIView):
 class ContactGroupListCreateView(APIView):
     permission_classes = [HasPermission('contacts.read'), HasFeature('contact_groups')]
 
+    @extend_schema(tags=['app-contacts'], summary='List contact groups')
     def get(self, request):
         groups = ContactGroup.objects.filter(tenant=request.tenant, user=request.user)
         return Response({'groups': ContactGroupSerializer(groups, many=True).data})
 
+    @extend_schema(tags=['app-contacts'], summary='Create contact group')
     def post(self, request):
         serializer = ContactGroupSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -144,6 +160,7 @@ class ContactGroupListCreateView(APIView):
 class ContactGroupDetailView(APIView):
     permission_classes = [HasPermission('contacts.read'), HasFeature('contact_groups')]
 
+    @extend_schema(tags=['app-contacts'], summary='Delete contact group')
     def delete(self, request, pk):
         group = _get_group(pk, request.tenant, request.user)
         if not group:
@@ -155,6 +172,7 @@ class ContactGroupDetailView(APIView):
 class ContactExportView(APIView):
     permission_classes = [HasPermission('contacts.read'), HasFeature('contact_export')]
 
+    @extend_schema(tags=['app-contacts'], summary='Export contacts as CSV')
     def get(self, request):
         contacts = Contact.objects.filter(tenant=request.tenant, user=request.user)
         response = HttpResponse(content_type='text/csv')

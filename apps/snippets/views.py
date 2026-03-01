@@ -10,6 +10,8 @@ Endpoints:
   PATCH  /app/snippets/<pk>/   → update snippet
   DELETE /app/snippets/<pk>/   → delete snippet
 """
+from drf_spectacular.utils import OpenApiParameter, extend_schema
+from drf_spectacular.types import OpenApiTypes
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -34,6 +36,15 @@ def _get_object(pk, tenant, user):
 class CodeSnippetListCreateView(APIView):
     permission_classes = [HasPermission('snippets.read')]
 
+    @extend_schema(
+        tags=['app-devops'],
+        summary='List code snippets',
+        parameters=[
+            OpenApiParameter('language', OpenApiTypes.STR, description='Filter by programming language'),
+            OpenApiParameter('tag', OpenApiTypes.STR, description='Filter by tag'),
+            OpenApiParameter('search', OpenApiTypes.STR, description='Search in title/description/code'),
+        ],
+    )
     def get(self, request):
         qs = CodeSnippet.objects.filter(tenant=request.tenant, user=request.user)
         language = request.query_params.get('language')
@@ -56,6 +67,7 @@ class CodeSnippetListCreateView(APIView):
             qs = qs.distinct()
         return Response({'snippets': CodeSnippetSerializer(qs, many=True).data})
 
+    @extend_schema(tags=['app-devops'], summary='Create code snippet')
     def post(self, request):
         if not request.user.has_perm('snippets.create'):
             from rest_framework.exceptions import PermissionDenied
@@ -75,12 +87,14 @@ class CodeSnippetListCreateView(APIView):
 class CodeSnippetDetailView(APIView):
     permission_classes = [HasPermission('snippets.read')]
 
+    @extend_schema(tags=['app-devops'], summary='Get snippet detail')
     def get(self, request, pk):
         snippet = _get_object(pk, request.tenant, request.user)
         if not snippet:
             return _NOT_FOUND
         return Response({'snippet': CodeSnippetSerializer(snippet).data})
 
+    @extend_schema(tags=['app-devops'], summary='Update snippet')
     def patch(self, request, pk):
         if not request.user.has_perm('snippets.update'):
             from rest_framework.exceptions import PermissionDenied
@@ -95,6 +109,7 @@ class CodeSnippetDetailView(APIView):
         snippet.save()
         return Response(CodeSnippetSerializer(snippet).data)
 
+    @extend_schema(tags=['app-devops'], summary='Delete snippet')
     def delete(self, request, pk):
         if not request.user.has_perm('snippets.delete'):
             from rest_framework.exceptions import PermissionDenied

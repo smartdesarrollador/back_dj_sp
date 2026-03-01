@@ -14,6 +14,8 @@ Endpoints:
   GET    /app/bookmarks/collections/<pk>/     → collection detail
   DELETE /app/bookmarks/collections/<pk>/     → delete collection
 """
+from drf_spectacular.utils import OpenApiParameter, extend_schema
+from drf_spectacular.types import OpenApiTypes
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -48,6 +50,15 @@ def _get_collection(pk, tenant, user):
 class BookmarkListCreateView(APIView):
     permission_classes = [HasPermission('bookmarks.read')]
 
+    @extend_schema(
+        tags=['app-bookmarks'],
+        summary='List bookmarks',
+        parameters=[
+            OpenApiParameter('collection', OpenApiTypes.UUID, description='Filter by collection'),
+            OpenApiParameter('search', OpenApiTypes.STR, description='Search in title/URL'),
+            OpenApiParameter('tag', OpenApiTypes.STR, description='Filter by tag'),
+        ],
+    )
     def get(self, request):
         qs = Bookmark.objects.filter(tenant=request.tenant, user=request.user)
         collection = request.query_params.get('collection')
@@ -64,6 +75,7 @@ class BookmarkListCreateView(APIView):
             qs = qs.filter(tags__contains=[tag])
         return Response({'bookmarks': BookmarkSerializer(qs, many=True).data})
 
+    @extend_schema(tags=['app-bookmarks'], summary='Create bookmark')
     def post(self, request):
         if not request.user.has_perm('bookmarks.create'):
             from rest_framework.exceptions import PermissionDenied
@@ -89,12 +101,14 @@ class BookmarkListCreateView(APIView):
 class BookmarkDetailView(APIView):
     permission_classes = [HasPermission('bookmarks.read')]
 
+    @extend_schema(tags=['app-bookmarks'], summary='Get bookmark detail')
     def get(self, request, pk):
         bookmark = _get_bookmark(pk, request.tenant, request.user)
         if not bookmark:
             return _NOT_FOUND
         return Response({'bookmark': BookmarkSerializer(bookmark).data})
 
+    @extend_schema(tags=['app-bookmarks'], summary='Update bookmark')
     def patch(self, request, pk):
         if not request.user.has_perm('bookmarks.update'):
             from rest_framework.exceptions import PermissionDenied
@@ -113,6 +127,7 @@ class BookmarkDetailView(APIView):
         bookmark.save()
         return Response(BookmarkSerializer(bookmark).data)
 
+    @extend_schema(tags=['app-bookmarks'], summary='Delete bookmark')
     def delete(self, request, pk):
         if not request.user.has_perm('bookmarks.delete'):
             from rest_framework.exceptions import PermissionDenied
@@ -127,10 +142,12 @@ class BookmarkDetailView(APIView):
 class BookmarkCollectionListCreateView(APIView):
     permission_classes = [HasPermission('bookmarks.read'), HasFeature('bookmark_collections')]
 
+    @extend_schema(tags=['app-bookmarks'], summary='List bookmark collections')
     def get(self, request):
         collections = BookmarkCollection.objects.filter(tenant=request.tenant, user=request.user)
         return Response({'collections': BookmarkCollectionSerializer(collections, many=True).data})
 
+    @extend_schema(tags=['app-bookmarks'], summary='Create bookmark collection')
     def post(self, request):
         serializer = BookmarkCollectionSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -143,6 +160,7 @@ class BookmarkCollectionListCreateView(APIView):
 class BookmarkCollectionDetailView(APIView):
     permission_classes = [HasPermission('bookmarks.read'), HasFeature('bookmark_collections')]
 
+    @extend_schema(tags=['app-bookmarks'], summary='Delete bookmark collection')
     def delete(self, request, pk):
         collection = _get_collection(pk, request.tenant, request.user)
         if not collection:

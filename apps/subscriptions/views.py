@@ -15,6 +15,8 @@ from datetime import datetime, timedelta, timezone as dt_tz
 import stripe
 from django.db import transaction
 from django.utils import timezone
+from drf_spectacular.utils import OpenApiParameter, OpenApiResponse, extend_schema
+from drf_spectacular.types import OpenApiTypes
 from rest_framework import status
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
@@ -53,6 +55,7 @@ def _ts_to_dt(timestamp):
 class CurrentSubscriptionView(APIView):
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(tags=['admin-billing'], summary='Get current subscription')
     def get(self, request):
         tenant = _get_tenant(request)
         if not tenant:
@@ -77,6 +80,15 @@ class CurrentSubscriptionView(APIView):
 class UpgradeSubscriptionView(APIView):
     permission_classes = [IsAuthenticated, HasPermission('subscriptions.manage')]
 
+    @extend_schema(
+        tags=['admin-billing'],
+        summary='Upgrade subscription plan',
+        request=UpgradeSerializer,
+        responses={
+            200: OpenApiResponse(description='Subscription upgraded'),
+            400: OpenApiResponse(description='Stripe error or validation error'),
+        },
+    )
     def post(self, request):
         tenant = _get_tenant(request)
         if not tenant:
@@ -141,6 +153,7 @@ class UpgradeSubscriptionView(APIView):
 class CancelSubscriptionView(APIView):
     permission_classes = [IsAuthenticated, HasPermission('subscriptions.cancel')]
 
+    @extend_schema(tags=['admin-billing'], summary='Cancel subscription at period end')
     def post(self, request):
         tenant = _get_tenant(request)
         if not tenant:
@@ -181,6 +194,13 @@ class CancelSubscriptionView(APIView):
 class InvoiceListView(APIView):
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(
+        tags=['admin-billing'],
+        summary='List invoices',
+        parameters=[
+            OpenApiParameter('refresh', OpenApiTypes.BOOL, description='Sync invoices from Stripe'),
+        ],
+    )
     def get(self, request):
         tenant = _get_tenant(request)
         if not tenant:
@@ -233,6 +253,12 @@ class WebhookView(APIView):
     permission_classes = [AllowAny]
     authentication_classes = []
 
+    @extend_schema(
+        tags=['admin-billing'],
+        summary='Stripe webhook receiver',
+        auth=[],
+        responses={200: OpenApiResponse(description='Webhook received')},
+    )
     def post(self, request):
         sig_header = request.META.get('HTTP_STRIPE_SIGNATURE', '')
         payload = request.body
@@ -339,6 +365,7 @@ def _extract_plan_from_items(items: list) -> str | None:
 class PaymentMethodView(APIView):
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(tags=['admin-billing'], summary='List payment methods')
     def get(self, request):
         tenant = _get_tenant(request)
         if not tenant:
@@ -357,6 +384,7 @@ class PaymentMethodView(APIView):
 class PaymentMethodCreateView(APIView):
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(tags=['admin-billing'], summary='Attach payment method to tenant')
     def post(self, request):
         tenant = _get_tenant(request)
         if not tenant:

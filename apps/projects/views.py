@@ -26,6 +26,7 @@ Endpoints:
 """
 from django.contrib.auth import get_user_model
 from django.db import transaction
+from drf_spectacular.utils import extend_schema
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -93,6 +94,7 @@ _NOT_FOUND = Response({'error': {'code': 'not_found', 'message': 'Not found.'}},
 class ProjectListView(APIView):
     permission_classes = [HasPermission('projects.read')]
 
+    @extend_schema(tags=['app-projects'], summary='List projects')
     def get(self, request):
         projects = Project.objects.filter(
             tenant=request.tenant
@@ -104,6 +106,7 @@ class ProjectListView(APIView):
 class ProjectCreateView(APIView):
     permission_classes = [HasPermission('projects.create')]
 
+    @extend_schema(tags=['app-projects'], summary='Create project')
     def post(self, request):
         count = Project.objects.filter(tenant=request.tenant).count()
         check_plan_limit(request.user, 'projects', count)
@@ -117,6 +120,7 @@ class ProjectCreateView(APIView):
 class ProjectDetailView(APIView):
     permission_classes = [HasPermission('projects.read')]
 
+    @extend_schema(tags=['app-projects'], summary='Get project detail')
     def get(self, request, pk):
         project = _get_project(pk, request.tenant)
         if not project:
@@ -128,6 +132,7 @@ class ProjectDetailView(APIView):
 class ProjectUpdateView(APIView):
     permission_classes = [HasPermission('projects.update')]
 
+    @extend_schema(tags=['app-projects'], summary='Update project')
     def patch(self, request, pk):
         project = _get_project(pk, request.tenant)
         if not project:
@@ -141,6 +146,7 @@ class ProjectUpdateView(APIView):
 class ProjectDeleteView(APIView):
     permission_classes = [HasPermission('projects.delete')]
 
+    @extend_schema(tags=['app-projects'], summary='Delete project')
     def delete(self, request, pk):
         project = _get_project(pk, request.tenant)
         if not project:
@@ -154,6 +160,7 @@ class ProjectDeleteView(APIView):
 class SectionCreateView(APIView):
     permission_classes = [HasPermission('projects.sections')]
 
+    @extend_schema(tags=['app-projects'], summary='Create section in project')
     def post(self, request, pk):
         project = _get_project(pk, request.tenant)
         if not project:
@@ -171,6 +178,7 @@ class SectionCreateView(APIView):
 class SectionReorderView(APIView):
     permission_classes = [HasPermission('projects.sections')]
 
+    @extend_schema(tags=['app-projects'], summary='Reorder sections')
     @transaction.atomic
     def patch(self, request, pk):
         project = _get_project(pk, request.tenant)
@@ -191,6 +199,7 @@ class SectionReorderView(APIView):
 class SectionUpdateView(APIView):
     permission_classes = [HasPermission('projects.sections')]
 
+    @extend_schema(tags=['app-projects'], summary='Update section')
     def patch(self, request, pk, sk):
         project = _get_project(pk, request.tenant)
         if not project:
@@ -207,6 +216,7 @@ class SectionUpdateView(APIView):
 class SectionDeleteView(APIView):
     permission_classes = [HasPermission('projects.sections')]
 
+    @extend_schema(tags=['app-projects'], summary='Delete section')
     def delete(self, request, pk, sk):
         project = _get_project(pk, request.tenant)
         if not project:
@@ -223,6 +233,7 @@ class SectionDeleteView(APIView):
 class ItemCreateView(APIView):
     permission_classes = [HasPermission('credentials.manage')]
 
+    @extend_schema(tags=['app-projects'], summary='Create item in section')
     def post(self, request, pk, sk):
         project = _get_project(pk, request.tenant)
         if not project:
@@ -244,6 +255,7 @@ class ItemCreateView(APIView):
 class ItemUpdateView(APIView):
     permission_classes = [HasPermission('credentials.manage')]
 
+    @extend_schema(tags=['app-projects'], summary='Update item')
     def patch(self, request, pk, sk, ik):
         project = _get_project(pk, request.tenant)
         if not project:
@@ -263,6 +275,7 @@ class ItemUpdateView(APIView):
 class ItemDeleteView(APIView):
     permission_classes = [HasPermission('credentials.manage')]
 
+    @extend_schema(tags=['app-projects'], summary='Delete item')
     def delete(self, request, pk, sk, ik):
         project = _get_project(pk, request.tenant)
         if not project:
@@ -282,6 +295,7 @@ class ItemDeleteView(APIView):
 class FieldCreateView(APIView):
     permission_classes = [HasPermission('credentials.manage')]
 
+    @extend_schema(tags=['app-projects'], summary='Create field in item')
     def post(self, request, pk, sk, ik):
         project = _get_project(pk, request.tenant)
         if not project:
@@ -302,6 +316,7 @@ class FieldCreateView(APIView):
 class FieldUpdateView(APIView):
     permission_classes = [HasPermission('credentials.manage')]
 
+    @extend_schema(tags=['app-projects'], summary='Update field')
     def patch(self, request, pk, sk, ik, fk):
         project = _get_project(pk, request.tenant)
         if not project:
@@ -329,6 +344,7 @@ class FieldUpdateView(APIView):
 class FieldDeleteView(APIView):
     permission_classes = [HasPermission('credentials.manage')]
 
+    @extend_schema(tags=['app-projects'], summary='Delete field')
     def delete(self, request, pk, sk, ik, fk):
         project = _get_project(pk, request.tenant)
         if not project:
@@ -351,6 +367,7 @@ class FieldDeleteView(APIView):
 class RevealPasswordView(APIView):
     permission_classes = [HasPermission('credentials.reveal')]
 
+    @extend_schema(tags=['app-projects'], summary='Reveal encrypted field value')
     def post(self, request, pk, sk, ik, fk):
         project = _get_project(pk, request.tenant)
         if not project:
@@ -394,6 +411,7 @@ class RevealPasswordView(APIView):
 class MemberListView(APIView):
     permission_classes = [HasPermission('projects.read')]
 
+    @extend_schema(tags=['app-projects'], summary='List project members')
     def get(self, request, pk):
         project = _get_project(pk, request.tenant)
         if not project:
@@ -405,6 +423,7 @@ class MemberListView(APIView):
 class MemberAddView(APIView):
     permission_classes = [HasPermission('projects.update')]
 
+    @extend_schema(tags=['app-projects'], summary='Add member to project')
     def post(self, request, pk):
         project = _get_project(pk, request.tenant)
         if not project:
@@ -437,6 +456,7 @@ class MemberAddView(APIView):
 class MemberRemoveView(APIView):
     permission_classes = [HasPermission('projects.update')]
 
+    @extend_schema(tags=['app-projects'], summary='Remove member from project')
     def delete(self, request, pk, mk):
         project = _get_project(pk, request.tenant)
         if not project:

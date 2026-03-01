@@ -11,6 +11,8 @@ Endpoints:
   DELETE /app/notes/<pk>/      → delete note
   PATCH  /app/notes/<pk>/pin/  → toggle pin
 """
+from drf_spectacular.utils import OpenApiParameter, extend_schema
+from drf_spectacular.types import OpenApiTypes
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -35,6 +37,14 @@ def _get_note(pk, tenant, user):
 class NoteListCreateView(APIView):
     permission_classes = [HasPermission('notes.read')]
 
+    @extend_schema(
+        tags=['app-notes'],
+        summary='List notes',
+        parameters=[
+            OpenApiParameter('category', OpenApiTypes.STR, description='Filter by category'),
+            OpenApiParameter('search', OpenApiTypes.STR, description='Search in title/content'),
+        ],
+    )
     def get(self, request):
         qs = Note.objects.filter(tenant=request.tenant, user=request.user)
         category = request.query_params.get('category')
@@ -48,6 +58,7 @@ class NoteListCreateView(APIView):
             qs = qs.distinct()
         return Response({'notes': NoteSerializer(qs, many=True).data})
 
+    @extend_schema(tags=['app-notes'], summary='Create note')
     def post(self, request):
         if not request.user.has_perm('notes.create'):
             from rest_framework.exceptions import PermissionDenied
@@ -67,12 +78,14 @@ class NoteListCreateView(APIView):
 class NoteDetailView(APIView):
     permission_classes = [HasPermission('notes.read')]
 
+    @extend_schema(tags=['app-notes'], summary='Get note detail')
     def get(self, request, pk):
         note = _get_note(pk, request.tenant, request.user)
         if not note:
             return _NOT_FOUND
         return Response({'note': NoteSerializer(note).data})
 
+    @extend_schema(tags=['app-notes'], summary='Update note')
     def patch(self, request, pk):
         if not request.user.has_perm('notes.update'):
             from rest_framework.exceptions import PermissionDenied
@@ -87,6 +100,7 @@ class NoteDetailView(APIView):
         note.save()
         return Response(NoteSerializer(note).data)
 
+    @extend_schema(tags=['app-notes'], summary='Delete note')
     def delete(self, request, pk):
         if not request.user.has_perm('notes.delete'):
             from rest_framework.exceptions import PermissionDenied
@@ -101,6 +115,7 @@ class NoteDetailView(APIView):
 class NotePinView(APIView):
     permission_classes = [HasPermission('notes.read')]
 
+    @extend_schema(tags=['app-notes'], summary='Toggle note pin status')
     def patch(self, request, pk):
         note = _get_note(pk, request.tenant, request.user)
         if not note:

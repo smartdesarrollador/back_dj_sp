@@ -10,6 +10,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.hashers import check_password, make_password
 from django.core.cache import cache
 from django.core.mail import send_mail
+from drf_spectacular.utils import OpenApiResponse, extend_schema
 from rest_framework import status
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
@@ -59,6 +60,15 @@ def _build_token_response(user) -> dict:
 class RegisterView(APIView):
     permission_classes = [AllowAny]
 
+    @extend_schema(
+        tags=['auth'],
+        summary='Register new tenant + user',
+        request=RegisterSerializer,
+        responses={
+            201: OpenApiResponse(description='Account created, verification email sent'),
+            400: OpenApiResponse(description='Validation error'),
+        },
+    )
     def post(self, request):
         serializer = RegisterSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -87,6 +97,16 @@ class RegisterView(APIView):
 class LoginView(APIView):
     permission_classes = [AllowAny]
 
+    @extend_schema(
+        tags=['auth'],
+        summary='Login with email/password',
+        request=LoginSerializer,
+        responses={
+            200: OpenApiResponse(description='JWT tokens or MFA challenge'),
+            400: OpenApiResponse(description='Validation error'),
+            401: OpenApiResponse(description='Invalid credentials'),
+        },
+    )
     def post(self, request):
         serializer = LoginSerializer(data=request.data, context={'request': request})
         serializer.is_valid(raise_exception=True)
@@ -102,6 +122,14 @@ class LoginView(APIView):
 class RefreshTokenView(APIView):
     permission_classes = [AllowAny]
 
+    @extend_schema(
+        tags=['auth'],
+        summary='Refresh access token',
+        responses={
+            200: OpenApiResponse(description='New access and refresh tokens'),
+            401: OpenApiResponse(description='Invalid or expired refresh token'),
+        },
+    )
     def post(self, request):
         raw_token = request.data.get('refresh_token')
         if not raw_token:
@@ -120,6 +148,15 @@ class RefreshTokenView(APIView):
 class LogoutView(APIView):
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(
+        tags=['auth'],
+        summary='Logout (blacklist token)',
+        request=LogoutSerializer,
+        responses={
+            204: OpenApiResponse(description='Logged out successfully'),
+            401: OpenApiResponse(description='Not authenticated'),
+        },
+    )
     def post(self, request):
         serializer = LogoutSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -134,6 +171,15 @@ class LogoutView(APIView):
 class VerifyEmailView(APIView):
     permission_classes = [AllowAny]
 
+    @extend_schema(
+        tags=['auth'],
+        summary='Verify email address',
+        request=VerifyEmailSerializer,
+        responses={
+            200: OpenApiResponse(description='Email verified successfully'),
+            400: OpenApiResponse(description='Invalid or expired token'),
+        },
+    )
     def post(self, request):
         serializer = VerifyEmailSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -152,6 +198,15 @@ class VerifyEmailView(APIView):
 class ForgotPasswordView(APIView):
     permission_classes = [AllowAny]
 
+    @extend_schema(
+        tags=['auth'],
+        summary='Request password reset',
+        request=ForgotPasswordSerializer,
+        responses={
+            200: OpenApiResponse(description='Reset link sent if email exists'),
+            400: OpenApiResponse(description='Validation error'),
+        },
+    )
     def post(self, request):
         serializer = ForgotPasswordSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -174,6 +229,15 @@ class ForgotPasswordView(APIView):
 class ResetPasswordView(APIView):
     permission_classes = [AllowAny]
 
+    @extend_schema(
+        tags=['auth'],
+        summary='Reset password with token',
+        request=ResetPasswordSerializer,
+        responses={
+            200: OpenApiResponse(description='Password reset successfully'),
+            400: OpenApiResponse(description='Invalid token or validation error'),
+        },
+    )
     def post(self, request):
         serializer = ResetPasswordSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -194,6 +258,14 @@ class ResetPasswordView(APIView):
 class MFAEnableView(APIView):
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(
+        tags=['auth'],
+        summary='Enable MFA (get QR code)',
+        responses={
+            200: OpenApiResponse(description='Provisioning URI and QR code (base64 PNG)'),
+            401: OpenApiResponse(description='Not authenticated'),
+        },
+    )
     def post(self, request):
         user = request.user
         mfa_secret = pyotp.random_base32()
@@ -213,6 +285,15 @@ class MFAEnableView(APIView):
 class MFAVerifySetupView(APIView):
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(
+        tags=['auth'],
+        summary='Verify MFA setup with TOTP',
+        request=MFAVerifySetupSerializer,
+        responses={
+            200: OpenApiResponse(description='MFA enabled, recovery codes returned'),
+            400: OpenApiResponse(description='Invalid TOTP code or expired session'),
+        },
+    )
     def post(self, request):
         serializer = MFAVerifySetupSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -247,6 +328,15 @@ class MFAVerifySetupView(APIView):
 class MFAValidateView(APIView):
     permission_classes = [AllowAny]
 
+    @extend_schema(
+        tags=['auth'],
+        summary='Validate MFA in login',
+        request=MFAValidateSerializer,
+        responses={
+            200: OpenApiResponse(description='JWT tokens'),
+            400: OpenApiResponse(description='Invalid TOTP code'),
+        },
+    )
     def post(self, request):
         serializer = MFAValidateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -270,6 +360,15 @@ class MFAValidateView(APIView):
 class MFADisableView(APIView):
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(
+        tags=['auth'],
+        summary='Disable MFA',
+        request=MFADisableSerializer,
+        responses={
+            200: OpenApiResponse(description='MFA disabled'),
+            400: OpenApiResponse(description='Invalid password'),
+        },
+    )
     def post(self, request):
         serializer = MFADisableSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -289,6 +388,15 @@ class MFADisableView(APIView):
 class MFARecoveryView(APIView):
     permission_classes = [AllowAny]
 
+    @extend_schema(
+        tags=['auth'],
+        summary='Use recovery code',
+        request=MFARecoverySerializer,
+        responses={
+            200: OpenApiResponse(description='JWT tokens'),
+            400: OpenApiResponse(description='Invalid or used recovery code'),
+        },
+    )
     def post(self, request):
         serializer = MFARecoverySerializer(data=request.data)
         serializer.is_valid(raise_exception=True)

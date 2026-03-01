@@ -11,6 +11,8 @@ Endpoints:
   DELETE /app/env-vars/<pk>/          → delete env var
   POST   /app/env-vars/<pk>/reveal/   → reveal decrypted value (audited)
 """
+from drf_spectacular.utils import OpenApiParameter, extend_schema
+from drf_spectacular.types import OpenApiTypes
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -36,6 +38,14 @@ def _get_object(pk, tenant, user):
 class EnvVariableListCreateView(APIView):
     permission_classes = [HasPermission('env_vars.read')]
 
+    @extend_schema(
+        tags=['app-devops'],
+        summary='List environment variables',
+        parameters=[
+            OpenApiParameter('environment', OpenApiTypes.STR, description='Filter by environment (dev/staging/prod)'),
+            OpenApiParameter('search', OpenApiTypes.STR, description='Search by key name'),
+        ],
+    )
     def get(self, request):
         qs = EnvVariable.objects.filter(tenant=request.tenant, user=request.user)
         environment = request.query_params.get('environment')
@@ -46,6 +56,7 @@ class EnvVariableListCreateView(APIView):
             qs = qs.filter(key__icontains=search)
         return Response({'env_vars': EnvVariableSerializer(qs, many=True).data})
 
+    @extend_schema(tags=['app-devops'], summary='Create environment variable')
     def post(self, request):
         if not request.user.has_perm('env_vars.create'):
             from rest_framework.exceptions import PermissionDenied
@@ -65,12 +76,14 @@ class EnvVariableListCreateView(APIView):
 class EnvVariableDetailView(APIView):
     permission_classes = [HasPermission('env_vars.read')]
 
+    @extend_schema(tags=['app-devops'], summary='Get environment variable (masked)')
     def get(self, request, pk):
         env_var = _get_object(pk, request.tenant, request.user)
         if not env_var:
             return _NOT_FOUND
         return Response({'env_var': EnvVariableSerializer(env_var).data})
 
+    @extend_schema(tags=['app-devops'], summary='Update environment variable')
     def patch(self, request, pk):
         if not request.user.has_perm('env_vars.update'):
             from rest_framework.exceptions import PermissionDenied
@@ -89,6 +102,7 @@ class EnvVariableDetailView(APIView):
         env_var.save()
         return Response(EnvVariableSerializer(env_var).data)
 
+    @extend_schema(tags=['app-devops'], summary='Delete environment variable')
     def delete(self, request, pk):
         if not request.user.has_perm('env_vars.delete'):
             from rest_framework.exceptions import PermissionDenied
@@ -103,6 +117,7 @@ class EnvVariableDetailView(APIView):
 class EnvVariableRevealView(APIView):
     permission_classes = [HasPermission('env_vars.reveal')]
 
+    @extend_schema(tags=['app-devops'], summary='Reveal decrypted env var value (audited)')
     def post(self, request, pk):
         env_var = _get_object(pk, request.tenant, request.user)
         if not env_var:

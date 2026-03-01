@@ -15,10 +15,6 @@ ruff==0.3.3
 mypy==1.9.0
 django-stubs==4.2.7
 
-# API Documentation
-drf-spectacular==0.27.1
-drf-spectacular[sidecar]==0.27.1
-
 # Development utilities
 ipython==8.22.2
 django-extensions==3.2.3

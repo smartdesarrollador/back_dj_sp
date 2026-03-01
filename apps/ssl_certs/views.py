@@ -10,6 +10,8 @@ Endpoints:
   PATCH  /app/ssl-certs/<pk>/   → update SSL cert
   DELETE /app/ssl-certs/<pk>/   → delete SSL cert
 """
+from drf_spectacular.utils import OpenApiParameter, extend_schema
+from drf_spectacular.types import OpenApiTypes
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -37,6 +39,14 @@ def _get_object(pk, tenant, user):
 class SSLCertificateListCreateView(APIView):
     permission_classes = [HasPermission('ssl_certs.read')]
 
+    @extend_schema(
+        tags=['app-devops'],
+        summary='List SSL certificates',
+        parameters=[
+            OpenApiParameter('domain', OpenApiTypes.STR, description='Filter by domain name'),
+            OpenApiParameter('status', OpenApiTypes.STR, description='Filter by status (valid/expiring/expired)'),
+        ],
+    )
     def get(self, request):
         qs = SSLCertificate.objects.filter(tenant=request.tenant, user=request.user)
         domain = request.query_params.get('domain')
@@ -48,6 +58,7 @@ class SSLCertificateListCreateView(APIView):
             certs = [c for c in certs if c.status == status_filter]
         return Response({'ssl_certs': SSLCertificateSerializer(certs, many=True).data})
 
+    @extend_schema(tags=['app-devops'], summary='Create SSL certificate tracking')
     def post(self, request):
         if not request.user.has_perm('ssl_certs.create'):
             from rest_framework.exceptions import PermissionDenied
@@ -67,12 +78,14 @@ class SSLCertificateListCreateView(APIView):
 class SSLCertificateDetailView(APIView):
     permission_classes = [HasPermission('ssl_certs.read')]
 
+    @extend_schema(tags=['app-devops'], summary='Get SSL certificate detail')
     def get(self, request, pk):
         cert = _get_object(pk, request.tenant, request.user)
         if not cert:
             return _NOT_FOUND
         return Response({'ssl_cert': SSLCertificateSerializer(cert).data})
 
+    @extend_schema(tags=['app-devops'], summary='Update SSL certificate')
     def patch(self, request, pk):
         if not request.user.has_perm('ssl_certs.update'):
             from rest_framework.exceptions import PermissionDenied
@@ -87,6 +100,7 @@ class SSLCertificateDetailView(APIView):
         cert.save()
         return Response(SSLCertificateSerializer(cert).data)
 
+    @extend_schema(tags=['app-devops'], summary='Delete SSL certificate')
     def delete(self, request, pk):
         if not request.user.has_perm('ssl_certs.delete'):
             from rest_framework.exceptions import PermissionDenied

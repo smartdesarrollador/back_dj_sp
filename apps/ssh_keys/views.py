@@ -10,6 +10,8 @@ Endpoints:
   PATCH  /app/ssh-keys/<pk>/     → update SSH key
   DELETE /app/ssh-keys/<pk>/     → delete SSH key
 """
+from drf_spectacular.utils import OpenApiParameter, extend_schema
+from drf_spectacular.types import OpenApiTypes
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -34,6 +36,14 @@ def _get_object(pk, tenant, user):
 class SSHKeyListCreateView(APIView):
     permission_classes = [HasPermission('ssh_keys.read')]
 
+    @extend_schema(
+        tags=['app-devops'],
+        summary='List SSH keys',
+        parameters=[
+            OpenApiParameter('algorithm', OpenApiTypes.STR, description='Filter by algorithm (rsa/ed25519/ecdsa)'),
+            OpenApiParameter('search', OpenApiTypes.STR, description='Search by name'),
+        ],
+    )
     def get(self, request):
         qs = SSHKey.objects.filter(tenant=request.tenant, user=request.user)
         algorithm = request.query_params.get('algorithm')
@@ -44,6 +54,7 @@ class SSHKeyListCreateView(APIView):
             qs = qs.filter(name__icontains=search)
         return Response({'ssh_keys': SSHKeySerializer(qs, many=True).data})
 
+    @extend_schema(tags=['app-devops'], summary='Create SSH key')
     def post(self, request):
         if not request.user.has_perm('ssh_keys.create'):
             from rest_framework.exceptions import PermissionDenied
@@ -63,12 +74,14 @@ class SSHKeyListCreateView(APIView):
 class SSHKeyDetailView(APIView):
     permission_classes = [HasPermission('ssh_keys.read')]
 
+    @extend_schema(tags=['app-devops'], summary='Get SSH key detail')
     def get(self, request, pk):
         ssh_key = _get_object(pk, request.tenant, request.user)
         if not ssh_key:
             return _NOT_FOUND
         return Response({'ssh_key': SSHKeySerializer(ssh_key).data})
 
+    @extend_schema(tags=['app-devops'], summary='Update SSH key')
     def patch(self, request, pk):
         if not request.user.has_perm('ssh_keys.update'):
             from rest_framework.exceptions import PermissionDenied
@@ -87,6 +100,7 @@ class SSHKeyDetailView(APIView):
         ssh_key.save()
         return Response(SSHKeySerializer(ssh_key).data)
 
+    @extend_schema(tags=['app-devops'], summary='Delete SSH key')
     def delete(self, request, pk):
         if not request.user.has_perm('ssh_keys.delete'):
             from rest_framework.exceptions import PermissionDenied

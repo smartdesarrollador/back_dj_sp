@@ -4,6 +4,8 @@ AuditLog views — endpoints de solo lectura con filtros y retención por plan.
 from datetime import timedelta
 
 from django.utils import timezone
+from drf_spectacular.utils import OpenApiParameter, extend_schema
+from drf_spectacular.types import OpenApiTypes
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -26,6 +28,20 @@ def _apply_retention(qs, tenant):
 class AuditLogListView(APIView):
     permission_classes = [HasFeature('audit_logs'), HasPermission('audit.read')]
 
+    @extend_schema(
+        tags=['audit'],
+        summary='List audit logs',
+        parameters=[
+            OpenApiParameter('action', OpenApiTypes.STR, description='Filter by action'),
+            OpenApiParameter('user_id', OpenApiTypes.UUID, description='Filter by user'),
+            OpenApiParameter('resource_type', OpenApiTypes.STR, description='Filter by resource type'),
+            OpenApiParameter('resource_id', OpenApiTypes.UUID, description='Filter by resource ID'),
+            OpenApiParameter('date_from', OpenApiTypes.DATE, description='Filter from date (YYYY-MM-DD)'),
+            OpenApiParameter('date_to', OpenApiTypes.DATE, description='Filter to date (YYYY-MM-DD)'),
+            OpenApiParameter('page', OpenApiTypes.INT, description='Page number (default: 1)'),
+            OpenApiParameter('per_page', OpenApiTypes.INT, description='Results per page (max: 100)'),
+        ],
+    )
     def get(self, request):
         qs = AuditLog.objects.filter(tenant=request.tenant)
         qs = _apply_retention(qs, request.tenant)
@@ -75,6 +91,7 @@ class AuditLogListView(APIView):
 class AuditLogDetailView(APIView):
     permission_classes = [HasFeature('audit_logs'), HasPermission('audit.read')]
 
+    @extend_schema(tags=['audit'], summary='Get audit log entry detail')
     def get(self, request, pk):
         try:
             log = AuditLog.objects.select_related('user').get(pk=pk, tenant=request.tenant)

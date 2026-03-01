@@ -47,6 +47,11 @@ PLAN_FEATURES: dict[str, dict[str, Any]] = {
         'form_export_csv': False,
         'analytics': False,
         'analytics_trends': False,
+        'max_task_boards': 1,
+        'max_tasks': 50,
+        'max_calendar_events': 50,
+        'task_assign': False,
+        'calendar_attendees': False,
     },
     'starter': {
         'max_users': 10,
@@ -86,6 +91,11 @@ PLAN_FEATURES: dict[str, dict[str, Any]] = {
         'form_export_csv': False,
         'analytics': True,
         'analytics_trends': False,
+        'max_task_boards': 5,
+        'max_tasks': 500,
+        'max_calendar_events': 200,
+        'task_assign': True,
+        'calendar_attendees': True,
     },
     'professional': {
         'max_users': 25,
@@ -125,6 +135,11 @@ PLAN_FEATURES: dict[str, dict[str, Any]] = {
         'form_export_csv': True,
         'analytics': True,
         'analytics_trends': True,
+        'max_task_boards': None,
+        'max_tasks': None,
+        'max_calendar_events': None,
+        'task_assign': True,
+        'calendar_attendees': True,
     },
     'enterprise': {
         'max_users': None,
@@ -164,6 +179,11 @@ PLAN_FEATURES: dict[str, dict[str, Any]] = {
         'form_export_csv': True,
         'analytics': True,
         'analytics_trends': True,
+        'max_task_boards': None,
+        'max_tasks': None,
+        'max_calendar_events': None,
+        'task_assign': True,
+        'calendar_attendees': True,
     },
 }
 

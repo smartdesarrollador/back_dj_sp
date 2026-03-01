@@ -16,6 +16,7 @@ import uuid
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.mail import send_mail
+from drf_spectacular.utils import OpenApiResponse, extend_schema
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -48,6 +49,7 @@ def _count_active_owners(tenant) -> int:
 class UserListView(APIView):
     permission_classes = [HasPermission('users.read')]
 
+    @extend_schema(tags=['admin-users'], summary='List users in tenant')
     def get(self, request):
         users = User.objects.filter(tenant=request.tenant).order_by('-created_at')
         return Response({'users': AdminUserListSerializer(users, many=True).data})
@@ -56,6 +58,15 @@ class UserListView(APIView):
 class UserCreateView(APIView):
     permission_classes = [HasPermission('users.create')]
 
+    @extend_schema(
+        tags=['admin-users'],
+        summary='Create user in tenant',
+        responses={
+            201: OpenApiResponse(description='User created'),
+            400: OpenApiResponse(description='Validation error'),
+            402: OpenApiResponse(description='Plan user limit exceeded'),
+        },
+    )
     def post(self, request):
         serializer = AdminUserCreateSerializer(data=request.data, context={'request': request})
         serializer.is_valid(raise_exception=True)
@@ -68,6 +79,7 @@ class UserCreateView(APIView):
 class UserInviteView(APIView):
     permission_classes = [HasPermission('users.invite')]
 
+    @extend_schema(tags=['admin-users'], summary='Invite user via email')
     def post(self, request):
         serializer = InviteUserSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -105,6 +117,7 @@ class UserInviteView(APIView):
 class UserDetailView(APIView):
     permission_classes = [HasPermission('users.read')]
 
+    @extend_schema(tags=['admin-users'], summary='Get user detail')
     def get(self, request, pk):
         try:
             user = User.objects.get(pk=pk, tenant=request.tenant)
@@ -116,6 +129,7 @@ class UserDetailView(APIView):
 class UserUpdateView(APIView):
     permission_classes = [HasPermission('users.update')]
 
+    @extend_schema(tags=['admin-users'], summary='Update user')
     def patch(self, request, pk):
         try:
             user = User.objects.get(pk=pk, tenant=request.tenant)
@@ -131,6 +145,7 @@ class UserUpdateView(APIView):
 class UserSuspendView(APIView):
     permission_classes = [HasPermission('users.update')]
 
+    @extend_schema(tags=['admin-users'], summary='Toggle user active/suspended status')
     def post(self, request, pk):
         try:
             user = User.objects.get(pk=pk, tenant=request.tenant)
@@ -156,6 +171,7 @@ class UserSuspendView(APIView):
 class UserRoleAssignView(APIView):
     permission_classes = [HasPermission('roles.assign')]
 
+    @extend_schema(tags=['admin-users'], summary='Assign role to user')
     def post(self, request, pk):
         try:
             user = User.objects.get(pk=pk, tenant=request.tenant)
@@ -184,6 +200,7 @@ class UserRoleAssignView(APIView):
 class UserRoleRemoveView(APIView):
     permission_classes = [HasPermission('roles.assign')]
 
+    @extend_schema(tags=['admin-users'], summary='Remove role from user')
     def delete(self, request, pk, role_pk):
         try:
             user = User.objects.get(pk=pk, tenant=request.tenant)
