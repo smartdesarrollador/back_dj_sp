@@ -61,6 +61,9 @@ PLAN_FEATURES: dict[str, dict[str, Any]] = {
         'digital_analytics': False,
         'qr_vcard_export': False,
         'max_portfolio_items': 0,
+        # Support
+        'support_export': False,
+        'support_sla': False,
     },
     'starter': {
         'max_users': 10,
@@ -114,6 +117,9 @@ PLAN_FEATURES: dict[str, dict[str, Any]] = {
         'digital_analytics': True,
         'qr_vcard_export': True,
         'max_portfolio_items': 0,
+        # Support
+        'support_export': False,
+        'support_sla': False,
     },
     'professional': {
         'max_users': 25,
@@ -167,6 +173,9 @@ PLAN_FEATURES: dict[str, dict[str, Any]] = {
         'digital_analytics': True,
         'qr_vcard_export': True,
         'max_portfolio_items': None,
+        # Support
+        'support_export': True,
+        'support_sla': False,
     },
     'enterprise': {
         'max_users': None,
@@ -220,6 +229,9 @@ PLAN_FEATURES: dict[str, dict[str, Any]] = {
         'digital_analytics': True,
         'qr_vcard_export': True,
         'max_portfolio_items': None,
+        # Support
+        'support_export': True,
+        'support_sla': True,
     },
 }
 
