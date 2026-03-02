@@ -31,7 +31,7 @@ class CalendarEvent(BaseModel):
         db_table = 'calendar_events'
         ordering = ['start_datetime']
         indexes = [
-            models.Index(fields=['tenant', 'user', 'start_datetime'], name='cal_events_tenant_user_start_idx'),
+            models.Index(fields=['tenant', 'user', 'start_datetime'], name='cal_evt_tnt_user_start_idx'),
             models.Index(fields=['tenant', 'user', 'end_datetime'], name='cal_events_tenant_user_end_idx'),
         ]
 

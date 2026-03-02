@@ -67,10 +67,10 @@ class SupportTicket(BaseModel):
         db_table = 'support_tickets'
         ordering = ['-created_at']
         indexes = [
-            models.Index(fields=['tenant', 'status'], name='support_tickets_tenant_status_idx'),
-            models.Index(fields=['tenant', 'priority'], name='support_tickets_tenant_priority_idx'),
-            models.Index(fields=['tenant', 'client'], name='support_tickets_tenant_client_idx'),
-            models.Index(fields=['assigned_to', 'status'], name='support_tickets_assigned_status_idx'),
+            models.Index(fields=['tenant', 'status'], name='sup_tkt_tenant_status_idx'),
+            models.Index(fields=['tenant', 'priority'], name='sup_tkt_tenant_priority_idx'),
+            models.Index(fields=['tenant', 'client'], name='sup_tkt_tenant_client_idx'),
+            models.Index(fields=['assigned_to', 'status'], name='sup_tkt_assigned_status_idx'),
         ]
 
     def __str__(self) -> str:

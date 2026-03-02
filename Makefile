@@ -4,7 +4,7 @@
 
 .PHONY: help dev down build test lint format typecheck \
         migrate makemigrations shell logs clean \
-        seed-permissions seed-data superuser
+        seed-permissions seed-data seed-faker superuser
 
 # Default: show help
 help:
@@ -16,6 +16,7 @@ help:
 	@echo "  make makemigrations  Create new migrations"
 	@echo "  make seed-permissions  Load permissions and system roles fixtures"
 	@echo "  make seed-data       Generate dev seed data (tenants, users)"
+	@echo "  make seed-faker      Fill all app tables with realistic Faker data"
 	@echo "  make superuser       Create a Django superuser"
 	@echo "  make test            Run test suite"
 	@echo "  make lint            Run ruff linter"
@@ -50,6 +51,9 @@ seed-permissions:
 
 seed-data:
 	docker-compose exec django python manage.py seed_dev_data
+
+seed-faker:
+	docker-compose exec django python manage.py seed_faker_data
 
 superuser:
 	docker-compose exec django python manage.py createsuperuser

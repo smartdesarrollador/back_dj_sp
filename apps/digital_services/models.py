@@ -44,7 +44,7 @@ class PublicProfile(BaseModel):
         db_table = 'public_profiles'
         indexes = [
             models.Index(fields=['username'], name='public_profiles_username_idx'),
-            models.Index(fields=['is_public', 'created_at'], name='public_profiles_public_created_idx'),
+            models.Index(fields=['is_public', 'created_at'], name='pub_profiles_pub_created_idx'),
         ]
 
     def __str__(self) -> str:
@@ -146,7 +146,7 @@ class PortfolioItem(BaseModel):
         ordering = ['-is_featured', 'order', '-project_date']
         unique_together = [['profile', 'slug']]
         indexes = [
-            models.Index(fields=['profile', 'is_featured'], name='portfolio_items_profile_featured_idx'),
+            models.Index(fields=['profile', 'is_featured'], name='portf_items_prof_feat_idx'),
         ]
 
     def __str__(self) -> str:
