@@ -1,6 +1,7 @@
 """Serializers for auth_app."""
 import uuid
 
+from django.conf import settings
 from django.contrib.auth import authenticate, get_user_model
 from django.db import transaction
 from django.utils.text import slugify
@@ -80,6 +81,9 @@ class RegisterSerializer(serializers.Serializer):
             password=data['password'],
             tenant=tenant,
         )
+        if settings.DEBUG:
+            user.email_verified = True
+            user.save(update_fields=['email_verified'])
         from apps.rbac.models import Role, UserRole
         try:
             owner_role = Role.objects.get(name='Owner', is_system_role=True)
