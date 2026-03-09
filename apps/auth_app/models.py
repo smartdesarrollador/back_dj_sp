@@ -5,8 +5,10 @@ No hereda de BaseModel para evitar conflictos de metaclase con AbstractBaseUser.
 Los campos id, created_at y updated_at se definen explícitamente.
 AbstractBaseUser provee: password, last_login.
 """
+import secrets
 import uuid
 
+from django.conf import settings
 from django.contrib.auth.hashers import make_password
 from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
 from django.db import models
@@ -118,3 +120,35 @@ class MFARecoveryCode(models.Model):
 
     def __str__(self) -> str:
         return f"RecoveryCode({self.user_id}, used={self.is_used})"
+
+
+class SSOToken(models.Model):
+    """Token opaco single-use TTL=60s para SSO Hub → servicio destino."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='sso_tokens',
+    )
+    tenant = models.ForeignKey(
+        'tenants.Tenant',
+        on_delete=models.CASCADE,
+        related_name='sso_tokens',
+    )
+    service = models.CharField(max_length=50)
+    token = models.CharField(max_length=64, unique=True, db_index=True)
+    used_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    expires_at = models.DateTimeField(db_index=True)
+
+    class Meta:
+        db_table = 'sso_tokens'
+        indexes = [
+            models.Index(fields=['token'], name='sso_tokens_token_idx'),
+            models.Index(fields=['expires_at', 'used_at'], name='sso_tokens_expires_used_idx'),
+        ]
+
+    def __str__(self) -> str:
+        return f'SSOToken({self.service}, {self.token[:8]}...)'

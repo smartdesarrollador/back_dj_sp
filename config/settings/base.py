@@ -63,6 +63,8 @@ LOCAL_APPS = [
     'apps.sharing',
     'apps.digital_services',
     'apps.support',
+    'apps.services',
+    'apps.referrals',
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
@@ -219,6 +221,14 @@ CELERY_BEAT_SCHEDULE = {
         'task': 'apps.audit.tasks.purge_old_audit_logs',
         'schedule': crontab(hour=2, minute=0),  # Daily at 2:00 AM UTC
     },
+    'cleanup-expired-sso-tokens': {
+        'task': 'apps.auth_app.tasks.cleanup_expired_sso_tokens',
+        'schedule': crontab(minute='*/5'),
+    },
+    'activate-pending-referrals': {
+        'task': 'apps.referrals.tasks.activate_pending_referrals',
+        'schedule': crontab(hour=3, minute=0),  # Daily at 3:00 AM UTC
+    },
 }
 
 # ─── Email ────────────────────────────────────────────────────────────────────
@@ -253,6 +263,9 @@ STRIPE_PLAN_PRICES: dict[str, dict[str, str]] = {
 
 # ─── Encryption ───────────────────────────────────────────────────────────────
 ENCRYPTION_KEY = env('ENCRYPTION_KEY', default='')
+
+# ─── Referrals ────────────────────────────────────────────────────────────────
+REFERRAL_BASE_URL = env('REFERRAL_BASE_URL', default='https://hub.app')
 
 # ─── App URLs ─────────────────────────────────────────────────────────────────
 APP_BASE_URL = env('APP_BASE_URL', default='http://localhost:8000')

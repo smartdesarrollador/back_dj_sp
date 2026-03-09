@@ -62,9 +62,48 @@ class PaymentMethodSerializer(serializers.ModelSerializer):
             'exp_month',
             'exp_year',
             'is_default',
+            'external_type',
+            'external_email',
+            'external_phone',
+            # external_account_id is intentionally excluded — write-only, sensitive
             'created_at',
         ]
         read_only_fields = fields
+
+
+_LATAM_TYPES = ['paypal', 'mercadopago', 'yape', 'plin', 'nequi', 'daviplata']
+
+
+class PaymentMethodCreateSerializer(serializers.Serializer):
+    # Card (Stripe)
+    stripe_payment_method_id = serializers.CharField(required=False, allow_blank=True)
+    set_default = serializers.BooleanField(required=False, default=True)
+    # LATAM external methods
+    external_type = serializers.ChoiceField(choices=_LATAM_TYPES, required=False)
+    external_email = serializers.EmailField(required=False, allow_blank=True)
+    external_phone = serializers.CharField(required=False, allow_blank=True, max_length=20)
+    external_account_id = serializers.CharField(required=False, allow_blank=True)
+    is_default = serializers.BooleanField(required=False, default=True)
+
+    def validate(self, data: dict) -> dict:
+        has_stripe = bool(data.get('stripe_payment_method_id'))
+        has_external = bool(data.get('external_type'))
+        if not has_stripe and not has_external:
+            raise serializers.ValidationError(
+                'Provide stripe_payment_method_id (card) or external_type (LATAM).'
+            )
+        if has_stripe and has_external:
+            raise serializers.ValidationError(
+                'Cannot provide both stripe_payment_method_id and external_type.'
+            )
+        return data
+
+
+class PaymentMethodUpdateSerializer(serializers.Serializer):
+    is_default = serializers.BooleanField(required=False)
+    external_email = serializers.EmailField(required=False, allow_blank=True)
+    external_phone = serializers.CharField(required=False, allow_blank=True, max_length=20)
+    external_account_id = serializers.CharField(required=False, allow_blank=True)
 
 
 class UpgradeSerializer(serializers.Serializer):

@@ -1,4 +1,5 @@
 """Tests for subscription billing views. All Stripe API calls are mocked."""
+import base64
 import json
 import uuid
 from unittest.mock import MagicMock, patch
@@ -12,6 +13,9 @@ from apps.subscriptions.models import Invoice, PaymentMethod, Subscription
 from apps.tenants.models import Tenant
 
 _FAST_HASHERS = ['django.contrib.auth.hashers.MD5PasswordHasher']
+
+# Valid Fernet key: base64url-encoded 32 bytes
+_TEST_ENCRYPTION_KEY = base64.urlsafe_b64encode(b'testkey-for-paso24-encryption-!1').decode()
 
 _TEST_STRIPE_SETTINGS = {
     'STRIPE_SECRET_KEY': 'sk_test_fake',
@@ -411,3 +415,231 @@ class TestWebhookView(APITestCase):
         resp = self._post_webhook({'type': 'some.unknown.event'})
 
         self.assertEqual(resp.status_code, status.HTTP_200_OK)
+
+
+# ─── PaymentMethodListView / PaymentMethodDetailView ──────────────────────────
+
+_PM_URL = '/api/v1/admin/billing/payment-methods'
+
+
+@override_settings(
+    PASSWORD_HASHERS=_FAST_HASHERS,
+    ENCRYPTION_KEY=_TEST_ENCRYPTION_KEY,
+    **_TEST_STRIPE_SETTINGS,
+)
+class TestPaymentMethodCRUD(APITestCase):
+    def setUp(self):
+        self.tenant = make_tenant()
+        self.other_tenant = make_tenant()
+        self.user = make_user(self.tenant, is_superuser=True)
+        self.other_user = make_user(self.other_tenant, is_superuser=True)
+        self.client.force_authenticate(user=self.user)
+
+    def _pm_detail_url(self, pm_id):
+        return f'{_PM_URL}/{pm_id}/'
+
+    def _make_latam_pm(self, tenant=None, **kwargs):
+        """Create a LATAM PaymentMethod directly in the DB (bypasses save encryption)."""
+        import os
+        os.environ.setdefault('ENCRYPTION_KEY', _TEST_ENCRYPTION_KEY)
+        t = tenant or self.tenant
+        return PaymentMethod.objects.create(
+            tenant=t,
+            type='external',
+            external_type=kwargs.get('external_type', 'paypal'),
+            external_email=kwargs.get('external_email', 'test@paypal.com'),
+            is_default=kwargs.get('is_default', False),
+        )
+
+    # ── List ──────────────────────────────────────────────────────────────────
+
+    def test_list_returns_payment_methods(self):
+        self._make_latam_pm()
+        resp = self.client.get(_PM_URL, **slug_header(self.tenant.slug))
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(resp.data['payment_methods']), 1)
+
+    def test_list_requires_auth(self):
+        client = APIClient()
+        resp = client.get(_PM_URL, **slug_header(self.tenant.slug))
+        self.assertEqual(resp.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_list_tenant_isolation(self):
+        self._make_latam_pm(tenant=self.other_tenant)
+        resp = self.client.get(_PM_URL, **slug_header(self.tenant.slug))
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.assertEqual(resp.data['payment_methods'], [])
+
+    # ── Create (LATAM) ────────────────────────────────────────────────────────
+
+    def test_create_latam_paypal(self):
+        resp = self.client.post(
+            _PM_URL,
+            {'external_type': 'paypal', 'external_email': 'user@paypal.com', 'is_default': True},
+            format='json',
+            **slug_header(self.tenant.slug),
+        )
+        self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
+        pm_data = resp.data['payment_method']
+        self.assertEqual(pm_data['external_type'], 'paypal')
+        self.assertEqual(pm_data['external_email'], 'user@paypal.com')
+        self.assertEqual(pm_data['type'], 'external')
+
+    def test_create_latam_yape(self):
+        resp = self.client.post(
+            _PM_URL,
+            {'external_type': 'yape', 'external_phone': '+51999888777', 'is_default': False},
+            format='json',
+            **slug_header(self.tenant.slug),
+        )
+        self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(resp.data['payment_method']['external_type'], 'yape')
+        self.assertEqual(resp.data['payment_method']['external_phone'], '+51999888777')
+
+    def test_create_encrypts_account_id(self):
+        resp = self.client.post(
+            _PM_URL,
+            {
+                'external_type': 'mercadopago',
+                'external_email': 'vendor@mp.com',
+                'external_account_id': 'acc-secret-123',
+                'is_default': True,
+            },
+            format='json',
+            **slug_header(self.tenant.slug),
+        )
+        self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
+        pm_id = resp.data['payment_method']['id']
+        pm = PaymentMethod.objects.get(id=pm_id)
+        # Stored value must be encrypted (Fernet tokens start with 'gAAAAA')
+        self.assertTrue(pm.external_account_id.startswith('gAAAAA'))
+        # Must not be returned in response
+        self.assertNotIn('external_account_id', resp.data['payment_method'])
+
+    def test_create_missing_method_returns_400(self):
+        resp = self.client.post(
+            _PM_URL,
+            {'is_default': True},
+            format='json',
+            **slug_header(self.tenant.slug),
+        )
+        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_create_both_methods_rejected(self):
+        resp = self.client.post(
+            _PM_URL,
+            {
+                'stripe_payment_method_id': 'pm_fake',
+                'external_type': 'paypal',
+                'external_email': 'x@y.com',
+            },
+            format='json',
+            **slug_header(self.tenant.slug),
+        )
+        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+
+    # ── Create (Stripe card) ───────────────────────────────────────────────────
+
+    @patch('stripe.Customer.create')
+    @patch('stripe.PaymentMethod.attach')
+    @patch('stripe.Customer.modify')
+    @patch('stripe.PaymentMethod.retrieve')
+    def test_create_card_via_stripe(
+        self, mock_retrieve, mock_modify, mock_attach, mock_cust_create
+    ):
+        mock_cust_create.return_value = MagicMock(id='cus_pm_test')
+        mock_attach.return_value = MagicMock()
+        mock_modify.return_value = MagicMock()
+        mock_retrieve.return_value = {
+            'type': 'card',
+            'card': {'brand': 'visa', 'last4': '4242', 'exp_month': 12, 'exp_year': 2030},
+        }
+
+        resp = self.client.post(
+            _PM_URL,
+            {'stripe_payment_method_id': 'pm_card_test', 'set_default': True},
+            format='json',
+            **slug_header(self.tenant.slug),
+        )
+        self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
+        pm_data = resp.data['payment_method']
+        self.assertEqual(pm_data['brand'], 'visa')
+        self.assertEqual(pm_data['last4'], '4242')
+
+    # ── PATCH ─────────────────────────────────────────────────────────────────
+
+    def test_patch_set_default(self):
+        pm1 = self._make_latam_pm(external_type='paypal', is_default=True)
+        pm2 = self._make_latam_pm(external_type='yape', is_default=False)
+
+        resp = self.client.patch(
+            self._pm_detail_url(pm2.id),
+            {'is_default': True},
+            format='json',
+            **slug_header(self.tenant.slug),
+        )
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        pm1.refresh_from_db()
+        pm2.refresh_from_db()
+        self.assertFalse(pm1.is_default)
+        self.assertTrue(pm2.is_default)
+
+    def test_patch_requires_manage_permission(self):
+        pm = self._make_latam_pm()
+        user_no_perm = make_user(self.tenant)
+        self.client.force_authenticate(user=user_no_perm)
+
+        resp = self.client.patch(
+            self._pm_detail_url(pm.id),
+            {'is_default': True},
+            format='json',
+            **slug_header(self.tenant.slug),
+        )
+        self.assertEqual(resp.status_code, status.HTTP_403_FORBIDDEN)
+
+    # ── DELETE ────────────────────────────────────────────────────────────────
+
+    def test_delete_payment_method(self):
+        # Create 2 PMs so deleting one is not blocked (not the last method)
+        pm1 = self._make_latam_pm(external_type='paypal')
+        self._make_latam_pm(external_type='yape')
+        resp = self.client.delete(
+            self._pm_detail_url(pm1.id),
+            **slug_header(self.tenant.slug),
+        )
+        self.assertEqual(resp.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertFalse(PaymentMethod.objects.filter(id=pm1.id).exists())
+
+    def test_delete_last_method_blocked_when_active_sub(self):
+        pm = self._make_latam_pm()
+        sub = Subscription.objects.get(tenant=self.tenant)
+        sub.status = 'active'
+        sub.save()
+
+        resp = self.client.delete(
+            self._pm_detail_url(pm.id),
+            **slug_header(self.tenant.slug),
+        )
+        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(resp.data['error']['code'], 'last_payment_method')
+
+    def test_delete_last_method_allowed_when_no_sub(self):
+        pm = self._make_latam_pm()
+        Subscription.objects.filter(tenant=self.tenant).delete()
+
+        resp = self.client.delete(
+            self._pm_detail_url(pm.id),
+            **slug_header(self.tenant.slug),
+        )
+        self.assertEqual(resp.status_code, status.HTTP_204_NO_CONTENT)
+
+    def test_delete_requires_manage_permission(self):
+        pm = self._make_latam_pm()
+        user_no_perm = make_user(self.tenant)
+        self.client.force_authenticate(user=user_no_perm)
+
+        resp = self.client.delete(
+            self._pm_detail_url(pm.id),
+            **slug_header(self.tenant.slug),
+        )
+        self.assertEqual(resp.status_code, status.HTTP_403_FORBIDDEN)

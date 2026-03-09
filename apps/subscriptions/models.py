@@ -5,11 +5,16 @@ Subscription  — OneToOne with Tenant, tracks plan/status/Stripe IDs
 Invoice       — Billing invoices (synced from Stripe), amounts in cents
 PaymentMethod — Stored payment method metadata (tokenized by Stripe)
 """
+from decimal import Decimal
+
 from django.db import models
 from django.db.models import CASCADE
 
 from core.models import BaseModel
 from apps.tenants.models import PLAN_CHOICES
+
+
+LATAM_PAYMENT_TYPES = ['paypal', 'mercadopago', 'yape', 'plin', 'nequi', 'daviplata']
 
 
 STATUS_CHOICES = [
@@ -59,6 +64,11 @@ class Subscription(BaseModel):
     current_period_start = models.DateTimeField(null=True, blank=True)
     current_period_end = models.DateTimeField(null=True, blank=True)
     cancel_at_period_end = models.BooleanField(default=False)
+    credit_balance = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=Decimal('0.00'),
+    )
 
     class Meta:
         db_table = 'subscriptions'
@@ -108,21 +118,28 @@ class Invoice(BaseModel):
 
 class PaymentMethod(BaseModel):
     """
-    Tokenized payment method stored in Stripe.
-    Only metadata is stored locally — no raw card numbers.
+    Stored payment method — either a Stripe card or a LATAM external method.
+    Stripe methods: stripe_payment_method_id populated, type='card'.
+    LATAM methods: external_type set, type='external', account_id AES-256 encrypted.
     """
     tenant = models.ForeignKey(
         'tenants.Tenant',
         on_delete=CASCADE,
         related_name='payment_methods',
     )
-    stripe_payment_method_id = models.CharField(max_length=255, unique=True)
-    type = models.CharField(max_length=20, default='card')  # 'card', 'bank_account'
+    stripe_payment_method_id = models.CharField(max_length=255, unique=True, null=True, blank=True)
+    type = models.CharField(max_length=20, default='card')  # 'card', 'external'
     brand = models.CharField(max_length=20, blank=True)     # 'visa', 'mastercard'
     last4 = models.CharField(max_length=4, blank=True)
     exp_month = models.PositiveSmallIntegerField(null=True, blank=True)
     exp_year = models.PositiveSmallIntegerField(null=True, blank=True)
     is_default = models.BooleanField(default=False)
+    # LATAM / external payment methods
+    external_type = models.CharField(max_length=20, blank=True)
+    # 'paypal' | 'mercadopago' | 'yape' | 'plin' | 'nequi' | 'daviplata'
+    external_email = models.EmailField(blank=True)          # PayPal, MercadoPago
+    external_phone = models.CharField(max_length=20, blank=True)  # Yape, Plin, Nequi, Daviplata
+    external_account_id = models.TextField(blank=True)      # AES-256 encrypted
 
     class Meta:
         db_table = 'payment_methods'
@@ -131,12 +148,18 @@ class PaymentMethod(BaseModel):
         ]
 
     def save(self, *args, **kwargs):
+        # Ensure only one default per tenant
         if self.is_default:
-            # Ensure only one default per tenant
             PaymentMethod.objects.filter(
                 tenant=self.tenant, is_default=True
             ).exclude(pk=self.pk).update(is_default=False)
+        # Encrypt external_account_id if present and not already encrypted
+        if self.external_account_id and not self.external_account_id.startswith('gAAAAA'):
+            from utils.encryption import encrypt_value
+            self.external_account_id = encrypt_value(self.external_account_id)
         super().save(*args, **kwargs)
 
     def __str__(self) -> str:
+        if self.external_type:
+            return f"{self.tenant.slug} — {self.external_type}"
         return f"{self.tenant.slug} — {self.brand} ****{self.last4}"

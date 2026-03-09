@@ -55,6 +55,8 @@ urlpatterns = [
         path('digital/', include('apps.digital_services.urls')),
         path('reports/', include('apps.analytics.urls')),
         path('sharing/', include('apps.sharing.urls')),
+        path('services/', include('apps.services.urls')),
+        path('referrals/', include('apps.referrals.urls')),
     ])),
 
     # Public endpoints (no auth)

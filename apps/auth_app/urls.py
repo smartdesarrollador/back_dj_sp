@@ -1,4 +1,4 @@
-from django.urls import path
+from django.urls import include, path
 
 from .views import (
     ForgotPasswordView,
@@ -28,4 +28,5 @@ urlpatterns = [
     path('mfa/validate', MFAValidateView.as_view(), name='mfa-validate'),
     path('mfa/disable', MFADisableView.as_view(), name='mfa-disable'),
     path('mfa/recovery', MFARecoveryView.as_view(), name='mfa-recovery'),
+    path('sso/', include('apps.auth_app.sso_urls')),
 ]

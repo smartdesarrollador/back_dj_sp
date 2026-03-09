@@ -1,13 +1,13 @@
 """
 Subscription billing views.
 
-CurrentSubscriptionView  — GET  /api/v1/admin/subscriptions/current
-UpgradeSubscriptionView  — POST /api/v1/admin/subscriptions/upgrade
-CancelSubscriptionView   — POST /api/v1/admin/subscriptions/cancel
-InvoiceListView          — GET  /api/v1/admin/billing/invoices
-WebhookView              — POST /api/v1/admin/billing/webhooks
-PaymentMethodView        — GET  /api/v1/admin/billing/payment-methods
-PaymentMethodCreateView  — POST /api/v1/admin/billing/payment-methods/create
+CurrentSubscriptionView    — GET  /api/v1/admin/subscriptions/current
+UpgradeSubscriptionView    — POST /api/v1/admin/subscriptions/upgrade
+CancelSubscriptionView     — POST /api/v1/admin/subscriptions/cancel
+InvoiceListView            — GET  /api/v1/admin/billing/invoices
+WebhookView                — POST /api/v1/admin/billing/webhooks
+PaymentMethodListView      — GET+POST /api/v1/admin/billing/payment-methods
+PaymentMethodDetailView    — PATCH+DELETE /api/v1/admin/billing/payment-methods/{pm_id}/
 """
 import logging
 from datetime import datetime, timedelta, timezone as dt_tz
@@ -27,7 +27,9 @@ from apps.subscriptions.models import Invoice, PaymentMethod, Subscription
 from apps.subscriptions.serializers import (
     CurrentSubscriptionSerializer,
     InvoiceSerializer,
+    PaymentMethodCreateSerializer,
     PaymentMethodSerializer,
+    PaymentMethodUpdateSerializer,
     SubscriptionSerializer,
     UpgradeSerializer,
 )
@@ -362,8 +364,16 @@ def _extract_plan_from_items(items: list) -> str | None:
     return None
 
 
-class PaymentMethodView(APIView):
-    permission_classes = [IsAuthenticated]
+class PaymentMethodListView(APIView):
+    """
+    GET  /api/v1/admin/billing/payment-methods  — list payment methods
+    POST /api/v1/admin/billing/payment-methods  — create (Stripe card or LATAM)
+    """
+
+    def get_permissions(self):
+        if self.request.method == 'POST':
+            return [IsAuthenticated(), HasPermission('billing.manage')()]
+        return [IsAuthenticated()]
 
     @extend_schema(tags=['admin-billing'], summary='List payment methods')
     def get(self, request):
@@ -373,18 +383,10 @@ class PaymentMethodView(APIView):
                 {'error': {'code': 'tenant_not_found', 'message': 'Tenant not found.'}},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+        methods = PaymentMethod.objects.filter(tenant=tenant).order_by('-is_default', '-created_at')
+        return Response({'payment_methods': PaymentMethodSerializer(methods, many=True).data})
 
-        payment_methods = PaymentMethod.objects.filter(tenant=tenant).order_by(
-            '-is_default', '-created_at'
-        )
-        serializer = PaymentMethodSerializer(payment_methods, many=True)
-        return Response({'payment_methods': serializer.data})
-
-
-class PaymentMethodCreateView(APIView):
-    permission_classes = [IsAuthenticated]
-
-    @extend_schema(tags=['admin-billing'], summary='Attach payment method to tenant')
+    @extend_schema(tags=['admin-billing'], summary='Create payment method (card or LATAM)')
     def post(self, request):
         tenant = _get_tenant(request)
         if not tenant:
@@ -392,44 +394,36 @@ class PaymentMethodCreateView(APIView):
                 {'error': {'code': 'tenant_not_found', 'message': 'Tenant not found.'}},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+        serializer = PaymentMethodCreateSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response({'error': serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
 
-        pm_id = request.data.get('stripe_payment_method_id', '')
-        set_default = request.data.get('set_default', True)
+        data = serializer.validated_data
+        if data.get('stripe_payment_method_id'):
+            return self._create_stripe_method(request, tenant, data)
+        return self._create_latam_method(tenant, data)
 
-        if not pm_id:
-            return Response(
-                {
-                    'error': {
-                        'code': 'validation_error',
-                        'message': 'stripe_payment_method_id is required.',
-                    }
-                },
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+    def _create_stripe_method(self, request, tenant, data):
+        pm_id = data['stripe_payment_method_id']
+        set_default = data.get('set_default', True)
 
         subscription, _ = Subscription.objects.get_or_create(
             tenant=tenant,
             defaults={'plan': 'free', 'status': 'trialing'},
         )
-
         stripe_client = StripeClient()
         try:
-            # Ensure customer exists
             if not subscription.stripe_customer_id:
                 customer_id = stripe_client.create_customer(tenant)
                 subscription.stripe_customer_id = customer_id
                 subscription.save(update_fields=['stripe_customer_id', 'updated_at'])
 
-            # Attach payment method to customer
             stripe_client.attach_payment_method(subscription.stripe_customer_id, pm_id)
-
-            # Optionally set as default
             if set_default:
                 stripe_client.set_default_payment_method(
                     subscription.stripe_customer_id, pm_id
                 )
 
-            # Retrieve payment method details from Stripe
             pm_data = stripe.PaymentMethod.retrieve(pm_id)
             card = pm_data.get('card', {})
 
@@ -443,7 +437,6 @@ class PaymentMethodCreateView(APIView):
                 exp_year=card.get('exp_year'),
                 is_default=bool(set_default),
             )
-
         except stripe.error.StripeError as e:
             logger.error('Stripe error attaching payment method: %s', str(e))
             return Response(
@@ -455,3 +448,83 @@ class PaymentMethodCreateView(APIView):
             {'payment_method': PaymentMethodSerializer(payment_method).data},
             status=status.HTTP_201_CREATED,
         )
+
+    def _create_latam_method(self, tenant, data):
+        payment_method = PaymentMethod.objects.create(
+            tenant=tenant,
+            type='external',
+            external_type=data['external_type'],
+            external_email=data.get('external_email', ''),
+            external_phone=data.get('external_phone', ''),
+            external_account_id=data.get('external_account_id', ''),
+            is_default=data.get('is_default', True),
+        )
+        return Response(
+            {'payment_method': PaymentMethodSerializer(payment_method).data},
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class PaymentMethodDetailView(APIView):
+    """
+    PATCH  /api/v1/admin/billing/payment-methods/{pm_id}/  — update
+    DELETE /api/v1/admin/billing/payment-methods/{pm_id}/  — delete
+    """
+    permission_classes = [IsAuthenticated, HasPermission('billing.manage')]
+
+    def _get_pm(self, request, pm_id):
+        tenant = _get_tenant(request)
+        if not tenant:
+            return None, Response(
+                {'error': {'code': 'tenant_not_found', 'message': 'Tenant not found.'}},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        try:
+            pm = PaymentMethod.objects.get(id=pm_id, tenant=tenant)
+            return pm, None
+        except PaymentMethod.DoesNotExist:
+            return None, Response(
+                {'error': {'code': 'not_found', 'message': 'Payment method not found.'}},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+    @extend_schema(tags=['admin-billing'], summary='Update payment method')
+    def patch(self, request, pm_id):
+        pm, err = self._get_pm(request, pm_id)
+        if err:
+            return err
+        serializer = PaymentMethodUpdateSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response({'error': serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+        for field, value in serializer.validated_data.items():
+            setattr(pm, field, value)
+        pm.save()
+        return Response({'payment_method': PaymentMethodSerializer(pm).data})
+
+    @extend_schema(tags=['admin-billing'], summary='Delete payment method')
+    def delete(self, request, pm_id):
+        pm, err = self._get_pm(request, pm_id)
+        if err:
+            return err
+        tenant = _get_tenant(request)
+        count = PaymentMethod.objects.filter(tenant=tenant).count()
+        if count == 1:
+            try:
+                sub = Subscription.objects.get(tenant=tenant)
+                if sub.status in ('active', 'trialing', 'past_due'):
+                    return Response(
+                        {
+                            'error': {
+                                'code': 'last_payment_method',
+                                'message': (
+                                    'Cannot delete the only payment method '
+                                    'while subscription is active.'
+                                ),
+                            }
+                        },
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+            except Subscription.DoesNotExist:
+                pass
+        pm.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)

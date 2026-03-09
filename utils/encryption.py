@@ -10,8 +10,15 @@ from cryptography.fernet import Fernet
 
 
 def _get_fernet() -> Fernet:
-    key = os.environ['ENCRYPTION_KEY'].encode()
-    return Fernet(key)
+    # Prefer Django settings so @override_settings works in tests
+    try:
+        from django.conf import settings
+        key_str = getattr(settings, 'ENCRYPTION_KEY', None)
+    except Exception:
+        key_str = None
+    if not key_str:
+        key_str = os.environ['ENCRYPTION_KEY']
+    return Fernet(key_str.encode())
 
 
 def encrypt_value(plain_text: str) -> str:

@@ -46,6 +46,7 @@ class RegisterSerializer(serializers.Serializer):
     email = serializers.EmailField()
     password = serializers.CharField(write_only=True)
     organization_name = serializers.CharField(max_length=255)
+    ref_code = serializers.CharField(required=False, allow_blank=True, default='')
 
     def validate_email(self, value):
         value = value.lower()
@@ -90,6 +91,27 @@ class RegisterSerializer(serializers.Serializer):
             UserRole.objects.create(user=user, role=owner_role)
         except Role.DoesNotExist:
             pass
+
+        # 5. Create ReferralCode for the new tenant
+        from apps.referrals.models import ReferralCode, Referral
+        ReferralCode.objects.create(
+            tenant=tenant,
+            code=ReferralCode.generate_code(tenant),
+        )
+
+        # 6. If a ref_code was provided, create a pending Referral (silent on error)
+        raw_ref = self.validated_data.get('ref_code', '').strip()
+        if raw_ref:
+            try:
+                referrer_code = ReferralCode.objects.get(code=raw_ref)
+                Referral.objects.create(
+                    referrer=referrer_code.tenant,
+                    referred=tenant,
+                    status='pending',
+                )
+            except (ReferralCode.DoesNotExist, Exception):
+                pass  # Invalid code or duplicate — do not interrupt registration
+
         return user, tenant
 
 
@@ -203,3 +225,13 @@ class MFADisableSerializer(serializers.Serializer):
 class MFARecoverySerializer(serializers.Serializer):
     mfa_token = serializers.CharField()
     recovery_code = serializers.CharField()
+
+
+# ─── SSO serializers ───────────────────────────────────────────────────────────
+
+class SSOTokenRequestSerializer(serializers.Serializer):
+    service = serializers.SlugField(max_length=50)
+
+
+class SSOValidateRequestSerializer(serializers.Serializer):
+    sso_token = serializers.CharField(max_length=64)

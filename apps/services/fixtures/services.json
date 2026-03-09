@@ -1,0 +1,47 @@
+[
+  {
+    "model": "services.service",
+    "pk": "00000000-0000-0000-0000-000000000001",
+    "fields": {
+      "created_at": "2024-01-01T00:00:00Z",
+      "updated_at": "2024-01-01T00:00:00Z",
+      "slug": "workspace",
+      "name": "Workspace",
+      "description": "Plataforma de productividad colaborativa",
+      "icon": "LayoutDashboard",
+      "url_template": "https://{subdomain}.workspace.app",
+      "min_plan": "free",
+      "is_active": true
+    }
+  },
+  {
+    "model": "services.service",
+    "pk": "00000000-0000-0000-0000-000000000002",
+    "fields": {
+      "created_at": "2024-01-01T00:00:00Z",
+      "updated_at": "2024-01-01T00:00:00Z",
+      "slug": "vista",
+      "name": "Vista",
+      "description": "Servicios digitales y presencia web",
+      "icon": "Globe",
+      "url_template": "https://{subdomain}.vista.app",
+      "min_plan": "free",
+      "is_active": true
+    }
+  },
+  {
+    "model": "services.service",
+    "pk": "00000000-0000-0000-0000-000000000003",
+    "fields": {
+      "created_at": "2024-01-01T00:00:00Z",
+      "updated_at": "2024-01-01T00:00:00Z",
+      "slug": "desktop",
+      "name": "Desktop App",
+      "description": "Aplicación de escritorio nativa",
+      "icon": "Monitor",
+      "url_template": "https://desktop.app",
+      "min_plan": "free",
+      "is_active": true
+    }
+  }
+]
