@@ -5,6 +5,7 @@ from datetime import timedelta
 from django.contrib.auth import get_user_model
 from django.db import transaction
 from django.utils import timezone
+from drf_spectacular.utils import OpenApiResponse, extend_schema
 from rest_framework import status
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.request import Request
@@ -39,6 +40,16 @@ class SSOTokenView(APIView):
     """
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(
+        tags=['hub-sso'],
+        summary='Genera token SSO de corta duración (TTL 60s, single-use)',
+        request=SSOTokenRequestSerializer,
+        responses={
+            200: OpenApiResponse(description='{ sso_token, redirect_url, expires_in }'),
+            403: OpenApiResponse(description='Tenant inactivo o servicio no adquirido'),
+            404: OpenApiResponse(description='Servicio no encontrado'),
+        },
+    )
     def post(self, request: Request) -> Response:
         serializer = SSOTokenRequestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -115,6 +126,16 @@ class SSOValidateView(APIView):
     permission_classes = [AllowAny]
     authentication_classes = []
 
+    @extend_schema(
+        tags=['hub-sso'],
+        summary='Valida y consume token SSO (server-to-server, sin auth)',
+        request=SSOValidateRequestSerializer,
+        responses={
+            200: OpenApiResponse(description='{ access_token, refresh_token, user }'),
+            404: OpenApiResponse(description='Token no encontrado'),
+            410: OpenApiResponse(description='Token ya usado o expirado'),
+        },
+    )
     def post(self, request: Request) -> Response:
         serializer = SSOValidateRequestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)

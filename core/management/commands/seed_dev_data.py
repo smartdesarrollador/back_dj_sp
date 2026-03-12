@@ -5,12 +5,16 @@ Idempotente: usa get_or_create. Requiere seed_permissions ejecutado antes.
 Ejecutar: python manage.py seed_dev_data
 Alias make: make seed-data
 """
-from django.core.management.base import BaseCommand
-from django.core.management import call_command
-from django.contrib.auth import get_user_model
+import secrets
+from datetime import timedelta
 
-from apps.tenants.models import Tenant
+from django.contrib.auth import get_user_model
+from django.core.management import call_command
+from django.core.management.base import BaseCommand
+from django.utils import timezone
+
 from apps.rbac.models import Role, UserRole
+from apps.tenants.models import Tenant
 
 User = get_user_model()
 
@@ -106,4 +110,80 @@ class Command(BaseCommand):
         self.stdout.write(self.style.SUCCESS(
             f'Dev data seeded: {tenants_created} tenants, '
             f'{users_created} users, {roles_assigned} roles assigned.'
+        ))
+
+        # ─── Datos Hub ─────────────────────────────────────────────────────────
+        self._seed_hub_data()
+
+    def _seed_hub_data(self) -> None:
+        from apps.auth_app.models import SSOToken
+        from apps.referrals.models import Referral, ReferralCode
+        from apps.services.models import Service, TenantService
+
+        tenants = list(Tenant.objects.filter(slug__in=['acme-corp', 'startup-xyz', 'freetier-inc']))
+        tenant_map = {t.slug: t for t in tenants}
+
+        # ReferralCode — uno por tenant
+        rc_created = 0
+        for tenant in tenants:
+            _, created = ReferralCode.objects.get_or_create(
+                tenant=tenant,
+                defaults={'code': ReferralCode.generate_code(tenant)},
+            )
+            if created:
+                rc_created += 1
+
+        # TenantService — workspace + vista para cada tenant
+        ts_created = 0
+        for svc_slug in ['workspace', 'vista']:
+            try:
+                service = Service.objects.get(slug=svc_slug)
+            except Service.DoesNotExist:
+                continue
+            for tenant in tenants:
+                _, created = TenantService.objects.get_or_create(
+                    tenant=tenant,
+                    service=service,
+                    defaults={'status': 'active'},
+                )
+                if created:
+                    ts_created += 1
+
+        # Referrals — acme→startup (active) y startup→freetier (pending)
+        ref_created = 0
+        for referrer_slug, referred_slug, ref_status in [
+            ('acme-corp', 'startup-xyz', 'active'),
+            ('startup-xyz', 'freetier-inc', 'pending'),
+        ]:
+            referrer = tenant_map.get(referrer_slug)
+            referred = tenant_map.get(referred_slug)
+            if referrer and referred:
+                _, created = Referral.objects.get_or_create(
+                    referrer=referrer,
+                    referred=referred,
+                    defaults={'status': ref_status},
+                )
+                if created:
+                    ref_created += 1
+
+        # SSOToken expirado de prueba (acme owner, workspace)
+        sso_created = 0
+        acme_owner = User.objects.filter(email='carlos@acme.com').first()
+        acme_tenant = tenant_map.get('acme-corp')
+        if acme_owner and acme_tenant:
+            existing = SSOToken.objects.filter(user=acme_owner, service='workspace').first()
+            if not existing:
+                SSOToken.objects.create(
+                    user=acme_owner,
+                    tenant=acme_tenant,
+                    service='workspace',
+                    token=secrets.token_hex(32),
+                    expires_at=timezone.now() - timedelta(hours=2),
+                )
+                sso_created += 1
+
+        self.stdout.write(self.style.SUCCESS(
+            f'Hub data seeded: {rc_created} referral codes, '
+            f'{ts_created} tenant services, {ref_created} referrals, '
+            f'{sso_created} SSO tokens.'
         ))

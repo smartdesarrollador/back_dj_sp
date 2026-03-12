@@ -37,6 +37,8 @@ urlpatterns = [
         path('billing/', include('apps.subscriptions.urls')),
         path('subscriptions/', include('apps.subscriptions.subscription_urls')),
         path('audit-logs/', include('apps.audit.urls')),
+        path('notifications/', include('apps.notifications.admin_urls')),
+        path('clients/', include('apps.tenants.admin_urls')),
     ])),
 
     # App API (per-user resources)
@@ -57,6 +59,8 @@ urlpatterns = [
         path('sharing/', include('apps.sharing.urls')),
         path('services/', include('apps.services.urls')),
         path('referrals/', include('apps.referrals.urls')),
+        path('notifications/', include('apps.notifications.hub_urls')),
+        path('team/', include('apps.auth_app.team_urls')),
     ])),
 
     # Public endpoints (no auth)

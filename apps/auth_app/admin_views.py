@@ -101,6 +101,12 @@ class UserInviteView(APIView):
                     UserRole.objects.get_or_create(user=user, role=role)
             except Role.DoesNotExist:
                 pass
+        else:
+            try:
+                member_role = Role.objects.get(name='Member', is_system_role=True)
+                UserRole.objects.get_or_create(user=user, role=member_role)
+            except Role.DoesNotExist:
+                pass  # Fixtures not loaded — do not interrupt invitation
 
         token = create_email_verification_token(str(user.id))
         link = f'{settings.FRONTEND_URL}/accept-invite?token={token}'

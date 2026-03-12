@@ -1,3 +1,4 @@
+from drf_spectacular.utils import OpenApiResponse, extend_schema
 from rest_framework import status as http_status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.request import Request
@@ -12,6 +13,11 @@ class ServiceCatalogView(APIView):
     """GET /api/v1/app/services/ — Catálogo completo con available + status."""
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(
+        tags=['hub-services'],
+        summary='Catálogo completo de servicios con available y status por tenant',
+        responses={200: OpenApiResponse(description='Lista de servicios con available y status')},
+    )
     def get(self, request: Request) -> Response:
         if not getattr(request, 'tenant', None):
             return Response(
@@ -35,6 +41,11 @@ class ActiveServicesView(APIView):
     """GET /api/v1/app/services/active/ — Solo servicios adquiridos y activos."""
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(
+        tags=['hub-services'],
+        summary='Servicios adquiridos y activos del tenant',
+        responses={200: OpenApiResponse(description='Lista de TenantServices activos')},
+    )
     def get(self, request: Request) -> Response:
         if not getattr(request, 'tenant', None):
             return Response(

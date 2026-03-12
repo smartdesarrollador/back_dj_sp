@@ -27,6 +27,7 @@ from utils.throttles import (
 )
 from .models import MFARecoveryCode
 from .serializers import (
+    AcceptInviteSerializer,
     ForgotPasswordSerializer,
     LoginSerializer,
     LogoutSerializer,
@@ -201,6 +202,39 @@ class VerifyEmailView(APIView):
         user.email_verified = True
         user.save(update_fields=['email_verified'])
         return Response({'message': 'Email verified successfully.'})
+
+
+class AcceptInviteView(APIView):
+    permission_classes = [AllowAny]
+
+    @extend_schema(
+        tags=['auth'],
+        summary='Accept invitation and set password',
+        request=AcceptInviteSerializer,
+        responses={
+            200: OpenApiResponse(description='Account activated successfully'),
+            400: OpenApiResponse(description='Invalid token or validation error'),
+        },
+    )
+    def post(self, request):
+        serializer = AcceptInviteSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        user_id = verify_email_token(serializer.validated_data['token'])
+        if not user_id:
+            raise InvalidToken()
+
+        try:
+            user = User.objects.get(pk=user_id, is_active=False)
+        except User.DoesNotExist:
+            raise InvalidToken()
+
+        user.set_password(serializer.validated_data['password'])
+        user.is_active = True
+        user.email_verified = True
+        user.save(update_fields=['password', 'is_active', 'email_verified'])
+
+        return Response({'message': 'Account activated successfully.'})
 
 
 class ForgotPasswordView(APIView):

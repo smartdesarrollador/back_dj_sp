@@ -65,6 +65,7 @@ LOCAL_APPS = [
     'apps.support',
     'apps.services',
     'apps.referrals',
+    'apps.notifications',
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
@@ -204,6 +205,18 @@ CORS_ALLOWED_ORIGINS = env.list('CORS_ALLOWED_ORIGINS', default=[
     'http://localhost:3000',
 ])
 CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOW_HEADERS = [
+    'accept',
+    'accept-encoding',
+    'authorization',
+    'content-type',
+    'dnt',
+    'origin',
+    'user-agent',
+    'x-csrftoken',
+    'x-requested-with',
+    'x-tenant-slug',
+]
 
 # ─── Celery ───────────────────────────────────────────────────────────────────
 CELERY_BROKER_URL = env('CELERY_BROKER_URL', default='redis://redis:6379/1')
@@ -308,6 +321,11 @@ SPECTACULAR_SETTINGS = {
         {'name': 'support', 'description': 'Support tickets'},
         {'name': 'audit', 'description': 'Audit logs'},
         {'name': 'reports', 'description': 'Analytics and reports'},
+        {'name': 'hub-sso',            'description': 'SSO token generation and validation (Hub → Services)'},
+        {'name': 'hub-services',       'description': 'Service catalog and active services (Hub)'},
+        {'name': 'hub-referrals',      'description': 'Referral codes and dashboard (Hub)'},
+        {'name': 'hub-notifications',  'description': 'In-app notifications for Hub users'},
+        {'name': 'admin-notifications', 'description': 'Admin panel notifications'},
     ],
 }
 

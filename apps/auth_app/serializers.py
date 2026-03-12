@@ -47,6 +47,11 @@ class RegisterSerializer(serializers.Serializer):
     password = serializers.CharField(write_only=True)
     organization_name = serializers.CharField(max_length=255)
     ref_code = serializers.CharField(required=False, allow_blank=True, default='')
+    plan = serializers.ChoiceField(
+        choices=['free', 'starter', 'professional', 'enterprise'],
+        required=False,
+        default='free',
+    )
 
     def validate_email(self, value):
         value = value.lower()
@@ -75,6 +80,7 @@ class RegisterSerializer(serializers.Serializer):
             name=data['organization_name'],
             slug=slug,
             subdomain=slug,
+            plan=data.get('plan', 'free'),
         )
         user = User.objects.create_user(
             email=data['email'],
@@ -156,6 +162,18 @@ class ResetPasswordSerializer(serializers.Serializer):
     password = serializers.CharField(write_only=True)
 
     def validate_password(self, value):
+        try:
+            validate_password_strength(value)
+        except Exception as exc:
+            raise serializers.ValidationError(str(exc)) from exc
+        return value
+
+
+class AcceptInviteSerializer(serializers.Serializer):
+    token = serializers.CharField()
+    password = serializers.CharField(write_only=True)
+
+    def validate_password(self, value: str) -> str:
         try:
             validate_password_strength(value)
         except Exception as exc:

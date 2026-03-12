@@ -2,6 +2,7 @@
 Tests for PASO 23 — Referral system: ReferralCode, Referral, and endpoints.
 Covers: dashboard endpoint, code creation, stats, tenant isolation, register flow, celery task.
 """
+import uuid
 from datetime import timedelta
 from decimal import Decimal
 
@@ -12,6 +13,7 @@ from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
 
+from apps.rbac.models import Permission, Role, RolePermission, UserRole
 from apps.referrals.models import Referral, ReferralCode
 from apps.referrals.tasks import activate_pending_referrals
 from apps.subscriptions.models import Subscription
@@ -239,3 +241,33 @@ class TestActivatePendingReferralsTask(APITestCase):
         self.assertEqual(result['activated'], 0)
         sub = Subscription.objects.get(tenant=self.referrer)
         self.assertEqual(sub.credit_balance, Decimal('0.00'))
+
+
+@override_settings(PASSWORD_HASHERS=_FAST_HASHERS, CACHES=_LOCMEM_CACHE)
+class TestReferralPermissionEnforcement(APITestCase):
+    """Verifica que referrals.read se aplica correctamente (post PASO 26)."""
+
+    def setUp(self) -> None:
+        cache.clear()
+        self.tenant = _create_tenant(slug=f't-{uuid.uuid4().hex[:6]}')
+        self.user = _create_user(self.tenant, email=f'u-{uuid.uuid4().hex[:6]}@t.com')
+        self.client.force_authenticate(user=self.user)
+
+    def _grant_referrals_read(self) -> None:
+        perm, _ = Permission.objects.get_or_create(
+            codename='referrals.read',
+            defaults={'name': 'Ver Referidos', 'resource': 'referrals', 'action': 'read'},
+        )
+        role = Role.objects.create(tenant=self.tenant, name='hub-user')
+        RolePermission.objects.create(role=role, permission=perm, scope='all')
+        UserRole.objects.create(user=self.user, role=role)
+
+    def test_user_without_referrals_read_gets_403(self) -> None:
+        resp = self.client.get(REFERRAL_URL, HTTP_X_TENANT_SLUG=self.tenant.slug)
+        self.assertEqual(resp.status_code, 403)
+
+    def test_user_with_referrals_read_gets_200(self) -> None:
+        self._grant_referrals_read()
+        resp = self.client.get(REFERRAL_URL, HTTP_X_TENANT_SLUG=self.tenant.slug)
+        self.assertEqual(resp.status_code, 200)
+        self.assertIn('code', resp.data)

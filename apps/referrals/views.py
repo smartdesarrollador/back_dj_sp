@@ -1,5 +1,6 @@
 from django.conf import settings
 from django.db.models import Sum
+from drf_spectacular.utils import OpenApiResponse, extend_schema
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -15,6 +16,14 @@ class ReferralView(APIView):
     """GET /api/v1/app/referrals/ — Código, stats y lista de referidos."""
     permission_classes = [HasPermission('referrals.read')]
 
+    @extend_schema(
+        tags=['hub-referrals'],
+        summary='Dashboard de referidos: código, stats y lista de referidos',
+        responses={
+            200: OpenApiResponse(description='{ code, referral_url, stats, referrals }'),
+            403: OpenApiResponse(description='Sin permiso referrals.read'),
+        },
+    )
     def get(self, request: Request) -> Response:
         tenant = request.tenant
         ref_code, _ = ReferralCode.objects.get_or_create(
