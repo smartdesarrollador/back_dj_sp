@@ -17,6 +17,7 @@ from apps.auth_app.models import SSOToken
 from apps.auth_app.serializers import (
     SSOTokenRequestSerializer,
     SSOValidateRequestSerializer,
+    TenantSerializer,
     UserSerializer,
 )
 from apps.auth_app.tokens import TenantRefreshToken
@@ -190,6 +191,7 @@ class SSOValidateView(APIView):
             'access_token': str(refresh.access_token),
             'refresh_token': str(refresh),
             'user': UserSerializer(user).data,
+            'tenant': TenantSerializer(tenant).data,
         })
 
     def _log_invalid(self, request: Request, sso_token: SSOToken, reason: str) -> None:

@@ -25,7 +25,7 @@ from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.rbac.permissions import HasFeature, HasPermission, check_plan_limit
+from apps.rbac.permissions import HasFeature, HasPermission, _user_has_permission, check_plan_limit
 from apps.tasks.models import Task, TaskBoard, TaskComment
 from apps.tasks.serializers import (
     TaskBoardCreateSerializer,
@@ -76,7 +76,7 @@ class TaskBoardListCreateView(APIView):
 
     @extend_schema(tags=['app-tasks'], summary='Create task board')
     def post(self, request):
-        if not request.user.has_perm('boards.create'):
+        if not _user_has_permission(request.user, 'boards.create'):
             from rest_framework.exceptions import PermissionDenied
             raise PermissionDenied()
         count = TaskBoard.objects.filter(tenant=request.tenant).count()
@@ -103,7 +103,7 @@ class TaskBoardDetailView(APIView):
 
     @extend_schema(tags=['app-tasks'], summary='Update task board')
     def patch(self, request, pk):
-        if not request.user.has_perm('boards.admin'):
+        if not _user_has_permission(request.user, 'boards.admin'):
             from rest_framework.exceptions import PermissionDenied
             raise PermissionDenied()
         board = _get_board(pk, request.tenant)
@@ -118,7 +118,7 @@ class TaskBoardDetailView(APIView):
 
     @extend_schema(tags=['app-tasks'], summary='Delete task board')
     def delete(self, request, pk):
-        if not request.user.has_perm('boards.admin'):
+        if not _user_has_permission(request.user, 'boards.admin'):
             from rest_framework.exceptions import PermissionDenied
             raise PermissionDenied()
         board = _get_board(pk, request.tenant)
@@ -163,7 +163,7 @@ class TaskListCreateView(APIView):
 
     @extend_schema(tags=['app-tasks'], summary='Create task')
     def post(self, request):
-        if not request.user.has_perm('tasks.create'):
+        if not _user_has_permission(request.user, 'tasks.create'):
             from rest_framework.exceptions import PermissionDenied
             raise PermissionDenied()
         count = Task.objects.filter(tenant=request.tenant).count()
@@ -185,6 +185,12 @@ class TaskListCreateView(APIView):
                     {'error': {'code': 'not_found', 'message': 'Board not found.'}},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
+        else:
+            board, _ = TaskBoard.objects.get_or_create(
+                tenant=request.tenant,
+                name='General',
+                defaults={'created_by': request.user},
+            )
 
         assignee = None
         if assignee_id:
@@ -253,7 +259,7 @@ class TaskDetailView(AuditMixin, APIView):
 
     @extend_schema(tags=['app-tasks'], summary='Update task')
     def patch(self, request, pk):
-        if not request.user.has_perm('tasks.update'):
+        if not _user_has_permission(request.user, 'tasks.update'):
             from rest_framework.exceptions import PermissionDenied
             raise PermissionDenied()
         task = _get_task(pk, request.tenant)
@@ -289,7 +295,7 @@ class TaskDetailView(AuditMixin, APIView):
 
     @extend_schema(tags=['app-tasks'], summary='Delete task')
     def delete(self, request, pk):
-        if not request.user.has_perm('tasks.delete'):
+        if not _user_has_permission(request.user, 'tasks.delete'):
             from rest_framework.exceptions import PermissionDenied
             raise PermissionDenied()
         task = _get_task(pk, request.tenant)

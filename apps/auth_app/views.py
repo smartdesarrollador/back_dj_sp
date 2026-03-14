@@ -145,11 +145,14 @@ class RefreshTokenView(APIView):
             raise InvalidToken()
         try:
             refresh = RefreshToken(raw_token)
+            user = User.objects.select_related('tenant').get(pk=refresh['user_id'])
             data = {
                 'access_token': str(refresh.access_token),
                 'refresh_token': str(refresh),
+                'user': UserSerializer(user).data,
+                'tenant': TenantSerializer(user.tenant).data,
             }
-        except TokenError as exc:
+        except (TokenError, User.DoesNotExist) as exc:
             raise InvalidToken() from exc
         return Response(data)
 

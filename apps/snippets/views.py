@@ -16,7 +16,7 @@ from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.rbac.permissions import HasPermission, check_plan_limit
+from apps.rbac.permissions import HasPermission, _user_has_permission, check_plan_limit
 from apps.snippets.models import CodeSnippet
 from apps.snippets.serializers import CodeSnippetCreateUpdateSerializer, CodeSnippetSerializer
 
@@ -69,7 +69,7 @@ class CodeSnippetListCreateView(APIView):
 
     @extend_schema(tags=['app-devops'], summary='Create code snippet')
     def post(self, request):
-        if not request.user.has_perm('snippets.create'):
+        if not _user_has_permission(request.user, 'snippets.create'):
             from rest_framework.exceptions import PermissionDenied
             raise PermissionDenied()
         count = CodeSnippet.objects.filter(tenant=request.tenant, user=request.user).count()
@@ -96,7 +96,7 @@ class CodeSnippetDetailView(APIView):
 
     @extend_schema(tags=['app-devops'], summary='Update snippet')
     def patch(self, request, pk):
-        if not request.user.has_perm('snippets.update'):
+        if not _user_has_permission(request.user, 'snippets.update'):
             from rest_framework.exceptions import PermissionDenied
             raise PermissionDenied()
         snippet = _get_object(pk, request.tenant, request.user)
@@ -111,7 +111,7 @@ class CodeSnippetDetailView(APIView):
 
     @extend_schema(tags=['app-devops'], summary='Delete snippet')
     def delete(self, request, pk):
-        if not request.user.has_perm('snippets.delete'):
+        if not _user_has_permission(request.user, 'snippets.delete'):
             from rest_framework.exceptions import PermissionDenied
             raise PermissionDenied()
         snippet = _get_object(pk, request.tenant, request.user)

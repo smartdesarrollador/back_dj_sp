@@ -94,6 +94,11 @@ PERMISSIONS: list[tuple[str, str, str, str, str]] = [
     # audit
     ('audit.read',   'Ver Auditoría',               'Ver logs de auditoría del tenant',              'audit', 'read'),
     ('audit.export', 'Exportar Auditoría',          'Exportar logs de auditoría',                    'audit', 'export'),
+    # snippets
+    ('snippets.create', 'Crear Snippets',            'Crear nuevos snippets de código',               'snippets', 'create'),
+    ('snippets.read',   'Ver Snippets',              'Ver snippets propios',                          'snippets', 'read'),
+    ('snippets.update', 'Editar Snippets',           'Editar snippets existentes',                    'snippets', 'update'),
+    ('snippets.delete', 'Eliminar Snippets',         'Eliminar snippets',                             'snippets', 'delete'),
     # dashboard
     ('dashboard.read', 'Ver Dashboard',             'Acceder al dashboard principal',                'dashboard', 'read'),
 ]

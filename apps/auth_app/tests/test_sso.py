@@ -164,6 +164,8 @@ class TestSSOValidateView(TestCase):
         self.assertIn('access_token', data)
         self.assertIn('refresh_token', data)
         self.assertIn('user', data)
+        self.assertIn('tenant', data)
+        self.assertIn('slug', data['tenant'])
 
     def test_happy_path_marks_token_used(self):
         sso_token = self._make_valid_token()
