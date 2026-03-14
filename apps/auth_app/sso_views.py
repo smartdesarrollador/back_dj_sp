@@ -107,7 +107,10 @@ class SSOTokenView(APIView):
             extra={'service': service_slug},
         )
 
-        redirect_url = service.url_template.format(subdomain=tenant.subdomain) + '/auth/sso'
+        redirect_url = (
+            service.url_template.format(subdomain=tenant.subdomain)
+            + f'?sso_token={token_value}'
+        )
 
         return Response({
             'sso_token': token_value,

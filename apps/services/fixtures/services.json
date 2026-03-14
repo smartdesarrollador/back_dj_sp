@@ -9,7 +9,7 @@
       "name": "Workspace",
       "description": "Plataforma de productividad colaborativa",
       "icon": "LayoutDashboard",
-      "url_template": "https://{subdomain}.workspace.app",
+      "url_template": "http://workspace.local.test/sso/callback",
       "min_plan": "free",
       "is_active": true
     }
@@ -24,7 +24,7 @@
       "name": "Vista",
       "description": "Servicios digitales y presencia web",
       "icon": "Globe",
-      "url_template": "https://{subdomain}.vista.app",
+      "url_template": "http://next-vista.local.test/sso",
       "min_plan": "free",
       "is_active": true
     }
