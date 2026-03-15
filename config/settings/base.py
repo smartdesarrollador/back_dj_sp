@@ -203,8 +203,9 @@ SIMPLE_JWT = {
 CORS_ALLOWED_ORIGINS = env.list('CORS_ALLOWED_ORIGINS', default=[
     'http://localhost:5173',
     'http://localhost:3000',
-    'https://tauri.localhost',   # Tauri v2 en Windows (WebView2)
-    'tauri://localhost',         # Tauri v2 en Linux/macOS
+    'http://localhost:1420',     # Tauri v2 dev mode (Vite devUrl)
+    'https://tauri.localhost',   # Tauri v2 bundle producción (WebView2 Windows)
+    'tauri://localhost',         # Tauri v2 bundle producción (Linux/macOS)
 ])
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOW_HEADERS = [
