@@ -1,0 +1,53 @@
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info
+dist/
+build/
+
+# Entornos virtuales
+.venv
+venv/
+env/
+
+# Variables de entorno (nunca al contenedor)
+.env
+.env.*
+!.env.example
+
+# Editores / IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Testing / Coverage
+.coverage
+htmlcov/
+.pytest_cache/
+
+# Logs
+*.log
+logs/
+
+# Archivos estáticos y media (se generan en runtime)
+staticfiles/
+mediafiles/
+
+# Docker
+docker-compose*.yml
+.dockerignore
+
+# Ruff / linting
+.ruff_cache/
+
+# OS
+.DS_Store
+Thumbs.db
