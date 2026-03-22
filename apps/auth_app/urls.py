@@ -1,5 +1,6 @@
 from django.urls import include, path
 
+from .google_oauth_views import GoogleOAuthCallbackView, GoogleOAuthInitView
 from .views import (
     AcceptInviteView,
     ForgotPasswordView,
@@ -31,4 +32,6 @@ urlpatterns = [
     path('mfa/disable', MFADisableView.as_view(), name='mfa-disable'),
     path('mfa/recovery', MFARecoveryView.as_view(), name='mfa-recovery'),
     path('sso/', include('apps.auth_app.sso_urls')),
+    path('google/', GoogleOAuthInitView.as_view(), name='google-oauth-init'),
+    path('google/callback/', GoogleOAuthCallbackView.as_view(), name='google-oauth-callback'),
 ]

@@ -20,8 +20,8 @@ MIDDLEWARE += [  # noqa: F405
 
 INTERNAL_IPS = ['127.0.0.1', '0.0.0.0']
 
-# Use console email backend in dev
-EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+# Use real SMTP in dev (Mailtrap sandbox)
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 
 # Logging - verbose in dev
 LOGGING = {

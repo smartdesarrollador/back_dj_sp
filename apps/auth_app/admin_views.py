@@ -11,11 +11,14 @@ Endpoints:
   POST   /api/v1/admin/users/<pk>/roles/            → Assign role to user
   DELETE /api/v1/admin/users/<pk>/roles/<role_pk>/  → Remove role from user
 """
+import logging
 import uuid
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.mail import send_mail
+
+logger = logging.getLogger(__name__)
 from drf_spectacular.utils import OpenApiResponse, extend_schema
 from rest_framework import status
 from rest_framework.response import Response
@@ -110,13 +113,22 @@ class UserInviteView(APIView):
 
         token = create_email_verification_token(str(user.id))
         link = f'{settings.FRONTEND_URL}/accept-invite?token={token}'
-        send_mail(
-            subject='Invitation',
-            message=f'You have been invited. Accept here: {link}',
-            from_email=settings.DEFAULT_FROM_EMAIL,
-            recipient_list=[email],
-            fail_silently=True,
-        )
+
+        logger.info('[INVITE] Sending invitation email to %s via %s:%s',
+                    email, settings.EMAIL_HOST, settings.EMAIL_PORT)
+        try:
+            send_mail(
+                subject='Invitation',
+                message=f'You have been invited. Accept here: {link}',
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                recipient_list=[email],
+                fail_silently=False,
+            )
+            logger.info('[INVITE] Email sent successfully to %s', email)
+        except Exception as exc:
+            logger.error('[INVITE] Failed to send email to %s — %s: %s',
+                         email, type(exc).__name__, exc)
+
         return Response({'message': 'Invitation sent.'}, status=status.HTTP_201_CREATED)
 
 

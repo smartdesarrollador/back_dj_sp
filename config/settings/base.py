@@ -286,6 +286,13 @@ REFERRAL_BASE_URL = env('REFERRAL_BASE_URL', default='https://hub.app')
 # ─── App URLs ─────────────────────────────────────────────────────────────────
 APP_BASE_URL = env('APP_BASE_URL', default='http://localhost:8000')
 FRONTEND_URL = env('FRONTEND_URL', default='http://localhost:5173')
+FRONTEND_ADMIN_URL = env('FRONTEND_ADMIN_URL', default='http://localhost:5173')
+FRONTEND_HUB_URL = env('FRONTEND_HUB_URL', default='http://localhost:5175')
+
+# ─── Google OAuth ─────────────────────────────────────────────────────────────
+GOOGLE_CLIENT_ID = env('GOOGLE_CLIENT_ID', default='')
+GOOGLE_CLIENT_SECRET = env('GOOGLE_CLIENT_SECRET', default='')
+GOOGLE_REDIRECT_URI = env('GOOGLE_REDIRECT_URI', default='http://localhost:8000/api/v1/auth/google/callback/')
 
 # ─── Security Headers ─────────────────────────────────────────────────────────
 SECURE_BROWSER_XSS_FILTER = True
@@ -330,6 +337,45 @@ SPECTACULAR_SETTINGS = {
         {'name': 'hub-notifications',  'description': 'In-app notifications for Hub users'},
         {'name': 'admin-notifications', 'description': 'Admin panel notifications'},
     ],
+}
+
+# ─── Logging ──────────────────────────────────────────────────────────────────
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '[{asctime}] {levelname} {name} — {message}',
+            'style': '{',
+        },
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'verbose',
+        },
+    },
+    'root': {
+        'handlers': ['console'],
+        'level': 'INFO',
+    },
+    'loggers': {
+        'django': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'django.request': {
+            'handlers': ['console'],
+            'level': 'WARNING',
+            'propagate': False,
+        },
+        'apps': {
+            'handlers': ['console'],
+            'level': 'DEBUG',
+            'propagate': False,
+        },
+    },
 }
 
 # ─── AWS S3 (optional) ────────────────────────────────────────────────────────

@@ -54,6 +54,9 @@ reportlab==4.1.0
 # HTTP
 requests==2.31.0
 
+# Google OAuth
+google-auth-oauthlib==1.2.0
+
 # Validation
 phonenumbers==8.13.31
 
