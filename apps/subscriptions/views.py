@@ -23,13 +23,15 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.rbac.permissions import HasPermission
-from apps.subscriptions.models import Invoice, PaymentMethod, Subscription
+from apps.subscriptions.models import Invoice, PaymentMethod, Plan, Subscription
 from apps.subscriptions.serializers import (
     CurrentSubscriptionSerializer,
     InvoiceSerializer,
     PaymentMethodCreateSerializer,
     PaymentMethodSerializer,
     PaymentMethodUpdateSerializer,
+    PlanSerializer,
+    PlanUpdateSerializer,
     SubscriptionSerializer,
     UpgradeSerializer,
 )
@@ -351,6 +353,46 @@ class WebhookView(APIView):
             sub.save(update_fields=['status', 'plan', 'updated_at'])
             sub.tenant.plan = 'free'
             sub.tenant.save(update_fields=['plan', 'updated_at'])
+
+
+class PlansView(APIView):
+    permission_classes = [AllowAny]
+    authentication_classes = []
+
+    def get(self, request) -> Response:
+        plans = Plan.objects.all()
+        return Response({'plans': PlanSerializer(plans, many=True).data})
+
+
+class AdminPlanListView(APIView):
+    permission_classes = [IsAuthenticated, HasPermission('subscriptions.manage')]
+
+    def get(self, request) -> Response:
+        plans = Plan.objects.all()
+        return Response({'plans': PlanSerializer(plans, many=True).data})
+
+
+class AdminPlanDetailView(APIView):
+    permission_classes = [IsAuthenticated, HasPermission('subscriptions.manage')]
+
+    def patch(self, request, plan_id: str) -> Response:
+        try:
+            plan = Plan.objects.get(id=plan_id)
+        except Plan.DoesNotExist:
+            return Response(
+                {'error': {'code': 'not_found', 'message': 'Plan not found.'}},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        serializer = PlanUpdateSerializer(data=request.data, partial=True)
+        if not serializer.is_valid():
+            return Response({'error': serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+
+        for field, value in serializer.validated_data.items():
+            setattr(plan, field, value)
+        plan.save()
+
+        return Response({'plan': PlanSerializer(plan).data})
 
 
 def _extract_plan_from_items(items: list) -> str | None:

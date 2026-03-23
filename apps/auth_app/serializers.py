@@ -26,7 +26,7 @@ class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ['id', 'name', 'email', 'tenant_id', 'email_verified',
-                  'mfa_enabled', 'created_at', 'roles', 'permissions']
+                  'mfa_enabled', 'is_staff', 'created_at', 'roles', 'permissions']
 
     def get_roles(self, obj):
         return list(

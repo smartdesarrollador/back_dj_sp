@@ -163,3 +163,25 @@ class PaymentMethod(BaseModel):
         if self.external_type:
             return f"{self.tenant.slug} — {self.external_type}"
         return f"{self.tenant.slug} — {self.brand} ****{self.last4}"
+
+
+class Plan(models.Model):
+    """
+    Presentation metadata for subscription plans.
+    IDs are immutable (free/starter/professional/enterprise).
+    Prices and highlights are editable by admins without code changes.
+    """
+    id            = models.CharField(max_length=20, primary_key=True, choices=PLAN_CHOICES)
+    display_name  = models.CharField(max_length=100)
+    description   = models.CharField(max_length=300, blank=True)
+    price_monthly = models.IntegerField(default=0)
+    price_annual  = models.IntegerField(default=0)
+    popular       = models.BooleanField(default=False)
+    highlights    = models.JSONField(default=list)   # [{ "label": str, "included": bool }]
+    updated_at    = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['price_monthly']
+
+    def __str__(self) -> str:
+        return f'{self.display_name} (${self.price_monthly}/mo)'

@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from apps.subscriptions.models import Invoice, PaymentMethod, Subscription
+from apps.subscriptions.models import Invoice, PaymentMethod, Plan, Subscription
 
 
 @admin.register(Subscription)
@@ -31,3 +31,9 @@ class PaymentMethodAdmin(admin.ModelAdmin):
     list_filter = ['type', 'brand', 'is_default']
     search_fields = ['tenant__name', 'tenant__slug', 'last4']
     readonly_fields = ['id', 'stripe_payment_method_id', 'created_at', 'updated_at']
+
+
+@admin.register(Plan)
+class PlanAdmin(admin.ModelAdmin):
+    list_display = ['id', 'display_name', 'price_monthly', 'price_annual', 'popular', 'updated_at']
+    readonly_fields = ['updated_at']

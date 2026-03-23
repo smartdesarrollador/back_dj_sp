@@ -259,3 +259,75 @@ def plan_has_feature(plan: str, feature: str) -> bool:
     """
     plan_config = PLAN_FEATURES.get(plan, PLAN_FEATURES['free'])
     return bool(plan_config.get(feature, False))
+
+
+PLAN_CATALOG: list[dict] = [
+    {
+        'id': 'free',
+        'display_name': 'Free',
+        'description': 'Para explorar la plataforma',
+        'price_monthly': 0,
+        'price_annual': 0,
+        'popular': False,
+        'highlights': [
+            {'label': 'Hasta 5 usuarios', 'included': True},
+            {'label': '1 GB almacenamiento', 'included': True},
+            {'label': '1,000 llamadas API/mes', 'included': True},
+            {'label': 'Roles personalizados', 'included': False},
+            {'label': 'MFA', 'included': False},
+            {'label': 'SSO/SAML', 'included': False},
+            {'label': 'Soporte prioritario', 'included': False},
+        ],
+    },
+    {
+        'id': 'starter',
+        'display_name': 'Starter',
+        'description': 'Para pequeños equipos en crecimiento',
+        'price_monthly': 29,
+        'price_annual': 313,
+        'popular': False,
+        'highlights': [
+            {'label': 'Hasta 10 usuarios', 'included': True},
+            {'label': '5 GB almacenamiento', 'included': True},
+            {'label': '10,000 llamadas API/mes', 'included': True},
+            {'label': 'Roles personalizados', 'included': True},
+            {'label': 'MFA', 'included': False},
+            {'label': 'SSO/SAML', 'included': False},
+            {'label': 'Soporte por email', 'included': True},
+        ],
+    },
+    {
+        'id': 'professional',
+        'display_name': 'Professional',
+        'description': 'Para empresas que necesitan escala y control',
+        'price_monthly': 79,
+        'price_annual': 854,
+        'popular': True,
+        'highlights': [
+            {'label': 'Hasta 25 usuarios', 'included': True},
+            {'label': '20 GB almacenamiento', 'included': True},
+            {'label': '100,000 llamadas API/mes', 'included': True},
+            {'label': 'Roles personalizados ilimitados', 'included': True},
+            {'label': 'MFA obligatorio', 'included': True},
+            {'label': 'SSO/SAML', 'included': False},
+            {'label': 'Soporte prioritario', 'included': True},
+        ],
+    },
+    {
+        'id': 'enterprise',
+        'display_name': 'Enterprise',
+        'description': 'Para grandes organizaciones',
+        'price_monthly': 199,
+        'price_annual': 2149,
+        'popular': False,
+        'highlights': [
+            {'label': 'Usuarios ilimitados', 'included': True},
+            {'label': 'Almacenamiento ilimitado', 'included': True},
+            {'label': 'Llamadas API ilimitadas', 'included': True},
+            {'label': 'Roles personalizados ilimitados', 'included': True},
+            {'label': 'MFA obligatorio', 'included': True},
+            {'label': 'SSO/SAML', 'included': True},
+            {'label': 'Soporte dedicado 24/7', 'included': True},
+        ],
+    },
+]

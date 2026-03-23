@@ -64,7 +64,10 @@ urlpatterns = [
     ])),
 
     # Public endpoints (no auth)
-    path('api/v1/public/', include('apps.digital_services.public_urls')),
+    path('api/v1/public/', include([
+        path('', include('apps.digital_services.public_urls')),
+        path('plans/', include('apps.subscriptions.public_urls')),
+    ])),
 
     # Support
     path('api/v1/support/', include('apps.support.urls')),

@@ -1,7 +1,7 @@
 """Serializers for subscription billing models."""
 from rest_framework import serializers
 
-from apps.subscriptions.models import Invoice, PaymentMethod, Subscription
+from apps.subscriptions.models import Invoice, PaymentMethod, Plan, Subscription
 from utils.plans import PLAN_FEATURES
 
 
@@ -104,6 +104,27 @@ class PaymentMethodUpdateSerializer(serializers.Serializer):
     external_email = serializers.EmailField(required=False, allow_blank=True)
     external_phone = serializers.CharField(required=False, allow_blank=True, max_length=20)
     external_account_id = serializers.CharField(required=False, allow_blank=True)
+
+
+class PlanSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Plan
+        fields = [
+            'id', 'display_name', 'description', 'price_monthly',
+            'price_annual', 'popular', 'highlights', 'updated_at',
+        ]
+        read_only_fields = ['id', 'updated_at']
+
+
+class PlanUpdateSerializer(serializers.Serializer):
+    display_name  = serializers.CharField(max_length=100, required=False)
+    description   = serializers.CharField(max_length=300, required=False, allow_blank=True)
+    price_monthly = serializers.IntegerField(min_value=0, required=False)
+    price_annual  = serializers.IntegerField(min_value=0, required=False)
+    popular       = serializers.BooleanField(required=False)
+    highlights    = serializers.ListField(
+        child=serializers.DictField(), required=False, min_length=1, max_length=10
+    )
 
 
 class UpgradeSerializer(serializers.Serializer):
