@@ -19,7 +19,7 @@ from rest_framework.views import APIView
 
 from apps.notes.models import Note
 from apps.notes.serializers import NoteCreateUpdateSerializer, NoteSerializer
-from apps.rbac.permissions import HasPermission, check_plan_limit
+from apps.rbac.permissions import HasPermission, check_plan_limit, _user_has_permission
 
 _NOT_FOUND = Response(
     {'error': {'code': 'not_found', 'message': 'Not found.'}}, status=404
@@ -56,21 +56,24 @@ class NoteListCreateView(APIView):
                 tenant=request.tenant, user=request.user, content__icontains=search
             )
             qs = qs.distinct()
-        return Response({'notes': NoteSerializer(qs, many=True).data})
+        notes = NoteSerializer(qs, many=True).data
+        return Response({'results': notes, 'count': len(notes), 'notes': notes})
 
     @extend_schema(tags=['app-notes'], summary='Create note')
     def post(self, request):
-        if not request.user.has_perm('notes.create'):
+        if not _user_has_permission(request.user, 'notes.create'):
             from rest_framework.exceptions import PermissionDenied
             raise PermissionDenied()
         count = Note.objects.filter(tenant=request.tenant, user=request.user).count()
         check_plan_limit(request.user, 'notes', count)
         serializer = NoteCreateUpdateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+        data = dict(serializer.validated_data)
+        data.pop('tags', None)  # model has no tags field
         note = Note.objects.create(
             tenant=request.tenant,
             user=request.user,
-            **serializer.validated_data,
+            **data,
         )
         return Response(NoteSerializer(note).data, status=status.HTTP_201_CREATED)
 
@@ -87,7 +90,7 @@ class NoteDetailView(APIView):
 
     @extend_schema(tags=['app-notes'], summary='Update note')
     def patch(self, request, pk):
-        if not request.user.has_perm('notes.update'):
+        if not _user_has_permission(request.user, 'notes.update'):
             from rest_framework.exceptions import PermissionDenied
             raise PermissionDenied()
         note = _get_note(pk, request.tenant, request.user)
@@ -96,13 +99,15 @@ class NoteDetailView(APIView):
         serializer = NoteCreateUpdateSerializer(data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         for field, value in serializer.validated_data.items():
+            if field == 'tags':
+                continue  # model has no tags field
             setattr(note, field, value)
         note.save()
         return Response(NoteSerializer(note).data)
 
     @extend_schema(tags=['app-notes'], summary='Delete note')
     def delete(self, request, pk):
-        if not request.user.has_perm('notes.delete'):
+        if not _user_has_permission(request.user, 'notes.delete'):
             from rest_framework.exceptions import PermissionDenied
             raise PermissionDenied()
         note = _get_note(pk, request.tenant, request.user)
