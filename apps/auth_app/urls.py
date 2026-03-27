@@ -11,6 +11,7 @@ from .views import (
     MFARecoveryView,
     MFAValidateView,
     MFAVerifySetupView,
+    ProfileView,
     RefreshTokenView,
     RegisterView,
     ResetPasswordView,
@@ -18,6 +19,7 @@ from .views import (
 )
 
 urlpatterns = [
+    path('profile', ProfileView.as_view(), name='auth-profile'),
     path('register', RegisterView.as_view(), name='auth-register'),
     path('login', LoginView.as_view(), name='auth-login'),
     path('refresh-token', RefreshTokenView.as_view(), name='auth-refresh-token'),

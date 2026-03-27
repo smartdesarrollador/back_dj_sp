@@ -22,11 +22,12 @@ class TenantSerializer(serializers.ModelSerializer):
 class UserSerializer(serializers.ModelSerializer):
     roles = serializers.SerializerMethodField()
     permissions = serializers.SerializerMethodField()
+    tenant_plan = serializers.SerializerMethodField()
 
     class Meta:
         model = User
         fields = ['id', 'name', 'email', 'tenant_id', 'email_verified',
-                  'mfa_enabled', 'is_staff', 'created_at', 'roles', 'permissions']
+                  'mfa_enabled', 'is_staff', 'created_at', 'roles', 'permissions', 'tenant_plan']
 
     def get_roles(self, obj):
         return list(
@@ -39,6 +40,9 @@ class UserSerializer(serializers.ModelSerializer):
                 'role__role_permissions__permission__codename', flat=True
             ).distinct()
         )
+
+    def get_tenant_plan(self, obj):
+        return obj.tenant.plan if obj.tenant_id else 'free'
 
 
 class RegisterSerializer(serializers.Serializer):

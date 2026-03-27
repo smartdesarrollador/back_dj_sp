@@ -54,6 +54,21 @@ from .tokens import (
 User = get_user_model()
 
 
+class ProfileView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        tags=['auth'],
+        summary='Get current user profile',
+        responses={200: OpenApiResponse(description='User profile with tenant plan')},
+    )
+    def get(self, request):
+        return Response({
+            'user': UserSerializer(request.user).data,
+            'tenant': TenantSerializer(request.user.tenant).data,
+        })
+
+
 def _build_token_response(user) -> dict:
     refresh = TenantRefreshToken.for_user(user)
     return {
