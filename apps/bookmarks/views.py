@@ -26,7 +26,7 @@ from apps.bookmarks.serializers import (
     BookmarkCreateUpdateSerializer,
     BookmarkSerializer,
 )
-from apps.rbac.permissions import HasFeature, HasPermission, check_plan_limit
+from apps.rbac.permissions import HasFeature, HasPermission, check_plan_limit, _user_has_permission
 
 _NOT_FOUND = Response(
     {'error': {'code': 'not_found', 'message': 'Not found.'}}, status=404
@@ -73,11 +73,12 @@ class BookmarkListCreateView(APIView):
             qs = qs.distinct()
         if tag:
             qs = qs.filter(tags__contains=[tag])
-        return Response({'bookmarks': BookmarkSerializer(qs, many=True).data})
+        bookmarks = BookmarkSerializer(qs, many=True).data
+        return Response({'results': bookmarks, 'count': len(bookmarks), 'bookmarks': bookmarks})
 
     @extend_schema(tags=['app-bookmarks'], summary='Create bookmark')
     def post(self, request):
-        if not request.user.has_perm('bookmarks.create'):
+        if not _user_has_permission(request.user, 'bookmarks.create'):
             from rest_framework.exceptions import PermissionDenied
             raise PermissionDenied()
         count = Bookmark.objects.filter(tenant=request.tenant, user=request.user).count()
@@ -110,7 +111,7 @@ class BookmarkDetailView(APIView):
 
     @extend_schema(tags=['app-bookmarks'], summary='Update bookmark')
     def patch(self, request, pk):
-        if not request.user.has_perm('bookmarks.update'):
+        if not _user_has_permission(request.user, 'bookmarks.update'):
             from rest_framework.exceptions import PermissionDenied
             raise PermissionDenied()
         bookmark = _get_bookmark(pk, request.tenant, request.user)
@@ -129,7 +130,7 @@ class BookmarkDetailView(APIView):
 
     @extend_schema(tags=['app-bookmarks'], summary='Delete bookmark')
     def delete(self, request, pk):
-        if not request.user.has_perm('bookmarks.delete'):
+        if not _user_has_permission(request.user, 'bookmarks.delete'):
             from rest_framework.exceptions import PermissionDenied
             raise PermissionDenied()
         bookmark = _get_bookmark(pk, request.tenant, request.user)
@@ -145,7 +146,8 @@ class BookmarkCollectionListCreateView(APIView):
     @extend_schema(tags=['app-bookmarks'], summary='List bookmark collections')
     def get(self, request):
         collections = BookmarkCollection.objects.filter(tenant=request.tenant, user=request.user)
-        return Response({'collections': BookmarkCollectionSerializer(collections, many=True).data})
+        cols = BookmarkCollectionSerializer(collections, many=True).data
+        return Response({'results': cols, 'count': len(cols), 'collections': cols})
 
     @extend_schema(tags=['app-bookmarks'], summary='Create bookmark collection')
     def post(self, request):
