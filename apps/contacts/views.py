@@ -30,7 +30,7 @@ from apps.contacts.serializers import (
     ContactGroupSerializer,
     ContactSerializer,
 )
-from apps.rbac.permissions import HasFeature, HasPermission, check_plan_limit
+from apps.rbac.permissions import HasFeature, HasPermission, check_plan_limit, _user_has_permission
 
 _NOT_FOUND = Response(
     {'error': {'code': 'not_found', 'message': 'Not found.'}}, status=404
@@ -75,11 +75,12 @@ class ContactListCreateView(APIView):
                 tenant=request.tenant, user=request.user, email__icontains=search
             )
             qs = qs.distinct()
-        return Response({'contacts': ContactSerializer(qs, many=True).data})
+        contacts = ContactSerializer(qs, many=True).data
+        return Response({'results': contacts, 'count': len(contacts), 'contacts': contacts})
 
     @extend_schema(tags=['app-contacts'], summary='Create contact')
     def post(self, request):
-        if not request.user.has_perm('contacts.create'):
+        if not _user_has_permission(request.user, 'contacts.create'):
             from rest_framework.exceptions import PermissionDenied
             raise PermissionDenied()
         count = Contact.objects.filter(tenant=request.tenant, user=request.user).count()
@@ -88,6 +89,12 @@ class ContactListCreateView(APIView):
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data.copy()
         group_id = data.pop('group', None)
+        # Split name → first_name / last_name if name provided
+        full_name = data.pop('name', '').strip()
+        if full_name and not data.get('first_name'):
+            parts = full_name.split(' ', 1)
+            data['first_name'] = parts[0]
+            data['last_name'] = parts[1] if len(parts) > 1 else data.get('last_name', '')
         group = None
         if group_id:
             group = _get_group(group_id, request.tenant, request.user)
@@ -112,7 +119,7 @@ class ContactDetailView(APIView):
 
     @extend_schema(tags=['app-contacts'], summary='Update contact')
     def patch(self, request, pk):
-        if not request.user.has_perm('contacts.update'):
+        if not _user_has_permission(request.user, 'contacts.update'):
             from rest_framework.exceptions import PermissionDenied
             raise PermissionDenied()
         contact = _get_contact(pk, request.tenant, request.user)
@@ -124,6 +131,11 @@ class ContactDetailView(APIView):
         group_id = data.pop('group', None)
         if group_id is not None:
             contact.group = _get_group(group_id, request.tenant, request.user)
+        full_name = data.pop('name', '').strip()
+        if full_name:
+            parts = full_name.split(' ', 1)
+            data['first_name'] = parts[0]
+            data['last_name'] = parts[1] if len(parts) > 1 else ''
         for field, value in data.items():
             setattr(contact, field, value)
         contact.save()
@@ -131,7 +143,7 @@ class ContactDetailView(APIView):
 
     @extend_schema(tags=['app-contacts'], summary='Delete contact')
     def delete(self, request, pk):
-        if not request.user.has_perm('contacts.delete'):
+        if not _user_has_permission(request.user, 'contacts.delete'):
             from rest_framework.exceptions import PermissionDenied
             raise PermissionDenied()
         contact = _get_contact(pk, request.tenant, request.user)
@@ -147,7 +159,8 @@ class ContactGroupListCreateView(APIView):
     @extend_schema(tags=['app-contacts'], summary='List contact groups')
     def get(self, request):
         groups = ContactGroup.objects.filter(tenant=request.tenant, user=request.user)
-        return Response({'groups': ContactGroupSerializer(groups, many=True).data})
+        groups_data = ContactGroupSerializer(groups, many=True).data
+        return Response({'results': groups_data, 'count': len(groups_data), 'groups': groups_data})
 
     @extend_schema(tags=['app-contacts'], summary='Create contact group')
     def post(self, request):
