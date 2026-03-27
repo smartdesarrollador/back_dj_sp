@@ -100,7 +100,8 @@ class ProjectListView(APIView):
             tenant=request.tenant
         ).prefetch_related('sections__items__fields', 'members')
         serializer = ProjectSerializer(projects, many=True)
-        return Response({'projects': serializer.data})
+        data = serializer.data
+        return Response({'results': data, 'count': len(data), 'projects': data})
 
 
 class ProjectCreateView(APIView):

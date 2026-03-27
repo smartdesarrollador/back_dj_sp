@@ -47,17 +47,34 @@ class ProjectSectionSerializer(serializers.ModelSerializer):
 
 class ProjectSerializer(serializers.ModelSerializer):
     sections = ProjectSectionSerializer(many=True, read_only=True)
-    member_count = serializers.SerializerMethodField()
+    status = serializers.SerializerMethodField()
+    sections_count = serializers.SerializerMethodField()
+    items_count = serializers.SerializerMethodField()
+    members_count = serializers.SerializerMethodField()
 
     class Meta:
         model = Project
         fields = [
             'id', 'name', 'description', 'color', 'icon', 'is_archived',
-            'member_count', 'sections', 'created_at', 'updated_at',
+            'status', 'sections_count', 'items_count', 'members_count',
+            'sections', 'created_at', 'updated_at',
         ]
-        read_only_fields = ['id', 'sections', 'member_count', 'created_at', 'updated_at']
+        read_only_fields = [
+            'id', 'sections', 'status', 'sections_count', 'items_count',
+            'members_count', 'created_at', 'updated_at',
+        ]
 
-    def get_member_count(self, obj) -> int:
+    def get_status(self, obj) -> str:
+        return 'archived' if obj.is_archived else 'active'
+
+    def get_sections_count(self, obj) -> int:
+        return obj.sections.count()
+
+    def get_items_count(self, obj) -> int:
+        from apps.projects.models import ProjectItem
+        return ProjectItem.objects.filter(section__project=obj).count()
+
+    def get_members_count(self, obj) -> int:
         return obj.members.count()
 
 
