@@ -27,7 +27,7 @@ from apps.calendar_app.serializers import (
     EventAttendeeCreateSerializer,
     EventAttendeeSerializer,
 )
-from apps.rbac.permissions import HasFeature, HasPermission, check_plan_limit
+from apps.rbac.permissions import HasFeature, HasPermission, check_plan_limit, _user_has_permission
 from core.mixins import AuditMixin
 
 User = get_user_model()
@@ -67,15 +67,28 @@ class CalendarEventListCreateView(APIView):
         qs = CalendarEvent.objects.filter(tenant=request.tenant, user=request.user)
         start = request.query_params.get('start')
         end = request.query_params.get('end')
+        month = request.query_params.get('month')
+        if month:
+            try:
+                year, mon = month.split('-')
+                import calendar as cal_mod
+                last_day = cal_mod.monthrange(int(year), int(mon))[1]
+                qs = qs.filter(
+                    start_datetime__gte=f'{year}-{mon}-01T00:00:00',
+                    start_datetime__lte=f'{year}-{mon}-{last_day}T23:59:59',
+                )
+            except (ValueError, AttributeError):
+                pass
         if start:
             qs = qs.filter(start_datetime__gte=start)
         if end:
             qs = qs.filter(end_datetime__lte=end)
-        return Response({'events': CalendarEventSerializer(qs, many=True).data})
+        events = CalendarEventSerializer(qs, many=True).data
+        return Response({'results': events, 'count': len(events), 'events': events})
 
     @extend_schema(tags=['app-calendar'], summary='Create calendar event')
     def post(self, request):
-        if not request.user.has_perm('calendar.create'):
+        if not _user_has_permission(request.user, 'calendar.create'):
             from rest_framework.exceptions import PermissionDenied
             raise PermissionDenied()
         count = CalendarEvent.objects.filter(
@@ -104,7 +117,7 @@ class CalendarEventDetailView(AuditMixin, APIView):
 
     @extend_schema(tags=['app-calendar'], summary='Update calendar event')
     def patch(self, request, pk):
-        if not request.user.has_perm('calendar.update'):
+        if not _user_has_permission(request.user, 'calendar.update'):
             from rest_framework.exceptions import PermissionDenied
             raise PermissionDenied()
         event = _get_event(pk, request.tenant, request.user)
@@ -125,7 +138,7 @@ class CalendarEventDetailView(AuditMixin, APIView):
 
     @extend_schema(tags=['app-calendar'], summary='Delete calendar event')
     def delete(self, request, pk):
-        if not request.user.has_perm('calendar.delete'):
+        if not _user_has_permission(request.user, 'calendar.delete'):
             from rest_framework.exceptions import PermissionDenied
             raise PermissionDenied()
         event = _get_event(pk, request.tenant, request.user)
@@ -153,7 +166,7 @@ class EventAttendeeListView(APIView):
         if not event:
             return _NOT_FOUND
         # Only the event owner can invite attendees
-        if event.user != request.user and not request.user.has_perm('calendar.share'):
+        if event.user != request.user and not _user_has_permission(request.user, 'calendar.share'):
             from rest_framework.exceptions import PermissionDenied
             raise PermissionDenied()
         serializer = EventAttendeeCreateSerializer(data=request.data)

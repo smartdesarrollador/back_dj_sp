@@ -8,11 +8,14 @@ from apps.calendar_app.models import CalendarEvent, EventAttendee
 
 class CalendarEventSerializer(serializers.ModelSerializer):
     attendees_count = serializers.SerializerMethodField()
+    start_date = serializers.SerializerMethodField()
+    end_date = serializers.SerializerMethodField()
 
     class Meta:
         model = CalendarEvent
         fields = [
             'id', 'title', 'description', 'start_datetime', 'end_datetime',
+            'start_date', 'end_date',
             'is_all_day', 'location', 'rrule', 'color',
             'attendees_count', 'created_at', 'updated_at',
         ]
@@ -20,6 +23,12 @@ class CalendarEventSerializer(serializers.ModelSerializer):
 
     def get_attendees_count(self, obj) -> int:
         return obj.attendees.count()
+
+    def get_start_date(self, obj) -> str:
+        return obj.start_datetime.strftime('%Y-%m-%dT%H:%M:%S') if obj.start_datetime else ''
+
+    def get_end_date(self, obj) -> str:
+        return obj.end_datetime.strftime('%Y-%m-%dT%H:%M:%S') if obj.end_datetime else ''
 
 
 class CalendarEventCreateUpdateSerializer(serializers.Serializer):
