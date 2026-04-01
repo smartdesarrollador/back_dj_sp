@@ -70,12 +70,25 @@ services:
       - dokploy-network
     restart: unless-stopped
     healthcheck:
-      # X-Forwarded-Proto: https tells Django this is already HTTPS (avoids 301 redirect loop)
-      test: ["CMD", "curl", "-f", "-H", "X-Forwarded-Proto: https", "http://localhost:8000/api/health/"]
+      # Host header needed for Django ALLOWED_HOSTS; X-Forwarded-Proto avoids SSL redirect loop
+      test: ["CMD", "curl", "-f", "-H", "X-Forwarded-Proto: https", "-H", "Host: api-rbac.smartdigitaltec.com", "http://localhost:8000/api/health/"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 40s
+    labels:
+      - "traefik.enable=true"
+      # HTTPS router
+      - "traefik.http.routers.rbac-api.rule=Host(`api-rbac.smartdigitaltec.com`)"
+      - "traefik.http.routers.rbac-api.entrypoints=websecure"
+      - "traefik.http.routers.rbac-api.service=rbac-api"
+      # HTTP → HTTPS redirect
+      - "traefik.http.routers.rbac-api-http.rule=Host(`api-rbac.smartdigitaltec.com`)"
+      - "traefik.http.routers.rbac-api-http.entrypoints=web"
+      - "traefik.http.routers.rbac-api-http.middlewares=redirect-to-https@file"
+      - "traefik.http.routers.rbac-api-http.service=rbac-api"
+      # Backend service
+      - "traefik.http.services.rbac-api.loadbalancer.server.port=8000"
 
   celery-worker:
     build:
