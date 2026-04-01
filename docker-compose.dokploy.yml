@@ -70,18 +70,12 @@ services:
       - dokploy-network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health/"]
+      # X-Forwarded-Proto: https tells Django this is already HTTPS (avoids 301 redirect loop)
+      test: ["CMD", "curl", "-f", "-H", "X-Forwarded-Proto: https", "http://localhost:8000/api/health/"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 40s
-    labels:
-      - "traefik.enable=true"
-      - "traefik.docker.network=dokploy-network"
-      - "traefik.http.routers.rbac-api.rule=Host(`${API_DOMAIN}`)"
-      - "traefik.http.routers.rbac-api.entrypoints=websecure"
-      - "traefik.http.routers.rbac-api.tls.certResolver=letsencrypt"
-      - "traefik.http.services.rbac-api.loadbalancer.server.port=8000"
 
   celery-worker:
     build:
