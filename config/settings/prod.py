@@ -10,6 +10,12 @@ env = environ.Env()
 
 DEBUG = False
 
+# Traefik reverse proxy — tells Django the real protocol is HTTPS
+# Without this, SECURE_SSL_REDIRECT causes an infinite redirect loop
+# because Traefik terminates SSL and forwards plain HTTP internally.
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+USE_X_FORWARDED_HOST = True
+
 # Security
 SECURE_SSL_REDIRECT = True
 SECURE_HSTS_SECONDS = 31536000

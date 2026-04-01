@@ -71,6 +71,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libpango-1.0-0 \
     libpangocairo-1.0-0 \
     libgdk-pixbuf-xlib-2.0-0 \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
 # Install only prod deps
@@ -80,8 +81,10 @@ RUN pip install --no-cache-dir --upgrade pip && \
 
 COPY . .
 
-# Collect static files
-RUN python manage.py collectstatic --noinput
+# Collect static files — SECRET_KEY is required by Django settings at import time.
+# A placeholder is used here; the real key is injected at runtime via env vars.
+ARG SECRET_KEY=placeholder-collectstatic-key-not-used-in-runtime
+RUN SECRET_KEY=${SECRET_KEY} python manage.py collectstatic --noinput
 
 # Create non-root user
 RUN adduser --disabled-password --gecos '' appuser && \

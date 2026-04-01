@@ -1,0 +1,129 @@
+# docker-compose.dokploy.yml — Para Dokploy (Traefik, no Nginx)
+# Diferencias vs docker-compose.prod.yml:
+#   - Red dokploy-network en vez de global
+#   - Sin servicio nginx (Traefik lo reemplaza con labels)
+#   - Servicio migrate dedicado (migrate + collectstatic en runtime)
+#   - Volúmenes Docker nombrados (persisten entre redeploys)
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - dokploy-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+    networks:
+      - dokploy-network
+
+  migrate:
+    build:
+      context: .
+      target: prod
+    command: >
+      sh -c "python manage.py migrate --noinput &&
+             python manage.py collectstatic --noinput"
+    environment:
+      DJANGO_SETTINGS_MODULE: config.settings.prod
+    env_file:
+      - .env
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - dokploy-network
+    restart: on-failure
+
+  django:
+    build:
+      context: .
+      target: prod
+    command: gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 4 --timeout 120 --access-logfile - --error-logfile -
+    environment:
+      DJANGO_SETTINGS_MODULE: config.settings.prod
+    env_file:
+      - .env
+    volumes:
+      - staticfiles:/app/staticfiles
+      - media:/app/media
+    depends_on:
+      db:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    networks:
+      - dokploy-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.rbac-api.rule=Host(`${API_DOMAIN}`)"
+      - "traefik.http.routers.rbac-api.entrypoints=websecure"
+      - "traefik.http.routers.rbac-api.tls.certResolver=letsencrypt"
+      - "traefik.http.services.rbac-api.loadbalancer.server.port=8000"
+
+  celery-worker:
+    build:
+      context: .
+      target: prod
+    command: celery -A config.celery worker --loglevel=warning --concurrency=4
+    environment:
+      DJANGO_SETTINGS_MODULE: config.settings.prod
+    env_file:
+      - .env
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    networks:
+      - dokploy-network
+    restart: unless-stopped
+
+  celery-beat:
+    build:
+      context: .
+      target: prod
+    command: celery -A config.celery beat --loglevel=warning --scheduler django_celery_beat.schedulers:DatabaseScheduler
+    environment:
+      DJANGO_SETTINGS_MODULE: config.settings.prod
+    env_file:
+      - .env
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    networks:
+      - dokploy-network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  redis_data:
+  staticfiles:
+  media:
+
+networks:
+  dokploy-network:
+    external: true
