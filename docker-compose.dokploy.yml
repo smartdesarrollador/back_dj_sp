@@ -75,12 +75,7 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.rbac-api.rule=Host(`${API_DOMAIN}`)"
-      - "traefik.http.routers.rbac-api.entrypoints=websecure"
-      - "traefik.http.routers.rbac-api.tls.certResolver=letsencrypt"
-      - "traefik.http.services.rbac-api.loadbalancer.server.port=8000"
+    # Traefik labels removed — Dokploy manages routing via its Domains tab
 
   celery-worker:
     build:
