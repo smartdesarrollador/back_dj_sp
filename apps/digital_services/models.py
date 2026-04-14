@@ -74,6 +74,9 @@ class DigitalCard(BaseModel):
     background_color = models.CharField(max_length=7, default='#FFFFFF')
     # Base64 data URL or external URL for the QR code image
     qr_code_url = models.TextField(blank=True)
+    # Professional info shown in the About section
+    specialties = models.JSONField(default=list, blank=True)
+    years_experience = models.PositiveSmallIntegerField(null=True, blank=True)
 
     class Meta:
         db_table = 'digital_cards'

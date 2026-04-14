@@ -49,6 +49,7 @@ class DigitalCardSerializer(serializers.ModelSerializer):
             'linkedin_url', 'twitter_url', 'github_url',
             'instagram_url', 'facebook_url', 'website_url',
             'primary_color', 'background_color', 'qr_code_url',
+            'specialties', 'years_experience',
             'created_at', 'updated_at',
         ]
         read_only_fields = ['id', 'qr_code_url', 'created_at', 'updated_at']
