@@ -176,7 +176,7 @@ REST_FRAMEWORK = {
         'anon': '60/minute',
         # Rates nombrados por endpoint sensible
         'login': '5/minute',
-        'register': '3/hour',
+        'register': '10/hour',
         'mfa': '5/minute',
         'forgot_password': '5/hour',
     },
