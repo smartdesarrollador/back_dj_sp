@@ -142,9 +142,7 @@ class LoginSerializer(serializers.Serializer):
         if not user.is_active:
             raise serializers.ValidationError('This account has been deactivated.')
         if not user.email_verified:
-            raise serializers.ValidationError(
-                {'code': 'email_not_verified', 'message': 'Please verify your email before logging in.'}
-            )
+            raise serializers.ValidationError('email_not_verified')
         attrs['user'] = user
         return attrs
 
