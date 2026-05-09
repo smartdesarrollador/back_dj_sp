@@ -448,6 +448,35 @@ class MFADisableView(APIView):
         return Response({'message': 'MFA has been disabled.'})
 
 
+class ResendVerificationView(APIView):
+    permission_classes = [AllowAny]
+    throttle_classes = [ForgotPasswordRateThrottle]
+
+    @extend_schema(
+        tags=['auth'],
+        summary='Resend email verification link',
+        responses={
+            200: OpenApiResponse(description='Link sent if email exists and is unverified'),
+        },
+    )
+    def post(self, request):
+        email = request.data.get('email', '').lower().strip()
+        try:
+            user = User.objects.get(email=email, email_verified=False)
+            token = create_email_verification_token(str(user.id))
+            verify_url = f"{settings.FRONTEND_URL}/verify-email?token={token}"
+            send_mail(
+                subject='Verify your email',
+                message=f'Click the link to verify your email: {verify_url}',
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                recipient_list=[user.email],
+                fail_silently=True,
+            )
+        except User.DoesNotExist:
+            pass
+        return Response({'message': 'If your email is registered and unverified, a new link has been sent.'})
+
+
 class MFARecoveryView(APIView):
     permission_classes = [AllowAny]
     throttle_classes = [MFARateThrottle]
