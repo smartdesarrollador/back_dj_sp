@@ -4,6 +4,8 @@ import json
 import secrets
 import urllib.parse
 
+from rest_framework.utils.encoders import JSONEncoder
+
 import requests
 from django.conf import settings
 from django.contrib.auth import get_user_model
@@ -148,10 +150,10 @@ class GoogleOAuthCallbackView(APIView):
 
         # Serialize user and tenant as base64 JSON
         user_b64 = base64.b64encode(
-            json.dumps(UserSerializer(user).data).encode()
+            json.dumps(UserSerializer(user).data, cls=JSONEncoder).encode()
         ).decode()
         tenant_b64 = base64.b64encode(
-            json.dumps(TenantSerializer(tenant).data).encode()
+            json.dumps(TenantSerializer(tenant).data, cls=JSONEncoder).encode()
         ).decode()
 
         params = urllib.parse.urlencode({
