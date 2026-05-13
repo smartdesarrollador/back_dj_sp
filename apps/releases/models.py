@@ -49,7 +49,7 @@ class DesktopRelease(BaseModel):
         return f'{self.version} ({self.platform})'
 
     def save(self, *args, **kwargs) -> None:
-        if self.file and not self.pk:
+        if self.file and not self.file_name:
             self.file_name = os.path.basename(self.file.name)
             self.file_size = self.file.size
             self.sha256 = self._compute_sha256()
