@@ -72,6 +72,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libpangocairo-1.0-0 \
     libgdk-pixbuf-xlib-2.0-0 \
     curl \
+    gosu \
     && rm -rf /var/lib/apt/lists/*
 
 # Install only prod deps
@@ -86,13 +87,16 @@ COPY . .
 ARG SECRET_KEY=placeholder-collectstatic-key-not-used-in-runtime
 RUN SECRET_KEY=${SECRET_KEY} python manage.py collectstatic --noinput
 
-# Create non-root user
+# Create non-root user; entrypoint will chown the media volume at runtime then drop to appuser
 RUN adduser --disabled-password --gecos '' appuser && \
     chown -R appuser:appuser /app
-USER appuser
+
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
 
 EXPOSE 8000
 
+ENTRYPOINT ["/entrypoint.sh"]
 CMD ["gunicorn", "config.wsgi:application", \
      "--bind", "0.0.0.0:8000", \
      "--workers", "4", \
