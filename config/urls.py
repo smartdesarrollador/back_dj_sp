@@ -39,6 +39,7 @@ urlpatterns = [
         path('audit-logs/', include('apps.audit.urls')),
         path('notifications/', include('apps.notifications.admin_urls')),
         path('clients/', include('apps.tenants.admin_urls')),
+        path('releases/', include('apps.releases.admin_urls')),
     ])),
 
     # App API (per-user resources)
@@ -67,6 +68,7 @@ urlpatterns = [
     path('api/v1/public/', include([
         path('', include('apps.digital_services.public_urls')),
         path('plans/', include('apps.subscriptions.public_urls')),
+        path('desktop/', include('apps.releases.public_urls')),
     ])),
 
     # Support

@@ -66,6 +66,7 @@ LOCAL_APPS = [
     'apps.services',
     'apps.referrals',
     'apps.notifications',
+    'apps.releases',
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
@@ -336,6 +337,8 @@ SPECTACULAR_SETTINGS = {
         {'name': 'hub-referrals',      'description': 'Referral codes and dashboard (Hub)'},
         {'name': 'hub-notifications',  'description': 'In-app notifications for Hub users'},
         {'name': 'admin-notifications', 'description': 'Admin panel notifications'},
+        {'name': 'admin-releases', 'description': 'Desktop app release management (admin)'},
+        {'name': 'public-releases', 'description': 'Latest desktop release info (public)'},
     ],
 }
 
@@ -384,3 +387,7 @@ AWS_SECRET_ACCESS_KEY = env('AWS_SECRET_ACCESS_KEY', default='')
 AWS_STORAGE_BUCKET_NAME = env('AWS_STORAGE_BUCKET_NAME', default='')
 AWS_S3_REGION_NAME = env('AWS_S3_REGION_NAME', default='us-east-1')
 AWS_S3_CUSTOM_DOMAIN = f'{AWS_STORAGE_BUCKET_NAME}.s3.amazonaws.com' if AWS_STORAGE_BUCKET_NAME else ''
+
+# ─── File Upload ───────────────────────────────────────────────────────────────
+DATA_UPLOAD_MAX_MEMORY_SIZE = 600 * 1024 * 1024   # 600 MB
+FILE_UPLOAD_MAX_MEMORY_SIZE = 600 * 1024 * 1024
