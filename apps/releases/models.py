@@ -12,17 +12,23 @@ PLATFORM_CHOICES = [
     ('linux', 'Linux'),
 ]
 
+APP_TYPE_CHOICES = [
+    ('tauri', 'Tauri Desktop'),
+    ('sidebar', 'Sidebar Offline'),
+]
+
 ALLOWED_EXTENSIONS = {'.exe', '.msi', '.dmg'}
 MAX_FILE_SIZE_BYTES = 500 * 1024 * 1024  # 500 MB
 
 
 def _release_upload_path(instance, filename):
-    return f'releases/{instance.platform}/{instance.version}/{filename}'
+    return f'releases/{instance.app_type}/{instance.platform}/{instance.version}/{filename}'
 
 
 class DesktopRelease(BaseModel):
     version = models.CharField(max_length=50, db_index=True)
     platform = models.CharField(max_length=10, choices=PLATFORM_CHOICES)
+    app_type = models.CharField(max_length=20, choices=APP_TYPE_CHOICES, default='tauri', db_index=True)
     file = models.FileField(upload_to=_release_upload_path)
     file_name = models.CharField(max_length=255, editable=False)
     file_size = models.BigIntegerField(editable=False)
@@ -40,8 +46,8 @@ class DesktopRelease(BaseModel):
         ]
         constraints = [
             models.UniqueConstraint(
-                fields=['version', 'platform'],
-                name='unique_release_version_platform',
+                fields=['version', 'platform', 'app_type'],
+                name='unique_release_version_platform_apptype',
             )
         ]
 

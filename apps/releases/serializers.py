@@ -13,7 +13,7 @@ class DesktopReleaseSerializer(serializers.ModelSerializer):
     class Meta:
         model = DesktopRelease
         fields = [
-            'id', 'version', 'platform', 'file_url', 'file_name', 'file_size',
+            'id', 'version', 'platform', 'app_type', 'file_url', 'file_name', 'file_size',
             'file_size_mb', 'sha256', 'release_notes', 'is_published',
             'download_count', 'created_at', 'updated_at',
         ]
@@ -33,7 +33,7 @@ class DesktopReleaseSerializer(serializers.ModelSerializer):
 class DesktopReleaseCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = DesktopRelease
-        fields = ['version', 'platform', 'file', 'release_notes']
+        fields = ['version', 'platform', 'app_type', 'file', 'release_notes']
 
     def validate_file(self, value):
         ext = os.path.splitext(value.name)[1].lower()
@@ -52,9 +52,10 @@ class DesktopReleaseCreateSerializer(serializers.ModelSerializer):
     def validate(self, attrs):
         version = attrs.get('version')
         platform = attrs.get('platform')
-        if DesktopRelease.objects.filter(version=version, platform=platform).exists():
+        app_type = attrs.get('app_type', 'tauri')
+        if DesktopRelease.objects.filter(version=version, platform=platform, app_type=app_type).exists():
             raise serializers.ValidationError(
-                {'version': f'Ya existe un release {version} para {platform}.'}
+                {'version': f'Ya existe un release {version} para {platform} ({app_type}).'}
             )
         return attrs
 

@@ -67,6 +67,7 @@ LOCAL_APPS = [
     'apps.referrals',
     'apps.notifications',
     'apps.releases',
+    'apps.licenses',
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
@@ -280,6 +281,9 @@ STRIPE_PLAN_PRICES: dict[str, dict[str, str]] = {
 
 # ─── Encryption ───────────────────────────────────────────────────────────────
 ENCRYPTION_KEY = env('ENCRYPTION_KEY', default='')
+
+# ─── Desktop App Licenses ─────────────────────────────────────────────────────
+LICENSE_SIGNING_SECRET = env('LICENSE_SIGNING_SECRET', default='change-me-in-production')
 
 # ─── Referrals ────────────────────────────────────────────────────────────────
 REFERRAL_BASE_URL = env('REFERRAL_BASE_URL', default='https://hub.app')

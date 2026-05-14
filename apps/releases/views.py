@@ -29,6 +29,7 @@ class ReleaseListView(APIView):
         parameters=[
             OpenApiParameter('platform', OpenApiTypes.STR, description='Filter by platform'),
             OpenApiParameter('published', OpenApiTypes.BOOL, description='Filter by published status'),
+            OpenApiParameter('app_type', OpenApiTypes.STR, description='Filter by app type: tauri, sidebar'),
         ],
         responses={200: OpenApiResponse(description='{ releases: [...] }')},
     )
@@ -36,6 +37,8 @@ class ReleaseListView(APIView):
         qs = DesktopRelease.objects.all()
         if platform := request.query_params.get('platform'):
             qs = qs.filter(platform=platform)
+        if app_type := request.query_params.get('app_type'):
+            qs = qs.filter(app_type=app_type)
         if (pub := request.query_params.get('published')) is not None:
             qs = qs.filter(is_published=pub.lower() in ('true', '1'))
         serializer = DesktopReleaseSerializer(qs, many=True, context={'request': request})
@@ -127,18 +130,17 @@ class LatestReleaseView(APIView):
         tags=['public-releases'],
         summary='Get latest published desktop release',
         parameters=[
-            OpenApiParameter(
-                'platform', OpenApiTypes.STR,
-                description='Platform: windows, macos, linux',
-            ),
+            OpenApiParameter('platform', OpenApiTypes.STR, description='Platform: windows, macos, linux'),
+            OpenApiParameter('app_type', OpenApiTypes.STR, description='App type: tauri (default), sidebar'),
         ],
         responses={200: OpenApiResponse(description='{ release: {...} } or { releases: [...] }')},
     )
     def get(self, request):
+        app_type = request.query_params.get('app_type', 'tauri')
         platform = request.query_params.get('platform')
         if platform:
             release = DesktopRelease.objects.filter(
-                is_published=True, platform=platform
+                is_published=True, platform=platform, app_type=app_type,
             ).first()
             if release is None:
                 return Response(
@@ -151,7 +153,7 @@ class LatestReleaseView(APIView):
 
         releases = []
         for p in ['windows', 'macos', 'linux']:
-            r = DesktopRelease.objects.filter(is_published=True, platform=p).first()
+            r = DesktopRelease.objects.filter(is_published=True, platform=p, app_type=app_type).first()
             if r:
                 releases.append(
                     DesktopReleaseSerializer(r, context={'request': request}).data

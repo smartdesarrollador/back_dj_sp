@@ -40,6 +40,7 @@ urlpatterns = [
         path('notifications/', include('apps.notifications.admin_urls')),
         path('clients/', include('apps.tenants.admin_urls')),
         path('releases/', include('apps.releases.admin_urls')),
+        path('licenses/', include('apps.licenses.admin_urls')),
     ])),
 
     # App API (per-user resources)
@@ -62,6 +63,7 @@ urlpatterns = [
         path('referrals/', include('apps.referrals.urls')),
         path('notifications/', include('apps.notifications.hub_urls')),
         path('team/', include('apps.auth_app.team_urls')),
+        path('desktop-license/', include('apps.licenses.app_urls')),
     ])),
 
     # Public endpoints (no auth)
@@ -69,6 +71,7 @@ urlpatterns = [
         path('', include('apps.digital_services.public_urls')),
         path('plans/', include('apps.subscriptions.public_urls')),
         path('desktop/', include('apps.releases.public_urls')),
+        path('desktop-license/', include('apps.licenses.public_urls')),
     ])),
 
     # Support
