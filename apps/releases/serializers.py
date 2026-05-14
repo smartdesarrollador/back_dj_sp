@@ -1,5 +1,6 @@
 import os
 
+from django.urls import reverse
 from rest_framework import serializers
 
 from apps.releases.models import ALLOWED_EXTENSIONS, MAX_FILE_SIZE_BYTES, DesktopRelease
@@ -21,8 +22,9 @@ class DesktopReleaseSerializer(serializers.ModelSerializer):
     def get_file_url(self, obj) -> str | None:
         request = self.context.get('request')
         if obj.file and request:
-            return request.build_absolute_uri(obj.file.url)
-        return obj.file.url if obj.file else None
+            download_path = reverse('public-release-download', kwargs={'pk': str(obj.id)})
+            return request.build_absolute_uri(download_path)
+        return None
 
     def get_file_size_mb(self, obj) -> float:
         return round(obj.file_size / (1024 * 1024), 2)

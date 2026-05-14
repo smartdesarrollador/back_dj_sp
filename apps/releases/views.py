@@ -1,4 +1,6 @@
 from django.db.models import F
+from django.http import FileResponse
+from django.urls import reverse
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import OpenApiParameter, OpenApiResponse, extend_schema
 from rest_framework import status
@@ -143,9 +145,6 @@ class LatestReleaseView(APIView):
                     {'error': {'code': 'not_found', 'message': 'No published release found.'}},
                     status=status.HTTP_404_NOT_FOUND,
                 )
-            DesktopRelease.objects.filter(pk=release.pk).update(
-                download_count=F('download_count') + 1
-            )
             return Response(
                 {'release': DesktopReleaseSerializer(release, context={'request': request}).data}
             )
@@ -154,10 +153,37 @@ class LatestReleaseView(APIView):
         for p in ['windows', 'macos', 'linux']:
             r = DesktopRelease.objects.filter(is_published=True, platform=p).first()
             if r:
-                DesktopRelease.objects.filter(pk=r.pk).update(
-                    download_count=F('download_count') + 1
-                )
                 releases.append(
                     DesktopReleaseSerializer(r, context={'request': request}).data
                 )
         return Response({'releases': releases})
+
+
+class DesktopReleaseDownloadView(APIView):
+    permission_classes = [AllowAny]
+
+    @extend_schema(
+        tags=['public-releases'],
+        summary='Download a published desktop release file',
+        responses={200: OpenApiResponse(description='Binary file stream')},
+    )
+    def get(self, request, pk):
+        try:
+            release = DesktopRelease.objects.get(pk=pk, is_published=True)
+        except DesktopRelease.DoesNotExist:
+            return Response(_NOT_FOUND, status=status.HTTP_404_NOT_FOUND)
+
+        DesktopRelease.objects.filter(pk=pk).update(download_count=F('download_count') + 1)
+
+        try:
+            file_handle = release.file.open('rb')
+        except FileNotFoundError:
+            return Response(
+                {'error': {'code': 'file_not_found', 'message': 'File not found on server.'}},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        response = FileResponse(file_handle, content_type='application/octet-stream')
+        response['Content-Disposition'] = f'attachment; filename="{release.file_name}"'
+        response['Content-Length'] = release.file_size
+        return response
