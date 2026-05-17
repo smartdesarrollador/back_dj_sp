@@ -23,6 +23,9 @@ class Share(BaseModel):
         ('project', 'Project'),
         ('section', 'Section'),
         ('item', 'Item'),
+        ('snippet', 'Snippet'),
+        ('note', 'Note'),
+        ('contact', 'Contact'),
     ]
     PERMISSION_LEVELS = [
         ('viewer', 'Viewer'),

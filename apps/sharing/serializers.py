@@ -42,7 +42,38 @@ class ShareCreateSerializer(serializers.Serializer):
     expires_at = serializers.DateTimeField(required=False, allow_null=True)
 
 
-class SharedWithMeSerializer(ShareSerializer):
-    """Serializer for the recipient's view — same fields as ShareSerializer."""
-    class Meta(ShareSerializer.Meta):
+def _fetch_resource_name(resource_type: str, resource_id) -> str:
+    """Fallback single-object lookup when no batch cache is provided (e.g. in tests)."""
+    try:
+        if resource_type == 'snippet':
+            from apps.snippets.models import CodeSnippet
+            return CodeSnippet.objects.values_list('title', flat=True).get(pk=resource_id)
+        if resource_type == 'note':
+            from apps.notes.models import Note
+            return Note.objects.values_list('title', flat=True).get(pk=resource_id)
+        if resource_type == 'contact':
+            from apps.contacts.models import Contact
+            c = Contact.objects.values('first_name', 'last_name').get(pk=resource_id)
+            return f"{c['first_name']} {c['last_name']}".strip()
+        if resource_type == 'project':
+            from apps.projects.models import Project
+            return Project.objects.values_list('name', flat=True).get(pk=resource_id)
+    except Exception:
         pass
+    return ''
+
+
+class SharedWithMeSerializer(ShareSerializer):
+    """Recipient's view — enriched with resource_name, shared_by_name, access_level."""
+    resource_name = serializers.SerializerMethodField()
+    shared_by_name = serializers.CharField(source='shared_by.name', read_only=True)
+    access_level = serializers.CharField(source='permission_level', read_only=True)
+
+    class Meta(ShareSerializer.Meta):
+        fields = ShareSerializer.Meta.fields + ['resource_name', 'shared_by_name', 'access_level']
+        read_only_fields = fields
+
+    def get_resource_name(self, obj) -> str:
+        cache = self.context.get('resource_cache', {})
+        cached = cache.get((obj.resource_type, obj.resource_id))
+        return cached if cached is not None else _fetch_resource_name(obj.resource_type, obj.resource_id)

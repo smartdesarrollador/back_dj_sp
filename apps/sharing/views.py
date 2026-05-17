@@ -10,6 +10,7 @@ Endpoints:
   PATCH  /app/sharing/<pk>/          → update permission level
   DELETE /app/sharing/<pk>/delete/   → revoke share (+ cascade for projects)
 """
+import collections
 import uuid
 
 from django.contrib.auth import get_user_model
@@ -20,6 +21,8 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.audit.models import AuditLog
+from apps.contacts.models import Contact
+from apps.notes.models import Note
 from apps.projects.models import Project
 from apps.rbac.permissions import HasFeature, HasPermission, check_plan_limit
 from apps.sharing.models import Share
@@ -28,6 +31,7 @@ from apps.sharing.serializers import (
     ShareSerializer,
     SharedWithMeSerializer,
 )
+from apps.snippets.models import CodeSnippet
 
 User = get_user_model()
 
@@ -150,21 +154,37 @@ class ShareListCreateView(APIView):
         except User.DoesNotExist:
             return _NOT_FOUND
 
-        # Validate resource belongs to tenant (project only; sections/items inherit)
+        # Validate resource belongs to tenant
         if resource_type == 'project':
             try:
                 project = Project.objects.get(pk=resource_id, tenant=request.tenant)
             except Project.DoesNotExist:
                 return _NOT_FOUND
 
-            # Plan limit: count existing shares for this project
             existing_count = Share.objects.filter(
                 tenant=request.tenant,
                 resource_type='project',
                 resource_id=resource_id,
             ).count()
             check_plan_limit(request.user, 'shares_per_project', existing_count)
+
+        elif resource_type == 'snippet':
+            if not CodeSnippet.objects.filter(pk=resource_id, tenant=request.tenant).exists():
+                return _NOT_FOUND
+            project = None
+
+        elif resource_type == 'note':
+            if not Note.objects.filter(pk=resource_id, tenant=request.tenant).exists():
+                return _NOT_FOUND
+            project = None
+
+        elif resource_type == 'contact':
+            if not Contact.objects.filter(pk=resource_id, tenant=request.tenant).exists():
+                return _NOT_FOUND
+            project = None
+
         else:
+            # section/item inherit from project — no direct tenant check needed
             project = None
 
         share, created = Share.objects.get_or_create(
@@ -284,6 +304,30 @@ class ShareDeleteView(APIView):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
+def _build_resource_cache(shares: list) -> dict:
+    """Batch-fetch resource names grouped by type to avoid N+1 queries.
+    Keys: (resource_type str, resource_id UUID)."""
+    grouped: dict = collections.defaultdict(set)
+    for s in shares:
+        grouped[s.resource_type].add(s.resource_id)
+
+    cache: dict = {}
+    for rtype, ids in grouped.items():
+        if rtype == 'project':
+            for row in Project.objects.filter(pk__in=ids).values('id', 'name'):
+                cache[('project', row['id'])] = row['name']
+        elif rtype == 'snippet':
+            for row in CodeSnippet.objects.filter(pk__in=ids).values('id', 'title'):
+                cache[('snippet', row['id'])] = row['title']
+        elif rtype == 'note':
+            for row in Note.objects.filter(pk__in=ids).values('id', 'title'):
+                cache[('note', row['id'])] = row['title']
+        elif rtype == 'contact':
+            for c in Contact.objects.filter(pk__in=ids).values('id', 'first_name', 'last_name'):
+                cache[('contact', c['id'])] = f"{c['first_name']} {c['last_name']}".strip()
+    return cache
+
+
 class SharedWithMeView(APIView):
     """GET /app/sharing/shared-with-me/ — shares received by the current user."""
     permission_classes = [IsAuthenticated]
@@ -297,5 +341,9 @@ class SharedWithMeView(APIView):
         if resource_type:
             qs = qs.filter(resource_type=resource_type)
 
-        serializer = SharedWithMeSerializer(qs, many=True)
-        return Response({'shares': serializer.data})
+        shares_list = list(qs)
+        resource_cache = _build_resource_cache(shares_list)
+        serializer = SharedWithMeSerializer(
+            shares_list, many=True, context={'resource_cache': resource_cache}
+        )
+        return Response({'items': serializer.data, 'total': len(serializer.data)})

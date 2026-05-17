@@ -252,7 +252,7 @@ class TestSharingViews(APITestCase):
         self.client.force_authenticate(user=self.other)
         response = self.client.get(f'{BASE_URL}shared-with-me/', **self.slug)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response.json()['shares']), 1)
+        self.assertEqual(len(response.json()['items']), 1)
 
     def test_shared_with_me_filtered_by_resource_type(self):
         Share.objects.create(
@@ -270,9 +270,9 @@ class TestSharingViews(APITestCase):
             f'{BASE_URL}shared-with-me/?resource_type=project', **self.slug
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        shares = response.json()['shares']
-        self.assertEqual(len(shares), 1)
-        self.assertEqual(shares[0]['resource_type'], 'project')
+        items = response.json()['items']
+        self.assertEqual(len(items), 1)
+        self.assertEqual(items[0]['resource_type'], 'project')
 
     # ─── Audit Logs ───────────────────────────────────────────────────────────
 
@@ -335,3 +335,129 @@ class TestSharingViews(APITestCase):
         }
         response = self.client.post(BASE_URL, data, **self.slug)
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+
+@override_settings(PASSWORD_HASHERS=_FAST_HASHERS, CACHES=_LOCMEM_CACHE)
+class TestSharingNewResourceTypes(APITestCase):
+    """Tests for snippet/note/contact sharing."""
+
+    def setUp(self):
+        cache.clear()
+        self.tenant = _create_tenant('corp2', plan='professional')
+        self.owner = _create_superuser(self.tenant, 'owner2@corp2.com')
+        self.other = User.objects.create_user(
+            email='bob@corp2.com', name='Bob', password='x', tenant=self.tenant
+        )
+        self.client.force_authenticate(user=self.owner)
+        self.slug = {'HTTP_X_TENANT_SLUG': 'corp2'}
+
+        from apps.snippets.models import CodeSnippet
+        from apps.notes.models import Note
+        from apps.contacts.models import Contact
+
+        self.snippet = CodeSnippet.objects.create(
+            tenant=self.tenant, user=self.owner,
+            title='Hello Snippet', code='print(1)', language='python',
+        )
+        self.note = Note.objects.create(
+            tenant=self.tenant, user=self.owner,
+            title='My Note', content='content', category='work',
+        )
+        self.contact = Contact.objects.create(
+            tenant=self.tenant, user=self.owner,
+            first_name='Jane', last_name='Doe',
+        )
+
+    def _share(self, resource_type, resource_id):
+        return self.client.post(BASE_URL, {
+            'resource_type': resource_type,
+            'resource_id': str(resource_id),
+            'shared_with_email': 'bob@corp2.com',
+            'permission_level': 'viewer',
+        }, **self.slug)
+
+    def test_create_share_snippet(self):
+        resp = self._share('snippet', self.snippet.pk)
+        self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
+        self.assertTrue(Share.objects.filter(
+            resource_type='snippet', resource_id=self.snippet.pk
+        ).exists())
+
+    def test_create_share_note(self):
+        resp = self._share('note', self.note.pk)
+        self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
+        self.assertTrue(Share.objects.filter(
+            resource_type='note', resource_id=self.note.pk
+        ).exists())
+
+    def test_create_share_contact(self):
+        resp = self._share('contact', self.contact.pk)
+        self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
+        self.assertTrue(Share.objects.filter(
+            resource_type='contact', resource_id=self.contact.pk
+        ).exists())
+
+    def test_share_snippet_wrong_tenant_404(self):
+        other_tenant = _create_tenant('other3', plan='professional')
+        from apps.snippets.models import CodeSnippet
+        alien = CodeSnippet.objects.create(
+            tenant=other_tenant,
+            user=_create_superuser(other_tenant, 'x3@other3.com'),
+            title='Alien', code='x', language='other',
+        )
+        resp = self._share('snippet', alien.pk)
+        self.assertEqual(resp.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_share_note_wrong_tenant_404(self):
+        other_tenant = _create_tenant('other4', plan='professional')
+        from apps.notes.models import Note
+        alien = Note.objects.create(
+            tenant=other_tenant,
+            user=_create_superuser(other_tenant, 'x4@other4.com'),
+            title='Alien Note', content='', category='work',
+        )
+        resp = self._share('note', alien.pk)
+        self.assertEqual(resp.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_share_contact_wrong_tenant_404(self):
+        other_tenant = _create_tenant('other5', plan='professional')
+        from apps.contacts.models import Contact
+        alien = Contact.objects.create(
+            tenant=other_tenant,
+            user=_create_superuser(other_tenant, 'x5@other5.com'),
+            first_name='Alien',
+        )
+        resp = self._share('contact', alien.pk)
+        self.assertEqual(resp.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_no_cascade_for_snippet(self):
+        self._share('snippet', self.snippet.pk)
+        self.assertEqual(Share.objects.filter(is_inherited=True).count(), 0)
+
+    def test_shared_with_me_includes_snippet(self):
+        self._share('snippet', self.snippet.pk)
+        self.client.force_authenticate(user=self.other)
+        resp = self.client.get(f'{BASE_URL}shared-with-me/', **self.slug)
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        body = resp.json()
+        self.assertIn('items', body)
+        self.assertIn('total', body)
+        self.assertEqual(body['total'], 1)
+        item = body['items'][0]
+        self.assertEqual(item['resource_name'], 'Hello Snippet')
+        self.assertEqual(item['access_level'], 'viewer')
+        self.assertIn('shared_by_name', item)
+
+    def test_shared_with_me_resource_name_note(self):
+        self._share('note', self.note.pk)
+        self.client.force_authenticate(user=self.other)
+        resp = self.client.get(f'{BASE_URL}shared-with-me/', **self.slug)
+        item = resp.json()['items'][0]
+        self.assertEqual(item['resource_name'], 'My Note')
+
+    def test_shared_with_me_resource_name_contact(self):
+        self._share('contact', self.contact.pk)
+        self.client.force_authenticate(user=self.other)
+        resp = self.client.get(f'{BASE_URL}shared-with-me/', **self.slug)
+        item = resp.json()['items'][0]
+        self.assertEqual(item['resource_name'], 'Jane Doe')
