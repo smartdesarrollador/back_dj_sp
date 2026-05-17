@@ -112,7 +112,7 @@ class TestCurrentSubscriptionView(APITestCase):
         usage = resp.data['subscription']['usage']
         self.assertIn('users', usage)
         self.assertIn('storage', usage)
-        self.assertIn('api_calls', usage)
+        self.assertIn('services', usage)
 
 
 # ─── UpgradeSubscriptionView ──────────────────────────────────────────────────

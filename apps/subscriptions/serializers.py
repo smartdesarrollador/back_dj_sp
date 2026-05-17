@@ -1,6 +1,7 @@
 """Serializers for subscription billing models."""
 from rest_framework import serializers
 
+from apps.services.models import TenantService
 from apps.subscriptions.models import Invoice, PaymentMethod, Plan, Subscription
 from utils.plans import PLAN_FEATURES
 
@@ -144,14 +145,25 @@ class UpgradeSerializer(serializers.Serializer):
         return data
 
 
+PLAN_DISPLAY_NAMES: dict[str, str] = {
+    'free': 'Free',
+    'starter': 'Starter',
+    'professional': 'Professional',
+    'enterprise': 'Enterprise',
+}
+
+
 class CurrentSubscriptionSerializer(serializers.ModelSerializer):
     usage = serializers.SerializerMethodField()
+    plan_display = serializers.SerializerMethodField()
+    mrr = serializers.SerializerMethodField()
 
     class Meta:
         model = Subscription
         fields = [
             'id',
             'plan',
+            'plan_display',
             'status',
             'billing_cycle',
             'trial_start',
@@ -159,10 +171,23 @@ class CurrentSubscriptionSerializer(serializers.ModelSerializer):
             'current_period_start',
             'current_period_end',
             'cancel_at_period_end',
+            'mrr',
             'created_at',
             'usage',
         ]
         read_only_fields = fields
+
+    def get_plan_display(self, obj) -> str:
+        return PLAN_DISPLAY_NAMES.get(obj.plan, obj.plan.capitalize())
+
+    def get_mrr(self, obj) -> float:
+        last_paid = (
+            obj.tenant.invoices.filter(status='paid')
+            .order_by('-created_at')
+            .values_list('amount_cents', flat=True)
+            .first()
+        )
+        return round((last_paid or 0) / 100, 2)
 
     def get_usage(self, obj) -> dict:
         tenant = obj.tenant
@@ -170,6 +195,7 @@ class CurrentSubscriptionSerializer(serializers.ModelSerializer):
         plan_config = PLAN_FEATURES.get(plan, PLAN_FEATURES['free'])
 
         user_count = tenant.users.count()
+        service_count = TenantService.objects.filter(tenant=tenant, status='active').count()
 
         return {
             'users': {
@@ -177,11 +203,11 @@ class CurrentSubscriptionSerializer(serializers.ModelSerializer):
                 'limit': plan_config.get('max_users'),
             },
             'storage': {
-                'current_gb': 0,  # TODO: implement actual storage tracking
+                'current_gb': 0,
                 'limit_gb': plan_config.get('storage_gb'),
             },
-            'api_calls': {
-                'current': 0,  # TODO: implement actual API call tracking
-                'limit': plan_config.get('api_calls_per_month'),
+            'services': {
+                'current': service_count,
+                'limit': None,
             },
         }
