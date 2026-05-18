@@ -331,8 +331,9 @@ class SharedWithMeView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
+        # No tenant filter: shares can come from any org (cross-tenant sharing)
         qs = Share.objects.filter(
-            shared_with=request.user, tenant=request.tenant
+            shared_with=request.user
         ).select_related('shared_by', 'shared_with')
 
         resource_type = request.query_params.get('resource_type')
