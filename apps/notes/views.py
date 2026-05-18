@@ -11,6 +11,7 @@ Endpoints:
   DELETE /app/notes/<pk>/      → delete note
   PATCH  /app/notes/<pk>/pin/  → toggle pin
 """
+from django.db.models import Q
 from drf_spectacular.utils import OpenApiParameter, extend_schema
 from drf_spectacular.types import OpenApiTypes
 from rest_framework import status
@@ -20,6 +21,7 @@ from rest_framework.views import APIView
 from apps.notes.models import Note
 from apps.notes.serializers import NoteCreateUpdateSerializer, NoteSerializer
 from apps.rbac.permissions import HasPermission, check_plan_limit, _user_has_permission
+from apps.sharing.models import Share
 
 _NOT_FOUND = Response(
     {'error': {'code': 'not_found', 'message': 'Not found.'}}, status=404
@@ -46,16 +48,18 @@ class NoteListCreateView(APIView):
         ],
     )
     def get(self, request):
-        qs = Note.objects.filter(tenant=request.tenant, user=request.user)
+        shared_ids = Share.objects.filter(
+            shared_with=request.user, resource_type='note'
+        ).values_list('resource_id', flat=True)
+        qs = Note.objects.filter(
+            Q(tenant=request.tenant, user=request.user) | Q(pk__in=shared_ids)
+        ).distinct()
         category = request.query_params.get('category')
         search = request.query_params.get('search')
         if category:
             qs = qs.filter(category=category)
         if search:
-            qs = qs.filter(title__icontains=search) | Note.objects.filter(
-                tenant=request.tenant, user=request.user, content__icontains=search
-            )
-            qs = qs.distinct()
+            qs = qs.filter(Q(title__icontains=search) | Q(content__icontains=search))
         notes = NoteSerializer(qs, many=True).data
         return Response({'results': notes, 'count': len(notes), 'notes': notes})
 

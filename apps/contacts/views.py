@@ -17,6 +17,7 @@ Endpoints:
 """
 import csv
 
+from django.db.models import Q
 from django.http import HttpResponse
 from drf_spectacular.utils import OpenApiParameter, extend_schema
 from drf_spectacular.types import OpenApiTypes
@@ -31,6 +32,7 @@ from apps.contacts.serializers import (
     ContactSerializer,
 )
 from apps.rbac.permissions import HasFeature, HasPermission, check_plan_limit, _user_has_permission
+from apps.sharing.models import Share
 
 _NOT_FOUND = Response(
     {'error': {'code': 'not_found', 'message': 'Not found.'}}, status=404
@@ -63,18 +65,22 @@ class ContactListCreateView(APIView):
         ],
     )
     def get(self, request):
-        qs = Contact.objects.filter(tenant=request.tenant, user=request.user)
+        shared_ids = Share.objects.filter(
+            shared_with=request.user, resource_type='contact'
+        ).values_list('resource_id', flat=True)
+        qs = Contact.objects.filter(
+            Q(tenant=request.tenant, user=request.user) | Q(pk__in=shared_ids)
+        ).distinct()
         group = request.query_params.get('group')
         search = request.query_params.get('search')
         if group:
             qs = qs.filter(group__pk=group)
         if search:
-            qs = qs.filter(first_name__icontains=search) | Contact.objects.filter(
-                tenant=request.tenant, user=request.user, last_name__icontains=search
-            ) | Contact.objects.filter(
-                tenant=request.tenant, user=request.user, email__icontains=search
+            qs = qs.filter(
+                Q(first_name__icontains=search) |
+                Q(last_name__icontains=search) |
+                Q(email__icontains=search)
             )
-            qs = qs.distinct()
         contacts = ContactSerializer(qs, many=True).data
         return Response({'results': contacts, 'count': len(contacts), 'contacts': contacts})
 

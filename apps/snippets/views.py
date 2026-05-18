@@ -10,6 +10,7 @@ Endpoints:
   PATCH  /app/snippets/<pk>/   → update snippet
   DELETE /app/snippets/<pk>/   → delete snippet
 """
+from django.db.models import Q
 from drf_spectacular.utils import OpenApiParameter, extend_schema
 from drf_spectacular.types import OpenApiTypes
 from rest_framework import status
@@ -17,6 +18,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.rbac.permissions import HasPermission, _user_has_permission, check_plan_limit
+from apps.sharing.models import Share
 from apps.snippets.models import CodeSnippet
 from apps.snippets.serializers import CodeSnippetCreateUpdateSerializer, CodeSnippetSerializer
 
@@ -46,7 +48,12 @@ class CodeSnippetListCreateView(APIView):
         ],
     )
     def get(self, request):
-        qs = CodeSnippet.objects.filter(tenant=request.tenant, user=request.user)
+        shared_ids = Share.objects.filter(
+            shared_with=request.user, resource_type='snippet'
+        ).values_list('resource_id', flat=True)
+        qs = CodeSnippet.objects.filter(
+            Q(tenant=request.tenant, user=request.user) | Q(pk__in=shared_ids)
+        ).distinct()
         language = request.query_params.get('language')
         tag = request.query_params.get('tag')
         search = request.query_params.get('search')
@@ -55,16 +62,11 @@ class CodeSnippetListCreateView(APIView):
         if tag:
             qs = qs.filter(tags__contains=[tag])
         if search:
-            qs = qs.filter(title__icontains=search) | CodeSnippet.objects.filter(
-                tenant=request.tenant,
-                user=request.user,
-                description__icontains=search,
-            ) | CodeSnippet.objects.filter(
-                tenant=request.tenant,
-                user=request.user,
-                code__icontains=search,
+            qs = qs.filter(
+                Q(title__icontains=search) |
+                Q(description__icontains=search) |
+                Q(code__icontains=search)
             )
-            qs = qs.distinct()
         return Response({'snippets': CodeSnippetSerializer(qs, many=True).data})
 
     @extend_schema(tags=['app-devops'], summary='Create code snippet')

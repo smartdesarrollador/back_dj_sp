@@ -53,7 +53,7 @@ class TestContactViews(APITestCase):
     # ── Create ────────────────────────────────────────────────────────────────
 
     def test_create_contact_success(self):
-        data = {'first_name': 'Jane', 'last_name': 'Doe', 'email': 'jane@example.com'}
+        data = {'name': 'Jane Doe', 'email': 'jane@example.com'}
         response = self.client.post(BASE_URL, data, **self.slug)
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         body = response.json()
