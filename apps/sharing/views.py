@@ -24,7 +24,7 @@ from apps.audit.models import AuditLog
 from apps.contacts.models import Contact
 from apps.notes.models import Note
 from apps.projects.models import Project
-from apps.rbac.permissions import HasFeature, HasPermission, check_plan_limit
+from apps.rbac.permissions import HasFeature, check_plan_limit
 from apps.sharing.models import Share
 from apps.sharing.serializers import (
     ShareCreateSerializer,
@@ -114,11 +114,8 @@ class ShareListCreateView(APIView):
     """
     def get_permissions(self):
         if self.request.method == 'POST':
-            return [
-                HasFeature('sharing')(),
-                HasPermission('projects.share')(),
-            ]
-        return [HasPermission('projects.read')()]
+            return [IsAuthenticated(), HasFeature('sharing')()]
+        return [IsAuthenticated()]
 
     def get(self, request):
         resource_type = request.query_params.get('resource_type')
@@ -222,7 +219,7 @@ class ShareListCreateView(APIView):
 
 class ShareUpdateView(APIView):
     """PATCH /app/sharing/<pk>/ — update permission level."""
-    permission_classes = [HasPermission('projects.share')]
+    permission_classes = [IsAuthenticated]
 
     @transaction.atomic
     def patch(self, request, pk):
@@ -266,7 +263,7 @@ class ShareUpdateView(APIView):
 
 class ShareDeleteView(APIView):
     """DELETE /app/sharing/<pk>/delete/ — revoke a share."""
-    permission_classes = [HasPermission('projects.share')]
+    permission_classes = [IsAuthenticated]
 
     @transaction.atomic
     def delete(self, request, pk):

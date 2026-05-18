@@ -322,7 +322,9 @@ class TestSharingViews(APITestCase):
         response = self.client.post(BASE_URL, data, **self.slug)
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
-    def test_share_requires_permission_codename(self):
+    def test_any_authenticated_user_on_sharing_plan_can_share(self):
+        # Sharing is plan-gated (HasFeature), not RBAC-gated.
+        # Any authenticated user on a plan with 'sharing' feature can create shares.
         non_privileged = User.objects.create_user(
             email='plain@corp.com', name='Plain', password='x', tenant=self.tenant
         )
@@ -334,7 +336,7 @@ class TestSharingViews(APITestCase):
             'permission_level': 'viewer',
         }
         response = self.client.post(BASE_URL, data, **self.slug)
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
 
 @override_settings(PASSWORD_HASHERS=_FAST_HASHERS, CACHES=_LOCMEM_CACHE)
