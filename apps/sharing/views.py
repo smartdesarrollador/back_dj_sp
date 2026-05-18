@@ -143,13 +143,14 @@ class ShareListCreateView(APIView):
         permission_level = data['permission_level']
         expires_at = data.get('expires_at')
 
-        # Resolve shared_with by email within the same tenant
+        # Resolve shared_with by email — cross-tenant sharing is allowed
         try:
-            shared_with = User.objects.get(
-                email=data['shared_with_email'], tenant=request.tenant
-            )
+            shared_with = User.objects.get(email=data['shared_with_email'])
         except User.DoesNotExist:
-            return _NOT_FOUND
+            return Response(
+                {'error': {'code': 'user_not_found', 'message': 'No existe ningún usuario con ese email.'}},
+                status=status.HTTP_404_NOT_FOUND,
+            )
 
         # Validate resource belongs to tenant
         if resource_type == 'project':

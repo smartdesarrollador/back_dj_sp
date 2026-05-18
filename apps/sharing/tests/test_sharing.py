@@ -308,7 +308,8 @@ class TestSharingViews(APITestCase):
 
     # ─── Security ─────────────────────────────────────────────────────────────
 
-    def test_cross_tenant_share_blocked(self):
+    def test_cross_tenant_share_allowed(self):
+        # Cross-tenant sharing is supported: users from other orgs can receive shares.
         other_tenant = _create_tenant('other-co', plan='professional')
         User.objects.create_user(
             email='bob@other.com', name='Bob', password='x', tenant=other_tenant
@@ -320,7 +321,7 @@ class TestSharingViews(APITestCase):
             'permission_level': 'viewer',
         }
         response = self.client.post(BASE_URL, data, **self.slug)
-        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
     def test_any_authenticated_user_on_sharing_plan_can_share(self):
         # Sharing is plan-gated (HasFeature), not RBAC-gated.
