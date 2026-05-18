@@ -99,6 +99,23 @@ PERMISSIONS: list[tuple[str, str, str, str, str]] = [
     ('snippets.read',   'Ver Snippets',              'Ver snippets propios',                          'snippets', 'read'),
     ('snippets.update', 'Editar Snippets',           'Editar snippets existentes',                    'snippets', 'update'),
     ('snippets.delete', 'Eliminar Snippets',         'Eliminar snippets',                             'snippets', 'delete'),
+    # notes
+    ('notes.create', 'Crear Notas',                  'Crear nuevas notas',                            'notes', 'create'),
+    ('notes.read',   'Ver Notas',                    'Ver notas propias',                             'notes', 'read'),
+    ('notes.update', 'Editar Notas',                 'Editar notas existentes',                       'notes', 'update'),
+    ('notes.delete', 'Eliminar Notas',               'Eliminar notas',                                'notes', 'delete'),
+    # contacts
+    ('contacts.create', 'Crear Contactos',           'Crear nuevos contactos',                        'contacts', 'create'),
+    ('contacts.read',   'Ver Contactos',             'Ver contactos propios',                         'contacts', 'read'),
+    ('contacts.update', 'Editar Contactos',          'Editar contactos existentes',                   'contacts', 'update'),
+    ('contacts.delete', 'Eliminar Contactos',        'Eliminar contactos',                            'contacts', 'delete'),
+    # bookmarks
+    ('bookmarks.create', 'Crear Bookmarks',          'Guardar nuevos bookmarks',                      'bookmarks', 'create'),
+    ('bookmarks.read',   'Ver Bookmarks',            'Ver bookmarks propios',                         'bookmarks', 'read'),
+    ('bookmarks.update', 'Editar Bookmarks',         'Editar bookmarks existentes',                   'bookmarks', 'update'),
+    ('bookmarks.delete', 'Eliminar Bookmarks',       'Eliminar bookmarks',                            'bookmarks', 'delete'),
+    # reports
+    ('reports.read',  'Ver Reportes',                'Ver reportes y analíticas del workspace',       'reports', 'read'),
     # dashboard
     ('dashboard.read', 'Ver Dashboard',             'Acceder al dashboard principal',                'dashboard', 'read'),
 ]
@@ -134,6 +151,10 @@ SYSTEM_ROLES: list[tuple[str, str, list[str]]] = [
             'boards.reorder',
             'calendar.create', 'calendar.read', 'calendar.update', 'calendar.delete',
             'projects.create', 'projects.read', 'projects.update',
+            'notes.create', 'notes.read', 'notes.update', 'notes.delete',
+            'contacts.create', 'contacts.read', 'contacts.update', 'contacts.delete',
+            'bookmarks.create', 'bookmarks.read', 'bookmarks.update', 'bookmarks.delete',
+            'snippets.create', 'snippets.read', 'snippets.update', 'snippets.delete',
             'credentials.manage', 'credentials.reveal',
             'digital_services.tarjeta', 'digital_services.landing',
             'digital_services.cv', 'digital_services.portfolio',
@@ -150,6 +171,10 @@ SYSTEM_ROLES: list[tuple[str, str, list[str]]] = [
             'tasks.read',
             'calendar.read',
             'projects.read',
+            'notes.read',
+            'contacts.read',
+            'bookmarks.read',
+            'snippets.read',
             'landing.read',
             'digital_services.tarjeta', 'digital_services.landing',
             'digital_services.cv', 'digital_services.portfolio',
