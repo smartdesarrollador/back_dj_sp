@@ -9,7 +9,7 @@
       "name": "Workspace",
       "description": "Plataforma de productividad colaborativa",
       "icon": "LayoutDashboard",
-      "url_template": "https://workspace.siderdigital.com/sso/callback",
+      "url_template": "https://workspace.digisider.com/sso/callback",
       "min_plan": "free",
       "is_active": true
     }
@@ -24,7 +24,7 @@
       "name": "Vista",
       "description": "Servicios digitales y presencia web",
       "icon": "Globe",
-      "url_template": "https://view.siderdigital.com/es/sso",
+      "url_template": "https://view.digisider.com/es/sso",
       "min_plan": "free",
       "is_active": true
     }

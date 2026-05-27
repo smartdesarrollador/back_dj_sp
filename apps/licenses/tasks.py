@@ -15,7 +15,7 @@ def send_license_key_email(user_id: str) -> dict:
     except (User.DoesNotExist, DesktopAppLicense.DoesNotExist):
         return {'sent': False, 'reason': 'user_or_license_not_found'}
 
-    hub_url = getattr(settings, 'FRONTEND_HUB_URL', 'https://hub.siderdigital.com')
+    hub_url = getattr(settings, 'FRONTEND_HUB_URL', 'https://hub.digisider.com')
     download_url = f"{hub_url}/desktop"
 
     subject = 'Tu License Key — Smart Sidebar Offline'

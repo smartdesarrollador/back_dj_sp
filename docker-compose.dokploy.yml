@@ -79,7 +79,7 @@ services:
           "-H",
           "X-Forwarded-Proto: https",
           "-H",
-          "Host: api-rbac.siderdigital.com",
+          "Host: api-rbac.digisider.com",
           "http://localhost:8000/api/health/",
         ]
       interval: 30s
@@ -89,11 +89,11 @@ services:
     labels:
       - "traefik.enable=true"
       # HTTPS router
-      - "traefik.http.routers.rbac-api.rule=Host(`api-rbac.siderdigital.com`)"
+      - "traefik.http.routers.rbac-api.rule=Host(`api-rbac.digisider.com`)"
       - "traefik.http.routers.rbac-api.entrypoints=websecure"
       - "traefik.http.routers.rbac-api.service=rbac-api"
       # HTTP → HTTPS redirect
-      - "traefik.http.routers.rbac-api-http.rule=Host(`api-rbac.siderdigital.com`)"
+      - "traefik.http.routers.rbac-api-http.rule=Host(`api-rbac.digisider.com`)"
       - "traefik.http.routers.rbac-api-http.entrypoints=web"
       - "traefik.http.routers.rbac-api-http.middlewares=redirect-to-https@file"
       - "traefik.http.routers.rbac-api-http.service=rbac-api"
