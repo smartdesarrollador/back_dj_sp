@@ -22,9 +22,18 @@ class TenantSerializer(serializers.ModelSerializer):
         fields = ['id', 'name', 'slug', 'subdomain', 'plan', 'logo_url', 'favicon_url']
 
     def _abs(self, field_file):
+        if not field_file:
+            return None
+        url = field_file.url
+        if url.startswith(('http://', 'https://')):
+            return url
+        from django.conf import settings as _s
+        base = getattr(_s, 'APP_BASE_URL', '').rstrip('/')
+        if base:
+            return f"{base}{url}"
         request = self.context.get('request')
-        if field_file and request:
-            return request.build_absolute_uri(field_file.url)
+        if request:
+            return request.build_absolute_uri(url)
         return None
 
     def get_logo_url(self, obj):    return self._abs(obj.logo)

@@ -143,9 +143,22 @@ class OrganizationSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'subdomain']
 
     def _abs(self, field_file):
+        if not field_file:
+            return None
+        url = field_file.url
+        # S3 or any absolute URL from external storage — return as-is
+        if url.startswith(('http://', 'https://')):
+            return url
+        # Use APP_BASE_URL so production always returns HTTPS
+        # (request.build_absolute_uri can return http:// when Traefik
+        #  terminates SSL and X-Forwarded-Proto is not forwarded correctly)
+        from django.conf import settings as _s
+        base = getattr(_s, 'APP_BASE_URL', '').rstrip('/')
+        if base:
+            return f"{base}{url}"
         request = self.context.get('request')
-        if field_file and request:
-            return request.build_absolute_uri(field_file.url)
+        if request:
+            return request.build_absolute_uri(url)
         return None
 
     def get_logo_url(self, obj):      return self._abs(obj.logo)
