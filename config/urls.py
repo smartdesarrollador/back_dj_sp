@@ -12,6 +12,8 @@ API layout:
   /api/redoc/           → ReDoc
   /api/health/          → Health check
 """
+from django.conf import settings
+from django.conf.urls.static import static
 from django.contrib import admin
 from django.urls import path, include
 from drf_spectacular.views import (
@@ -41,6 +43,7 @@ urlpatterns = [
         path('clients/', include('apps.tenants.admin_urls')),
         path('releases/', include('apps.releases.admin_urls')),
         path('licenses/', include('apps.licenses.admin_urls')),
+        path('organization/', include('apps.tenants.organization_urls')),
     ])),
 
     # App API (per-user resources)
@@ -72,6 +75,7 @@ urlpatterns = [
         path('plans/', include('apps.subscriptions.public_urls')),
         path('desktop/', include('apps.releases.public_urls')),
         path('desktop-license/', include('apps.licenses.public_urls')),
+        path('branding/', include('apps.tenants.public_branding_urls')),
     ])),
 
     # Support
@@ -88,3 +92,6 @@ urlpatterns = [
     path('api/docs/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
     path('api/redoc/', SpectacularRedocView.as_view(url_name='schema'), name='redoc'),
 ]
+
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

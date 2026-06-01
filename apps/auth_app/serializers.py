@@ -14,9 +14,21 @@ User = get_user_model()
 
 
 class TenantSerializer(serializers.ModelSerializer):
+    logo_url    = serializers.SerializerMethodField()
+    favicon_url = serializers.SerializerMethodField()
+
     class Meta:
-        model = Tenant
-        fields = ['id', 'name', 'slug', 'subdomain', 'plan']
+        model  = Tenant
+        fields = ['id', 'name', 'slug', 'subdomain', 'plan', 'logo_url', 'favicon_url']
+
+    def _abs(self, field_file):
+        request = self.context.get('request')
+        if field_file and request:
+            return request.build_absolute_uri(field_file.url)
+        return None
+
+    def get_logo_url(self, obj):    return self._abs(obj.logo)
+    def get_favicon_url(self, obj): return self._abs(obj.favicon)
 
 
 class UserSerializer(serializers.ModelSerializer):

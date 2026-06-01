@@ -28,8 +28,10 @@ class Tenant(BaseModel):
         validators=[validate_subdomain],
     )
     plan = models.CharField(max_length=20, choices=PLAN_CHOICES, default='free')
-    branding = models.JSONField(default=dict)   # {logo_url, primary_color, ...}
+    branding = models.JSONField(default=dict)   # {primary_color, ...}
     settings = models.JSONField(default=dict)
+    logo    = models.ImageField(upload_to='tenants/logos/',    null=True, blank=True)
+    favicon = models.ImageField(upload_to='tenants/favicons/', null=True, blank=True)
     is_active = models.BooleanField(default=True)
 
     class Meta:

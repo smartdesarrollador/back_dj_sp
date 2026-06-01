@@ -2,18 +2,22 @@
 Admin views for Client (Tenant) management.
 
 Endpoints:
-  GET  /api/v1/admin/clients/              → List all tenants (except own)
-  POST /api/v1/admin/clients/<pk>/suspend/ → Toggle tenant active status
+  GET   /api/v1/admin/clients/              → List all tenants (except own)
+  POST  /api/v1/admin/clients/<pk>/suspend/ → Toggle tenant active status
+  GET   /api/v1/admin/organization/         → Get own tenant branding data
+  PATCH /api/v1/admin/organization/         → Update name, color, logo, favicon
 """
 from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import extend_schema
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework import status
 
 from apps.rbac.permissions import HasPermission
 from apps.tenants.models import Tenant
-from apps.tenants.serializers import ClientListSerializer
+from apps.tenants.serializers import ClientListSerializer, OrganizationSerializer
 
 
 class ClientListView(APIView):
@@ -50,3 +54,35 @@ class SuspendClientView(APIView):
         tenant.is_active = bool(active)
         tenant.save(update_fields=['is_active'])
         return Response(ClientListSerializer(tenant).data)
+
+
+class OrganizationView(APIView):
+    permission_classes = [IsAuthenticated]
+    parser_classes     = [MultiPartParser, FormParser, JSONParser]
+
+    @extend_schema(tags=['admin-organization'], summary='Get own tenant branding')
+    def get(self, request):
+        serializer = OrganizationSerializer(
+            request.tenant, context={'request': request}
+        )
+        return Response(serializer.data)
+
+    @extend_schema(tags=['admin-organization'], summary='Update own tenant branding')
+    def patch(self, request):
+        tenant = request.tenant
+        update_fields = []
+        if 'name' in request.data:
+            tenant.name = request.data['name']
+            update_fields.append('name')
+        if 'logo' in request.FILES:
+            tenant.logo = request.FILES['logo']
+            update_fields.append('logo')
+        if 'favicon' in request.FILES:
+            tenant.favicon = request.FILES['favicon']
+            update_fields.append('favicon')
+        if 'primary_color' in request.data:
+            tenant.branding = {**tenant.branding, 'primary_color': request.data['primary_color']}
+            update_fields.append('branding')
+        if update_fields:
+            tenant.save(update_fields=update_fields)
+        return Response(OrganizationSerializer(tenant, context={'request': request}).data)

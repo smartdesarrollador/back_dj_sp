@@ -130,3 +130,24 @@ class ClientListSerializer(serializers.ModelSerializer):
     def get_recent_users(self, obj) -> list:
         users = obj.users.order_by('-created_at')[:5]
         return ClientUserSerializer(users, many=True).data
+
+
+class OrganizationSerializer(serializers.ModelSerializer):
+    logo_url      = serializers.SerializerMethodField()
+    favicon_url   = serializers.SerializerMethodField()
+    primary_color = serializers.SerializerMethodField()
+
+    class Meta:
+        model  = Tenant
+        fields = ['id', 'name', 'subdomain', 'logo_url', 'favicon_url', 'primary_color']
+        read_only_fields = ['id', 'subdomain']
+
+    def _abs(self, field_file):
+        request = self.context.get('request')
+        if field_file and request:
+            return request.build_absolute_uri(field_file.url)
+        return None
+
+    def get_logo_url(self, obj):      return self._abs(obj.logo)
+    def get_favicon_url(self, obj):   return self._abs(obj.favicon)
+    def get_primary_color(self, obj): return obj.branding.get('primary_color', '')
