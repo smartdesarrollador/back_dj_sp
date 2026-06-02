@@ -9,6 +9,12 @@ services:
   db:
     image: postgres:16-alpine
     restart: unless-stopped
+    command: >
+      postgres
+      -c shared_buffers=64MB
+      -c work_mem=4MB
+      -c maintenance_work_mem=32MB
+      -c max_connections=30
     environment:
       POSTGRES_DB: ${POSTGRES_DB}
       POSTGRES_USER: ${POSTGRES_USER}
@@ -22,14 +28,34 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 384M
+        reservations:
+          memory: 128M
 
   redis:
     image: redis:7-alpine
     restart: unless-stopped
+    command: >
+      redis-server
+      --maxmemory 128mb
+      --maxmemory-policy allkeys-lru
+      --save ""
+      --appendonly no
     volumes:
       - redis_data:/data
     networks:
       - dokploy-network
+    deploy:
+      resources:
+        limits:
+          cpus: '0.2'
+          memory: 160M
+        reservations:
+          memory: 64M
 
   migrate:
     build:
@@ -48,12 +74,17 @@ services:
     networks:
       - dokploy-network
     restart: on-failure
+    deploy:
+      resources:
+        limits:
+          cpus: '0.3'
+          memory: 256M
 
   django:
     build:
       context: .
       target: prod
-    command: gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 4 --timeout 120 --access-logfile - --error-logfile -
+    command: gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 2 --worker-class gthread --threads 2 --timeout 120 --access-logfile - --error-logfile -
     environment:
       DJANGO_SETTINGS_MODULE: config.settings.prod
     env_file:
@@ -69,6 +100,13 @@ services:
     networks:
       - dokploy-network
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.6'
+          memory: 400M
+        reservations:
+          memory: 200M
     healthcheck:
       # Host header needed for Django ALLOWED_HOSTS; X-Forwarded-Proto avoids SSL redirect loop
       test:
@@ -104,7 +142,7 @@ services:
     build:
       context: .
       target: prod
-    command: celery -A config.celery worker --loglevel=warning --concurrency=4
+    command: celery -A config.celery worker --loglevel=warning --concurrency=2 --max-tasks-per-child=100
     environment:
       DJANGO_SETTINGS_MODULE: config.settings.prod
     env_file:
@@ -117,6 +155,13 @@ services:
     networks:
       - dokploy-network
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.4'
+          memory: 300M
+        reservations:
+          memory: 128M
 
   celery-beat:
     build:
@@ -135,6 +180,13 @@ services:
     networks:
       - dokploy-network
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.1'
+          memory: 128M
+        reservations:
+          memory: 48M
 
 volumes:
   postgres_data:
