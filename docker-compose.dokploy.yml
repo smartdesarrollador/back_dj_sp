@@ -184,9 +184,9 @@ services:
       resources:
         limits:
           cpus: '0.1'
-          memory: 128M
+          memory: 192M
         reservations:
-          memory: 48M
+          memory: 64M
 
 volumes:
   postgres_data:
