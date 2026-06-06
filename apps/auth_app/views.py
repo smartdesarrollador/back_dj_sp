@@ -97,17 +97,27 @@ class RegisterView(APIView):
         serializer.is_valid(raise_exception=True)
         user, tenant = serializer.save()
 
-        from apps.auth_app.tasks import notify_n8n_nuevo_registro
-        notify_n8n_nuevo_registro.delay(
-            user_data={'id': str(user.id), 'name': user.name, 'email': user.email},
-            tenant_data={
-                'id': str(tenant.id),
-                'name': tenant.name,
-                'slug': tenant.slug,
-                'subdomain': tenant.subdomain,
-            },
-            plan=tenant.plan,
-        )
+        import threading
+        import requests as _requests
+        from django.utils import timezone as _tz
+
+        def _notify_n8n():
+            url = getattr(settings, 'N8N_WEBHOOK_REGISTRO_URL', '')
+            if not url:
+                return
+            try:
+                _requests.post(url, json={
+                    'event': 'tenant.registered',
+                    'user': {'id': str(user.id), 'name': user.name, 'email': user.email},
+                    'tenant': {'id': str(tenant.id), 'name': tenant.name,
+                               'slug': tenant.slug, 'subdomain': tenant.subdomain},
+                    'plan': tenant.plan,
+                    'timestamp': _tz.now().isoformat(),
+                }, timeout=5)
+            except Exception:
+                pass
+
+        threading.Thread(target=_notify_n8n, daemon=True).start()
 
         token = create_email_verification_token(str(user.id))
         verify_url = f"{settings.FRONTEND_URL}/verify-email?token={token}"
