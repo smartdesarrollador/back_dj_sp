@@ -1,6 +1,8 @@
 from datetime import timedelta
 
+import requests
 from celery import shared_task
+from django.conf import settings
 from django.utils import timezone
 
 
@@ -17,3 +19,24 @@ def cleanup_expired_sso_tokens() -> dict:
         used_at__lt=now - timedelta(hours=1),
     ).delete()
     return {'expired_unused_deleted': expired, 'used_old_deleted': used_old}
+
+
+@shared_task(
+    name='apps.auth_app.tasks.notify_n8n_nuevo_registro',
+    ignore_result=True,
+    autoretry_for=(Exception,),
+    max_retries=2,
+    retry_backoff=5,
+)
+def notify_n8n_nuevo_registro(user_data: dict, tenant_data: dict, plan: str) -> None:
+    url = getattr(settings, 'N8N_WEBHOOK_REGISTRO_URL', '')
+    if not url:
+        return
+    payload = {
+        'event': 'tenant.registered',
+        'user': user_data,
+        'tenant': tenant_data,
+        'plan': plan,
+        'timestamp': timezone.now().isoformat(),
+    }
+    requests.post(url, json=payload, timeout=5)

@@ -294,6 +294,9 @@ FRONTEND_URL = env('FRONTEND_URL', default='http://localhost:5173')
 FRONTEND_ADMIN_URL = env('FRONTEND_ADMIN_URL', default='http://localhost:5173')
 FRONTEND_HUB_URL = env('FRONTEND_HUB_URL', default='http://localhost:5175')
 
+# ─── n8n Webhooks ─────────────────────────────────────────────────────────────
+N8N_WEBHOOK_REGISTRO_URL = env('N8N_WEBHOOK_REGISTRO_URL', default='')
+
 # ─── Google OAuth ─────────────────────────────────────────────────────────────
 GOOGLE_CLIENT_ID = env('GOOGLE_CLIENT_ID', default='')
 GOOGLE_CLIENT_SECRET = env('GOOGLE_CLIENT_SECRET', default='')

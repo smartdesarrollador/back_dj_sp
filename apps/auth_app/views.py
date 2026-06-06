@@ -97,6 +97,18 @@ class RegisterView(APIView):
         serializer.is_valid(raise_exception=True)
         user, tenant = serializer.save()
 
+        from apps.auth_app.tasks import notify_n8n_nuevo_registro
+        notify_n8n_nuevo_registro.delay(
+            user_data={'id': str(user.id), 'name': user.name, 'email': user.email},
+            tenant_data={
+                'id': str(tenant.id),
+                'name': tenant.name,
+                'slug': tenant.slug,
+                'subdomain': tenant.subdomain,
+            },
+            plan=tenant.plan,
+        )
+
         token = create_email_verification_token(str(user.id))
         verify_url = f"{settings.FRONTEND_URL}/verify-email?token={token}"
         send_mail(
