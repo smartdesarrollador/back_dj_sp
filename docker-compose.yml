@@ -65,8 +65,10 @@ services:
     ports:
       - "8001:8000"
     networks:
-      - default
-      - global
+      default:
+      global:
+        aliases:
+          - rbac-django
 
   # ── Celery Worker ─────────────────────────────────────────
   celery-worker:
