@@ -23,6 +23,7 @@ import secrets
 import weasyprint
 from drf_spectacular.utils import extend_schema
 from rest_framework import status
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -61,7 +62,7 @@ def _get_profile(user) -> PublicProfile | None:
 # ─── Profile ──────────────────────────────────────────────────────────────────
 
 class PublicProfileView(APIView):
-    permission_classes = [HasFeature('digital_card')]
+    permission_classes = [IsAuthenticated, HasFeature('digital_card')]
 
     @extend_schema(tags=['app-digital'], summary='Get own public profile')
     def get(self, request):
@@ -94,7 +95,7 @@ class PublicProfileView(APIView):
 # ─── Digital Card ─────────────────────────────────────────────────────────────
 
 class DigitalCardView(APIView):
-    permission_classes = [HasFeature('digital_card')]
+    permission_classes = [IsAuthenticated, HasFeature('digital_card')]
 
     @extend_schema(tags=['app-digital'], summary='Get own digital card')
     def get(self, request):
@@ -134,7 +135,7 @@ class DigitalCardView(APIView):
 
 
 class GenerateQRView(APIView):
-    permission_classes = [HasFeature('qr_vcard_export')]
+    permission_classes = [IsAuthenticated, HasFeature('qr_vcard_export')]
 
     @extend_schema(tags=['app-digital'], summary='Generate QR code for digital card')
     def post(self, request):
@@ -160,7 +161,7 @@ class GenerateQRView(APIView):
 # ─── Landing ──────────────────────────────────────────────────────────────────
 
 class LandingView(APIView):
-    permission_classes = [HasFeature('landing_page')]
+    permission_classes = [IsAuthenticated, HasFeature('landing_page')]
 
     @extend_schema(tags=['app-digital'], summary='Get own landing page')
     def get(self, request):
@@ -202,7 +203,7 @@ class LandingView(APIView):
 # ─── Portfolio ────────────────────────────────────────────────────────────────
 
 class PortfolioListCreateView(APIView):
-    permission_classes = [HasFeature('portfolio')]
+    permission_classes = [IsAuthenticated, HasFeature('portfolio')]
 
     @extend_schema(tags=['app-digital'], summary='List portfolio items')
     def get(self, request):
@@ -236,7 +237,7 @@ class PortfolioListCreateView(APIView):
 
 
 class PortfolioDetailView(APIView):
-    permission_classes = [HasFeature('portfolio')]
+    permission_classes = [IsAuthenticated, HasFeature('portfolio')]
 
     def _get_item(self, pk, user):
         try:
@@ -282,7 +283,7 @@ class PortfolioDetailView(APIView):
 
 class CVView(APIView):
     # CV basic is available on Free plan (uses digital_card gate)
-    permission_classes = [HasFeature('digital_card')]
+    permission_classes = [IsAuthenticated, HasFeature('digital_card')]
 
     @extend_schema(tags=['app-digital'], summary='Get own CV document')
     def get(self, request):
@@ -322,7 +323,7 @@ class CVView(APIView):
 
 
 class CVExportPDFView(APIView):
-    permission_classes = [HasFeature('cv_pdf_export')]
+    permission_classes = [IsAuthenticated, HasFeature('cv_pdf_export')]
 
     @extend_schema(tags=['app-digital'], summary='Export CV as PDF')
     def get(self, request):
@@ -377,7 +378,7 @@ def _render_cv_html(profile, cv) -> str:
 # ─── Analytics ────────────────────────────────────────────────────────────────
 
 class DigitalAnalyticsView(APIView):
-    permission_classes = [HasFeature('digital_analytics')]
+    permission_classes = [IsAuthenticated, HasFeature('digital_analytics')]
 
     @extend_schema(tags=['app-digital'], summary='Get basic analytics for a digital service')
     def get(self, request, service: str):
@@ -405,7 +406,7 @@ class DigitalAnalyticsView(APIView):
 # ─── Custom Domain ────────────────────────────────────────────────────────────
 
 class CustomDomainView(APIView):
-    permission_classes = [HasFeature('custom_domain')]
+    permission_classes = [IsAuthenticated, HasFeature('custom_domain')]
 
     @extend_schema(tags=['app-digital'], summary='Get custom domain configuration')
     def get(self, request):
@@ -452,7 +453,7 @@ class CustomDomainView(APIView):
 
 
 class CustomDomainVerifyView(APIView):
-    permission_classes = [HasFeature('custom_domain')]
+    permission_classes = [IsAuthenticated, HasFeature('custom_domain')]
 
     @extend_schema(tags=['app-digital'], summary='Trigger domain DNS verification (stub)')
     def post(self, request):
