@@ -99,7 +99,7 @@ class PublicPortfolioView(APIView):
         profile = _get_public_profile(username)
         if not profile:
             return _NOT_FOUND
-        items = PortfolioItem.objects.filter(profile=profile)
+        items = PortfolioItem.objects.filter(profile=profile, is_published=True)
         return Response({
             'profile': PublicProfileSerializer(profile).data,
             'items': PortfolioItemSerializer(items, many=True).data,
@@ -120,7 +120,7 @@ class PublicPortfolioItemView(APIView):
         if not profile:
             return _NOT_FOUND
         try:
-            item = PortfolioItem.objects.get(profile=profile, slug=slug)
+            item = PortfolioItem.objects.get(profile=profile, slug=slug, is_published=True)
         except PortfolioItem.DoesNotExist:
             return _NOT_FOUND
         return Response({'item': PortfolioItemSerializer(item).data})

@@ -131,6 +131,21 @@ class PortfolioItem(BaseModel):
     A single portfolio case study.  Multiple per profile (ForeignKey).
     slug must be unique per profile.
     """
+    CATEGORY_CHOICES = [
+        ('web', 'Web'),
+        ('mobile', 'Mobile'),
+        ('design', 'Diseño'),
+        ('branding', 'Branding'),
+        ('data', 'Datos'),
+        ('consulting', 'Consultoría'),
+        ('other', 'Otro'),
+    ]
+    STATUS_CHOICES = [
+        ('completed', 'Completado'),
+        ('in_progress', 'En progreso'),
+        ('archived', 'Archivado'),
+    ]
+
     profile = models.ForeignKey(
         PublicProfile,
         on_delete=models.CASCADE,
@@ -140,15 +155,22 @@ class PortfolioItem(BaseModel):
     slug = models.SlugField(max_length=100)
     description_short = models.CharField(max_length=200)
     description_full = models.TextField(blank=True)
-    cover_image_url = models.URLField()
+    cover_image_url = models.URLField(blank=True)
     gallery_images = models.JSONField(default=list)
     demo_url = models.URLField(blank=True)
     repo_url = models.URLField(blank=True)
     case_study_url = models.URLField(blank=True)
     tags = models.JSONField(default=list)
     is_featured = models.BooleanField(default=False)
+    is_published = models.BooleanField(default=True)
     order = models.IntegerField(default=0)
     project_date = models.DateField()
+    category = models.CharField(max_length=30, blank=True, choices=CATEGORY_CHOICES)
+    client_name = models.CharField(max_length=100, blank=True)
+    technologies = models.JSONField(default=list)
+    duration = models.CharField(max_length=50, blank=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='completed')
+    accent_color = models.CharField(max_length=7, blank=True)
 
     class Meta:
         db_table = 'portfolio_items'

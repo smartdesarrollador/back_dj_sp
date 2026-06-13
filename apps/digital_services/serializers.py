@@ -68,21 +68,34 @@ class LandingTemplateSerializer(serializers.ModelSerializer):
 
 
 class PortfolioItemSerializer(serializers.ModelSerializer):
+    slug = serializers.SlugField(max_length=100, required=False, allow_blank=True)
+    cover_image_url = serializers.URLField(required=False, allow_blank=True)
+
     class Meta:
         model = PortfolioItem
         fields = [
             'id', 'title', 'slug', 'description_short', 'description_full',
             'cover_image_url', 'gallery_images', 'demo_url', 'repo_url',
-            'case_study_url', 'tags', 'is_featured', 'order', 'project_date',
+            'case_study_url', 'tags', 'is_featured', 'is_published', 'order', 'project_date',
+            'category', 'client_name', 'technologies', 'duration', 'status', 'accent_color',
             'created_at', 'updated_at',
         ]
         read_only_fields = ['id', 'created_at', 'updated_at']
 
     def validate(self, attrs):
-        # Auto-generate slug from title if not provided
-        if not attrs.get('slug') and attrs.get('title'):
-            from django.utils.text import slugify
-            attrs['slug'] = slugify(attrs['title'])[:100]
+        from django.utils.text import slugify
+        title = attrs.get('title') or (self.instance.title if self.instance else '')
+        if not attrs.get('slug') and title:
+            base_slug = slugify(title)[:90]
+            profile = attrs.get('profile') or (self.instance.profile if self.instance else None)
+            slug = base_slug
+            n = 1
+            while profile and PortfolioItem.objects.filter(profile=profile, slug=slug).exclude(
+                pk=self.instance.pk if self.instance else None
+            ).exists():
+                slug = f'{base_slug}-{n}'
+                n += 1
+            attrs['slug'] = slug
         return attrs
 
 
