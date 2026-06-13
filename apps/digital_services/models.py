@@ -112,6 +112,12 @@ class LandingTemplate(BaseModel):
     enable_contact_form = models.BooleanField(default=False)
     custom_css = models.TextField(blank=True)
     ga_tracking_id = models.CharField(max_length=20, blank=True)
+    social_links = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text='{"linkedin":"","github":"","twitter":"","instagram":"","website":"","tiktok":""}',
+    )
+    accent_color = models.CharField(max_length=7, blank=True, default='')
 
     class Meta:
         db_table = 'landing_templates'

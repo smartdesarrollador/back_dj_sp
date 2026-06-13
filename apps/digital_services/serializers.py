@@ -61,6 +61,7 @@ class LandingTemplateSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'template_type', 'sections', 'contact_email',
             'enable_contact_form', 'custom_css', 'ga_tracking_id',
+            'social_links', 'accent_color',
             'created_at', 'updated_at',
         ]
         read_only_fields = ['id', 'created_at', 'updated_at']
