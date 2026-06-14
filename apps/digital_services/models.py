@@ -118,12 +118,34 @@ class LandingTemplate(BaseModel):
         help_text='{"linkedin":"","github":"","twitter":"","instagram":"","website":"","tiktok":""}',
     )
     accent_color = models.CharField(max_length=7, blank=True, default='')
+    theme_colors = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text='{"hero_bg":"","hero_text":"","button_bg":"","nav_bg":""}',
+    )
 
     class Meta:
         db_table = 'landing_templates'
 
     def __str__(self) -> str:
         return f'Landing for @{self.profile.username}'
+
+
+class PortfolioSettings(BaseModel):
+    profile = models.OneToOneField(
+        PublicProfile, on_delete=models.CASCADE, related_name='portfolio_settings'
+    )
+    theme_colors = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text='{"header_bg":"","header_text":"","accent":"","nav_bg":""}',
+    )
+
+    class Meta:
+        db_table = 'portfolio_settings'
+
+    def __str__(self) -> str:
+        return f'PortfolioSettings for @{self.profile.username}'
 
 
 class PortfolioItem(BaseModel):

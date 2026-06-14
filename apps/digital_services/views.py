@@ -20,6 +20,8 @@ import base64
 import io
 import secrets
 
+from django.shortcuts import get_object_or_404
+
 import weasyprint
 from drf_spectacular.utils import extend_schema
 from rest_framework import status
@@ -33,6 +35,7 @@ from apps.digital_services.models import (
     DigitalCard,
     LandingTemplate,
     PortfolioItem,
+    PortfolioSettings,
     PublicProfile,
 )
 from apps.digital_services.serializers import (
@@ -41,6 +44,7 @@ from apps.digital_services.serializers import (
     DigitalCardSerializer,
     LandingTemplateSerializer,
     PortfolioItemSerializer,
+    PortfolioSettingsSerializer,
     PublicProfileSerializer,
 )
 from apps.rbac.permissions import HasFeature, check_plan_limit
@@ -476,3 +480,22 @@ class CustomDomainVerifyView(APIView):
             'message': 'Add TXT record to your DNS with the verification_token value.',
             'verification_token': domain.verification_token,
         })
+
+
+class PortfolioSettingsView(APIView):
+    permission_classes = [IsAuthenticated, HasFeature('portfolio')]
+
+    @extend_schema(tags=['app-digital'], summary='Get portfolio theme settings')
+    def get(self, request):
+        profile = get_object_or_404(PublicProfile, user=request.user)
+        obj, _ = PortfolioSettings.objects.get_or_create(profile=profile)
+        return Response(PortfolioSettingsSerializer(obj).data)
+
+    @extend_schema(tags=['app-digital'], summary='Save portfolio theme settings')
+    def post(self, request):
+        profile = get_object_or_404(PublicProfile, user=request.user)
+        obj, _ = PortfolioSettings.objects.get_or_create(profile=profile)
+        serializer = PortfolioSettingsSerializer(obj, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data)

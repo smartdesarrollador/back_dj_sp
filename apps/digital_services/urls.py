@@ -11,6 +11,7 @@ from apps.digital_services.views import (
     LandingView,
     PortfolioDetailView,
     PortfolioListCreateView,
+    PortfolioSettingsView,
     PublicProfileView,
 )
 
@@ -21,6 +22,7 @@ urlpatterns = [
     path('landing/', LandingView.as_view()),
     path('portafolio/', PortfolioListCreateView.as_view()),
     path('portafolio/<uuid:pk>/', PortfolioDetailView.as_view()),
+    path('portfolio-settings/', PortfolioSettingsView.as_view()),
     path('cv/', CVView.as_view()),
     path('cv/export/', CVExportPDFView.as_view()),
     path('analytics/<str:service>/', DigitalAnalyticsView.as_view()),

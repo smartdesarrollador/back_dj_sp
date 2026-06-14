@@ -11,6 +11,7 @@ from apps.digital_services.models import (
     DigitalCard,
     LandingTemplate,
     PortfolioItem,
+    PortfolioSettings,
     PublicProfile,
 )
 
@@ -61,7 +62,7 @@ class LandingTemplateSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'template_type', 'sections', 'contact_email',
             'enable_contact_form', 'custom_css', 'ga_tracking_id',
-            'social_links', 'accent_color',
+            'social_links', 'accent_color', 'theme_colors',
             'created_at', 'updated_at',
         ]
         read_only_fields = ['id', 'created_at', 'updated_at']
@@ -126,3 +127,10 @@ class CustomDomainSerializer(serializers.ModelSerializer):
             'last_verification_attempt', 'ssl_status', 'ssl_cert_expires_at',
             'created_at', 'updated_at',
         ]
+
+
+class PortfolioSettingsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PortfolioSettings
+        fields = ['id', 'theme_colors', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'created_at', 'updated_at']

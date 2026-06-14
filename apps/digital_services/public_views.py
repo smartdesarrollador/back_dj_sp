@@ -100,9 +100,12 @@ class PublicPortfolioView(APIView):
         if not profile:
             return _NOT_FOUND
         items = PortfolioItem.objects.filter(profile=profile, is_published=True)
+        portfolio_settings = getattr(profile, 'portfolio_settings', None)
+        theme_colors = portfolio_settings.theme_colors if portfolio_settings else {}
         return Response({
             'profile': PublicProfileSerializer(profile).data,
             'items': PortfolioItemSerializer(items, many=True).data,
+            'theme_colors': theme_colors,
         })
 
 
