@@ -140,7 +140,7 @@ class PublicCVView(APIView):
         if not profile:
             return _NOT_FOUND
         cv = CVDocument.objects.filter(profile=profile).first()
-        if not cv:
+        if not cv or not cv.is_published:
             return _NOT_FOUND
         return Response({
             'profile': PublicProfileSerializer(profile).data,

@@ -208,6 +208,19 @@ class CVDocument(BaseModel):
     template_type = models.CharField(max_length=20, default='classic')
     show_photo = models.BooleanField(default=True)
     show_contact = models.BooleanField(default=True)
+    headline = models.CharField(max_length=120, blank=True)
+    location = models.CharField(max_length=100, blank=True)
+    website_url = models.URLField(blank=True)
+    linkedin_url = models.URLField(blank=True)
+    github_url = models.URLField(blank=True)
+    accent_color = models.CharField(max_length=7, blank=True)
+    is_published = models.BooleanField(default=True)
+    # [{name, description, url, year, technologies[]}]
+    projects = models.JSONField(default=list)
+    # [{org, role, start_date, end_date, description}]
+    volunteer = models.JSONField(default=list)
+    # [{title, issuer, date, description}]
+    awards = models.JSONField(default=list)
 
     class Meta:
         db_table = 'cv_documents'
