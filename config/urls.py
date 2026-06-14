@@ -77,6 +77,7 @@ urlpatterns = [
         path('desktop/', include('apps.releases.public_urls')),
         path('desktop-license/', include('apps.licenses.public_urls')),
         path('branding/', include('apps.tenants.public_branding_urls')),
+        path('yape-payment/', include('apps.subscriptions.yape_public_urls')),
     ])),
 
     # Support

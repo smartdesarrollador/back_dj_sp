@@ -100,12 +100,13 @@ class RegisterSerializer(serializers.Serializer):
     @transaction.atomic
     def save(self):
         data = self.validated_data
+        plan = data.get('plan', 'free')
         slug = self._unique_slug(data['organization_name'])
         tenant = Tenant.objects.create(
             name=data['organization_name'],
             slug=slug,
             subdomain=slug,
-            plan=data.get('plan', 'free'),
+            plan=plan,
         )
         user = User.objects.create_user(
             email=data['email'],
@@ -116,6 +117,20 @@ class RegisterSerializer(serializers.Serializer):
         if settings.DEBUG:
             user.email_verified = True
             user.save(update_fields=['email_verified'])
+
+        # For paid plans: update the auto-created subscription (created by signal with free/trialing)
+        # and block login until admin confirms payment.
+        if plan in ('starter', 'professional', 'enterprise'):
+            from apps.subscriptions.models import Subscription
+            Subscription.objects.filter(tenant=tenant).update(
+                plan=plan,
+                status='unpaid',
+                trial_start=None,
+                trial_end=None,
+            )
+            user.is_active = False
+            user.save(update_fields=['is_active'])
+
         from apps.rbac.models import Role, UserRole
         try:
             owner_role = Role.objects.get(name='Owner', is_system_role=True)
@@ -123,14 +138,12 @@ class RegisterSerializer(serializers.Serializer):
         except Role.DoesNotExist:
             pass
 
-        # 5. Create ReferralCode for the new tenant
         from apps.referrals.models import ReferralCode, Referral
         ReferralCode.objects.create(
             tenant=tenant,
             code=ReferralCode.generate_code(tenant),
         )
 
-        # 6. If a ref_code was provided, create a pending Referral (silent on error)
         raw_ref = self.validated_data.get('ref_code', '').strip()
         if raw_ref:
             try:
@@ -141,9 +154,9 @@ class RegisterSerializer(serializers.Serializer):
                     status='pending',
                 )
             except (ReferralCode.DoesNotExist, Exception):
-                pass  # Invalid code or duplicate — do not interrupt registration
+                pass
 
-        return user, tenant
+        return user, tenant, plan
 
 
 class LoginSerializer(serializers.Serializer):

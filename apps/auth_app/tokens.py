@@ -56,3 +56,19 @@ def verify_mfa_session_token(token: str) -> str | None:
     if user_id:
         cache.delete(f'mfa_session:{token}')
     return user_id
+
+
+PAYMENT_UPLOAD_TTL = 1800  # 30 min — single-use, consumed on first verify call
+
+
+def create_payment_upload_token(tenant_id: str) -> str:
+    token = secrets.token_urlsafe(32)
+    cache.set(f'payment_upload:{token}', tenant_id, timeout=PAYMENT_UPLOAD_TTL)
+    return token
+
+
+def verify_payment_upload_token(token: str) -> str | None:
+    tenant_id = cache.get(f'payment_upload:{token}')
+    if tenant_id:
+        cache.delete(f'payment_upload:{token}')
+    return tenant_id

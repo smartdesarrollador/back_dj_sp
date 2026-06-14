@@ -11,7 +11,10 @@ from django.contrib.auth.hashers import check_password, make_password
 from django.core.cache import cache
 from django.core.mail import send_mail
 from drf_spectacular.utils import OpenApiResponse, extend_schema
+from decimal import Decimal, InvalidOperation
+
 from rest_framework import status
+from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -46,9 +49,11 @@ from .tokens import (
     create_email_verification_token,
     create_mfa_session_token,
     create_password_reset_token,
+    create_payment_upload_token,
     verify_email_token,
     verify_mfa_session_token,
     verify_password_reset_token,
+    verify_payment_upload_token,
 )
 
 User = get_user_model()
@@ -95,7 +100,7 @@ class RegisterView(APIView):
     def post(self, request):
         serializer = RegisterSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        user, tenant = serializer.save()
+        user, tenant, plan = serializer.save()
 
         import threading
         import requests as _requests
@@ -111,7 +116,7 @@ class RegisterView(APIView):
                     'user': {'id': str(user.id), 'name': user.name, 'email': user.email},
                     'tenant': {'id': str(tenant.id), 'name': tenant.name,
                                'slug': tenant.slug, 'subdomain': tenant.subdomain},
-                    'plan': tenant.plan,
+                    'plan': plan,
                     'timestamp': _tz.now().isoformat(),
                 }, timeout=5)
             except Exception:
@@ -129,12 +134,25 @@ class RegisterView(APIView):
             fail_silently=True,
         )
 
-        return Response(
-            {
-                'user': {'id': str(user.id), 'name': user.name, 'email': user.email},
-                'tenant': {'id': str(tenant.id), 'name': tenant.name, 'slug': tenant.slug, 'subdomain': tenant.subdomain},
-                'message': 'Account created. Please check your email to verify your account.',
+        base_response = {
+            'user': {'id': str(user.id), 'name': user.name, 'email': user.email},
+            'tenant': {
+                'id': str(tenant.id), 'name': tenant.name,
+                'slug': tenant.slug, 'subdomain': tenant.subdomain,
             },
+            'message': 'Account created. Please check your email to verify your account.',
+        }
+
+        if plan in ('starter', 'professional', 'enterprise'):
+            upload_token = create_payment_upload_token(str(tenant.id))
+            return Response(
+                {**base_response, 'requires_payment': True,
+                 'payment_upload_token': upload_token, 'plan': plan},
+                status=status.HTTP_201_CREATED,
+            )
+
+        return Response(
+            {**base_response, 'requires_payment': False},
             status=status.HTTP_201_CREATED,
         )
 
@@ -539,3 +557,68 @@ class MFARecoveryView(APIView):
         matched.save(update_fields=['is_used'])
 
         return Response(_build_token_response(user))
+
+
+class YapePaymentProofView(APIView):
+    """
+    Upload a Yape payment screenshot after registration with a paid plan.
+    Uses a short-lived Redis token (payment_upload_token) from the register response
+    to identify the tenant without requiring full JWT authentication.
+    """
+    permission_classes  = [AllowAny]
+    authentication_classes = []
+    parser_classes      = [MultiPartParser, FormParser]
+
+    @extend_schema(
+        tags=['auth'],
+        summary='Upload Yape payment proof screenshot',
+        responses={
+            201: OpenApiResponse(description='Proof received, pending admin review'),
+            400: OpenApiResponse(description='Invalid token, missing file, or invalid plan'),
+        },
+    )
+    def post(self, request):
+        from apps.subscriptions.models import Subscription, YapePaymentProof
+        from apps.subscriptions.tasks import notify_yape_payment
+
+        upload_token = request.data.get('payment_upload_token', '').strip()
+        if not upload_token:
+            return Response({'detail': 'payment_upload_token is required.'}, status=400)
+
+        tenant_id = verify_payment_upload_token(upload_token)
+        if not tenant_id:
+            return Response({'detail': 'Invalid or expired upload token.'}, status=400)
+
+        screenshot = request.FILES.get('screenshot')
+        if not screenshot:
+            return Response({'detail': 'screenshot file is required.'}, status=400)
+
+        plan = request.data.get('plan', '').strip()
+        if plan not in ('starter', 'professional', 'enterprise'):
+            return Response({'detail': 'Invalid plan.'}, status=400)
+
+        try:
+            amount = Decimal(request.data.get('amount', '0'))
+        except InvalidOperation:
+            return Response({'detail': 'Invalid amount.'}, status=400)
+
+        try:
+            subscription = Subscription.objects.select_related('tenant').get(tenant_id=tenant_id)
+        except Subscription.DoesNotExist:
+            return Response({'detail': 'Subscription not found.'}, status=400)
+
+        admin_token = secrets.token_urlsafe(48)
+        proof = YapePaymentProof.objects.create(
+            subscription=subscription,
+            screenshot=screenshot,
+            plan=plan,
+            amount=amount,
+            admin_token=admin_token,
+        )
+
+        notify_yape_payment.delay(str(proof.id))
+
+        return Response(
+            {'message': 'Payment proof submitted. We will review it shortly.', 'proof_id': str(proof.id)},
+            status=status.HTTP_201_CREATED,
+        )

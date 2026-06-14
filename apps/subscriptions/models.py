@@ -165,6 +165,39 @@ class PaymentMethod(BaseModel):
         return f"{self.tenant.slug} — {self.brand} ****{self.last4}"
 
 
+YAPE_PROOF_STATUS = [
+    ('pending',  'Pending Review'),
+    ('approved', 'Approved'),
+    ('rejected', 'Rejected'),
+]
+
+
+class YapePaymentProof(BaseModel):
+    """
+    Screenshot uploaded by a user as proof of manual Yape payment.
+    status='pending' until an admin reviews via the one-click Telegram links.
+    admin_token is stored in DB (not Redis) so approve/reject links work days later.
+    """
+    subscription  = models.ForeignKey(
+        Subscription, on_delete=CASCADE, related_name='yape_proofs'
+    )
+    screenshot    = models.ImageField(upload_to='yape_proofs/')
+    plan          = models.CharField(max_length=20, choices=PLAN_CHOICES)
+    amount        = models.DecimalField(max_digits=8, decimal_places=2)
+    status        = models.CharField(max_length=10, choices=YAPE_PROOF_STATUS, default='pending')
+    admin_token   = models.CharField(max_length=64, unique=True, db_index=True)
+    reviewed_at   = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        db_table = 'yape_payment_proofs'
+        indexes = [
+            models.Index(fields=['status'], name='yape_proof_status_idx'),
+        ]
+
+    def __str__(self) -> str:
+        return f"YapeProof({self.subscription.tenant.slug} — {self.plan} — {self.status})"
+
+
 class Plan(models.Model):
     """
     Presentation metadata for subscription plans.

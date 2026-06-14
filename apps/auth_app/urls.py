@@ -17,6 +17,7 @@ from .views import (
     ResendVerificationView,
     ResetPasswordView,
     VerifyEmailView,
+    YapePaymentProofView,
 )
 
 urlpatterns = [
@@ -38,4 +39,5 @@ urlpatterns = [
     path('sso/', include('apps.auth_app.sso_urls')),
     path('google/', GoogleOAuthInitView.as_view(), name='google-oauth-init'),
     path('google/callback/', GoogleOAuthCallbackView.as_view(), name='google-oauth-callback'),
+    path('yape-payment-proof', YapePaymentProofView.as_view(), name='yape-payment-proof'),
 ]
