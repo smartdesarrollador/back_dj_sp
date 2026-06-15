@@ -198,6 +198,30 @@ class YapePaymentProof(BaseModel):
         return f"YapeProof({self.subscription.tenant.slug} — {self.plan} — {self.status})"
 
 
+class YapeConfig(models.Model):
+    """
+    Singleton configuration for the manual Yape payment method.
+    Always access via YapeConfig.get() — creates the record on first use.
+    """
+    phone             = models.CharField(max_length=30, default='')
+    holder_name       = models.CharField(max_length=255, default='')
+    is_enabled        = models.BooleanField(default=True)
+    exchange_rate     = models.DecimalField(max_digits=5, decimal_places=2, default=Decimal('3.75'))
+    instructions_note = models.TextField(blank=True, default='')
+    updated_at        = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'yape_config'
+
+    @classmethod
+    def get(cls) -> 'YapeConfig':
+        obj, _ = cls.objects.get_or_create(id=1)
+        return obj
+
+    def __str__(self) -> str:
+        return f"YapeConfig({self.phone} — {'enabled' if self.is_enabled else 'disabled'})"
+
+
 class Plan(models.Model):
     """
     Presentation metadata for subscription plans.

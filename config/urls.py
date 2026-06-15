@@ -45,6 +45,7 @@ urlpatterns = [
         path('releases/', include('apps.releases.admin_urls')),
         path('licenses/', include('apps.licenses.admin_urls')),
         path('organization/', include('apps.tenants.organization_urls')),
+        path('yape/', include('apps.subscriptions.yape_admin_urls')),
     ])),
 
     # App API (per-user resources)
