@@ -222,8 +222,11 @@ class YapeProofReviewView(APIView):
 
         else:  # rejected
             with transaction.atomic():
-                subscription.status = 'canceled'
-                subscription.save(update_fields=['status', 'updated_at'])
+                subscription.plan   = 'free'
+                subscription.status = 'active'
+                subscription.save(update_fields=['plan', 'status', 'updated_at'])
+                tenant.plan = 'free'
+                tenant.save(update_fields=['plan', 'updated_at'])
                 proof.status      = 'rejected'
                 proof.reviewed_at = timezone.now()
                 proof.save(update_fields=['status', 'reviewed_at', 'updated_at'])
@@ -236,7 +239,9 @@ class YapeProofReviewView(APIView):
                         f"Hola {owner.name},\n\n"
                         f"Lamentablemente no pudimos verificar tu comprobante de pago Yape "
                         f"para el plan {proof.plan.capitalize()}.\n\n"
-                        f"Por favor contáctanos para resolver tu caso.\n\n"
+                        f"Tu cuenta continúa activa con el plan Free. "
+                        f"Si deseas intentarlo de nuevo o tienes dudas, contáctanos respondiendo este email.\n\n"
+                        f"Ingresa a tu cuenta: {hub_url}/login\n\n"
                         f"Saludos,\nEl equipo"
                     ),
                     from_email=settings.DEFAULT_FROM_EMAIL,

@@ -18,11 +18,12 @@ LATAM_PAYMENT_TYPES = ['paypal', 'mercadopago', 'yape', 'plin', 'nequi', 'davipl
 
 
 STATUS_CHOICES = [
-    ('trialing', 'Trialing'),
-    ('active', 'Active'),
-    ('past_due', 'Past Due'),
-    ('canceled', 'Canceled'),
-    ('unpaid', 'Unpaid'),
+    ('trialing',        'Trialing'),
+    ('active',          'Active'),
+    ('past_due',        'Past Due'),
+    ('canceled',        'Canceled'),
+    ('unpaid',          'Unpaid'),
+    ('pending_payment', 'Pending Payment'),
 ]
 
 BILLING_CYCLE_CHOICES = [

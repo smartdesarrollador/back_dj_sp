@@ -106,7 +106,7 @@ class RegisterSerializer(serializers.Serializer):
             name=data['organization_name'],
             slug=slug,
             subdomain=slug,
-            plan=plan,
+            plan='free',
         )
         user = User.objects.create_user(
             email=data['email'],
@@ -124,12 +124,10 @@ class RegisterSerializer(serializers.Serializer):
             from apps.subscriptions.models import Subscription
             Subscription.objects.filter(tenant=tenant).update(
                 plan=plan,
-                status='unpaid',
+                status='pending_payment',
                 trial_start=None,
                 trial_end=None,
             )
-            user.is_active = False
-            user.save(update_fields=['is_active'])
 
         from apps.rbac.models import Role, UserRole
         try:

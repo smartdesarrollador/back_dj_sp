@@ -95,12 +95,19 @@ class TestRegisterWithPlan(APITestCase):
 
     @patch('apps.auth_app.views.send_mail', return_value=1)
     def test_plan_starter_is_applied(self, _mock_mail):
+        """On paid-plan registration, tenant starts on Free until Yape proof is approved."""
+        from apps.subscriptions.models import Subscription
         payload = _register_payload(plan='starter')
         response = self.client.post(REGISTER_URL, payload, format='json')
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         tenant = Tenant.objects.filter(name=payload['organization_name']).first()
         self.assertIsNotNone(tenant)
-        self.assertEqual(tenant.plan, 'starter')
+        # Tenant stays Free while payment is pending review
+        self.assertEqual(tenant.plan, 'free')
+        # But subscription records the requested paid plan + pending_payment status
+        sub = Subscription.objects.get(tenant=tenant)
+        self.assertEqual(sub.plan, 'starter')
+        self.assertEqual(sub.status, 'pending_payment')
 
     @patch('apps.auth_app.views.send_mail', return_value=1)
     def test_invalid_plan_returns_400(self, _mock_mail):

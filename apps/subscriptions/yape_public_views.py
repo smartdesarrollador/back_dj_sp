@@ -148,10 +148,15 @@ class YapeRejectView(APIView):
 
         tenant       = proof.subscription.tenant
         subscription = proof.subscription
+        hub_url      = getattr(settings, 'FRONTEND_HUB_URL', '').rstrip('/')
 
         with transaction.atomic():
-            subscription.status = 'canceled'
-            subscription.save(update_fields=['status', 'updated_at'])
+            subscription.plan   = 'free'
+            subscription.status = 'active'
+            subscription.save(update_fields=['plan', 'status', 'updated_at'])
+
+            tenant.plan = 'free'
+            tenant.save(update_fields=['plan', 'updated_at'])
 
             proof.status      = 'rejected'
             proof.reviewed_at = timezone.now()
@@ -165,7 +170,9 @@ class YapeRejectView(APIView):
                     f"Hola {owner.name},\n\n"
                     f"Lamentablemente no pudimos verificar tu comprobante de pago Yape "
                     f"para el plan {proof.plan.capitalize()}.\n\n"
-                    f"Por favor contáctanos respondiendo este email para resolver tu caso.\n\n"
+                    f"Tu cuenta continúa activa con el plan Free. "
+                    f"Si deseas intentarlo de nuevo o tienes dudas, contáctanos respondiendo este email.\n\n"
+                    f"Ingresa a tu cuenta: {hub_url}/login\n\n"
                     f"Saludos,\nEl equipo"
                 ),
                 from_email=settings.DEFAULT_FROM_EMAIL,
