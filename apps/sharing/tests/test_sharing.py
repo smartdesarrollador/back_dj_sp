@@ -117,7 +117,7 @@ class TestSharingViews(APITestCase):
         }
         response = self.client.post(BASE_URL, data, HTTP_X_TENANT_SLUG='free-co')
         # HasFeature returns False → DRF responds 403 Forbidden (not 402)
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(response.status_code, status.HTTP_402_PAYMENT_REQUIRED)
 
     def test_create_share_plan_limit_exceeded(self):
         with patch('apps.sharing.views.check_plan_limit') as mock_limit:

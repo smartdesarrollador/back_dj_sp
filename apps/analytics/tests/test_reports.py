@@ -50,7 +50,7 @@ class TestReportViews(APITestCase):
         free_user = _create_superuser(free_tenant, 'u@free-analytics.com')
         self.client.force_authenticate(user=free_user)
         response = self.client.get(SUMMARY_URL, **{'HTTP_X_TENANT_SLUG': 'free-analytics'})
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(response.status_code, status.HTTP_402_PAYMENT_REQUIRED)
 
     # ── Summary returns expected metrics keys ─────────────────────────────────
 
@@ -83,8 +83,8 @@ class TestReportViews(APITestCase):
         starter_user = _create_superuser(starter_tenant, 'u@starter-analytics.com')
         self.client.force_authenticate(user=starter_user)
         response = self.client.get(TRENDS_URL, **{'HTTP_X_TENANT_SLUG': 'starter-analytics'})
-        # starter has analytics=True but analytics_trends=False → 403
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        # starter has analytics=True but analytics_trends=False → 402
+        self.assertEqual(response.status_code, status.HTTP_402_PAYMENT_REQUIRED)
 
     # ── Report export requires pdf_export feature ─────────────────────────────
 
@@ -93,4 +93,4 @@ class TestReportViews(APITestCase):
         starter_user = _create_superuser(starter_tenant, 'u@starter-export.com')
         self.client.force_authenticate(user=starter_user)
         response = self.client.get(EXPORT_URL, **{'HTTP_X_TENANT_SLUG': 'starter-export'})
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(response.status_code, status.HTTP_402_PAYMENT_REQUIRED)

@@ -178,10 +178,12 @@ class HasFeatureTest(TestCase):
         return request
 
     def test_free_plan_no_custom_roles(self):
+        from core.exceptions import FeatureNotAvailable
         cls = HasFeature('custom_roles')
         perm = cls()
         request = self._make_request('free')
-        self.assertFalse(perm.has_permission(request, None))
+        with self.assertRaises(FeatureNotAvailable):
+            perm.has_permission(request, None)
 
     def test_pro_plan_has_custom_roles(self):
         cls = HasFeature('custom_roles')
@@ -202,10 +204,12 @@ class HasFeatureTest(TestCase):
         self.assertTrue(perm.has_permission(request, None))
 
     def test_starter_no_sso(self):
+        from core.exceptions import FeatureNotAvailable
         cls = HasFeature('sso')
         perm = cls()
         request = self._make_request('starter')
-        self.assertFalse(perm.has_permission(request, None))
+        with self.assertRaises(FeatureNotAvailable):
+            perm.has_permission(request, None)
 
     def test_factory_returns_unique_class_per_feature(self):
         cls_a = HasFeature('mfa')

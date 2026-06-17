@@ -105,7 +105,7 @@ class TestAdminRoleViews(APITestCase):
         response = self.client.post(
             ROLES_URL + 'create/', payload, format='json', HTTP_X_TENANT_SLUG='free-co'
         )
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(response.status_code, status.HTTP_402_PAYMENT_REQUIRED)
 
     @patch('apps.rbac.views.check_plan_limit')
     def test_create_exceeds_plan_limit(self, mock_limit):

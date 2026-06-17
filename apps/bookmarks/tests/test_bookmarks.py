@@ -86,7 +86,7 @@ class TestBookmarkViews(APITestCase):
         response = self.client.get(
             BASE_URL + 'collections/', HTTP_X_TENANT_SLUG='free-bm'
         )
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(response.status_code, status.HTTP_402_PAYMENT_REQUIRED)
 
     # ── Cross-tenant isolation ────────────────────────────────────────────────
 

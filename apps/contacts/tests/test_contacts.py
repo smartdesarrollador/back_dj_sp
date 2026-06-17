@@ -81,7 +81,7 @@ class TestContactViews(APITestCase):
         response = self.client.get(
             BASE_URL + 'groups/', HTTP_X_TENANT_SLUG='free-contacts'
         )
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(response.status_code, status.HTTP_402_PAYMENT_REQUIRED)
 
     # ── Export feature gate ────────────────────────────────────────────────────
 
@@ -92,7 +92,7 @@ class TestContactViews(APITestCase):
         free_user = _create_superuser(free_tenant, 'free@exp.com')
         self.client.force_authenticate(user=free_user)
         response = self.client.get(BASE_URL + 'export/', HTTP_X_TENANT_SLUG='free-exp')
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(response.status_code, status.HTTP_402_PAYMENT_REQUIRED)
 
         # Starter plan → 200 CSV
         starter_tenant = _create_tenant('starter-exp', plan='starter')

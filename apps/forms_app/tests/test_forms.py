@@ -116,4 +116,4 @@ class TestFormsViews(APITestCase):
         )
         export_url = f'{BASE_URL}{form.pk}/export/'
         response = self.client.get(export_url, **{'HTTP_X_TENANT_SLUG': 'free-form'})
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(response.status_code, status.HTTP_402_PAYMENT_REQUIRED)

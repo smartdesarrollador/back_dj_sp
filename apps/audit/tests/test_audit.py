@@ -158,7 +158,7 @@ class TestAuditLogViews(APITestCase):
         self.client.force_authenticate(user=free_user)
 
         response = self.client.get(BASE_URL, HTTP_X_TENANT_SLUG='free-corp')
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(response.status_code, status.HTTP_402_PAYMENT_REQUIRED)
 
     def test_list_starter_plan_blocked(self):
         starter_tenant = _create_tenant('starter-corp', plan='starter')
@@ -166,7 +166,7 @@ class TestAuditLogViews(APITestCase):
         self.client.force_authenticate(user=starter_user)
 
         response = self.client.get(BASE_URL, HTTP_X_TENANT_SLUG='starter-corp')
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(response.status_code, status.HTTP_402_PAYMENT_REQUIRED)
 
     # ─── Detail ───────────────────────────────────────────────────────────────
 

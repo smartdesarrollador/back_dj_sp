@@ -110,7 +110,7 @@ class TestPublicProfileAndCard(APITestCase):
     # ── Test 4 ───────────────────────────────────────────────────────────────
 
     def test_generate_qr_requires_starter(self):
-        """POST tarjeta/qr/ with a Free plan returns 403 (feature gate: qr_vcard_export)."""
+        """POST tarjeta/qr/ with a Free plan returns 402 (feature gate: qr_vcard_export)."""
         free_tenant = _create_tenant('free-digital', plan='free')
         free_user = _create_superuser(free_tenant, 'u@free-digital.com')
         _make_profile(free_user, username='freeuser')
@@ -120,7 +120,7 @@ class TestPublicProfileAndCard(APITestCase):
             {'url': 'https://example.com'},
             **{'HTTP_X_TENANT_SLUG': 'free-digital'},
         )
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(response.status_code, status.HTTP_402_PAYMENT_REQUIRED)
 
     # ── Test 5 ───────────────────────────────────────────────────────────────
 
@@ -148,7 +148,7 @@ class TestLandingAndPortfolio(APITestCase):
     # ── Test 6 ───────────────────────────────────────────────────────────────
 
     def test_landing_requires_starter(self):
-        """POST landing/ with Free plan returns 403 (feature gate: landing_page)."""
+        """POST landing/ with Free plan returns 402 (feature gate: landing_page)."""
         free_tenant = _create_tenant('free-landing', plan='free')
         free_user = _create_superuser(free_tenant, 'u@free-landing.com')
         _make_profile(free_user, username='freelander')
@@ -158,7 +158,7 @@ class TestLandingAndPortfolio(APITestCase):
             {'template_type': 'basic'},
             **{'HTTP_X_TENANT_SLUG': 'free-landing'},
         )
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(response.status_code, status.HTTP_402_PAYMENT_REQUIRED)
 
     # ── Test 7 ───────────────────────────────────────────────────────────────
 
@@ -182,7 +182,7 @@ class TestLandingAndPortfolio(APITestCase):
     # ── Test 8 ───────────────────────────────────────────────────────────────
 
     def test_portfolio_requires_professional(self):
-        """POST portafolio/ with Starter plan returns 403 (feature gate: portfolio)."""
+        """POST portafolio/ with Starter plan returns 402 (feature gate: portfolio)."""
         starter_tenant = _create_tenant('starter-port', plan='starter')
         starter_user = _create_superuser(starter_tenant, 'u@starter-port.com')
         _make_profile(starter_user, username='starterport')
@@ -192,7 +192,7 @@ class TestLandingAndPortfolio(APITestCase):
             {'title': 'My Project'},
             **{'HTTP_X_TENANT_SLUG': 'starter-port'},
         )
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(response.status_code, status.HTTP_402_PAYMENT_REQUIRED)
 
     # ── Test 9 ───────────────────────────────────────────────────────────────
 
@@ -267,7 +267,7 @@ class TestCVAndDomain(APITestCase):
     # ── Test 12 ──────────────────────────────────────────────────────────────
 
     def test_cv_pdf_export_requires_starter(self):
-        """GET cv/export/ with Free plan returns 403 (feature gate: cv_pdf_export)."""
+        """GET cv/export/ with Free plan returns 402 (feature gate: cv_pdf_export)."""
         free_tenant = _create_tenant('free-cvpdf', plan='free')
         free_user = _create_superuser(free_tenant, 'u@free-cvpdf.com')
         _make_profile(free_user, username='freepdf')
@@ -276,7 +276,7 @@ class TestCVAndDomain(APITestCase):
             f'{BASE_URL}cv/export/',
             **{'HTTP_X_TENANT_SLUG': 'free-cvpdf'},
         )
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(response.status_code, status.HTTP_402_PAYMENT_REQUIRED)
 
     # ── Test 13 ──────────────────────────────────────────────────────────────
 
@@ -305,7 +305,7 @@ class TestCVAndDomain(APITestCase):
     # ── Test 14 ──────────────────────────────────────────────────────────────
 
     def test_analytics_requires_starter(self):
-        """GET analytics/tarjeta/ with Free plan returns 403 (feature gate: digital_analytics)."""
+        """GET analytics/tarjeta/ with Free plan returns 402 (feature gate: digital_analytics)."""
         free_tenant = _create_tenant('free-analytics', plan='free')
         free_user = _create_superuser(free_tenant, 'u@free-analytics.com')
         _make_profile(free_user, username='freeanalytics')
@@ -314,12 +314,12 @@ class TestCVAndDomain(APITestCase):
             f'{BASE_URL}analytics/tarjeta/',
             **{'HTTP_X_TENANT_SLUG': 'free-analytics'},
         )
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(response.status_code, status.HTTP_402_PAYMENT_REQUIRED)
 
     # ── Test 15 ──────────────────────────────────────────────────────────────
 
     def test_custom_domain_requires_enterprise(self):
-        """POST custom-domain/ with Professional plan returns 403 (feature gate: custom_domain)."""
+        """POST custom-domain/ with Professional plan returns 402 (feature gate: custom_domain)."""
         _make_profile(self.user, username='prodomain')
         response = self.client.post(
             f'{BASE_URL}custom-domain/',
@@ -327,4 +327,4 @@ class TestCVAndDomain(APITestCase):
             **self.slug,
         )
         # self.tenant has plan='professional', which does NOT have custom_domain
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(response.status_code, status.HTTP_402_PAYMENT_REQUIRED)

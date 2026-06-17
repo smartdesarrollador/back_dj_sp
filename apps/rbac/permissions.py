@@ -137,9 +137,18 @@ def HasFeature(feature: str) -> type[BasePermission]:
         }
 
         def has_permission(self, request, view) -> bool:
-            if not hasattr(request, 'tenant') or request.tenant is None:
+            tenant = getattr(request, 'tenant', None)
+            # Auth endpoints bypass TenantMiddleware; fall back to the
+            # authenticated user's own tenant for plan checks.
+            if tenant is None and getattr(request, 'user', None) and request.user.is_authenticated:
+                tenant = getattr(request.user, 'tenant', None)
+            if tenant is None:
                 return True
-            return plan_has_feature(request.tenant.plan, feature)
+            if not plan_has_feature(tenant.plan, feature):
+                raise FeatureNotAvailable(
+                    detail=f'La funcionalidad "{feature}" no está disponible en tu plan actual.'
+                )
+            return True
 
     _Feature.__name__ = f'HasFeature[{feature}]'
     _Feature.__qualname__ = f'HasFeature[{feature}]'

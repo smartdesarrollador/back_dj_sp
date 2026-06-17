@@ -24,8 +24,12 @@ MFA_DISABLE_URL = '/api/v1/auth/mfa/disable'
 MFA_RECOVERY_URL = '/api/v1/auth/mfa/recovery'
 
 
-def _create_tenant(slug='mfa-corp'):
-    return Tenant.objects.create(name='MFA Corp', slug=slug, subdomain=slug)
+def _create_tenant(slug='mfa-corp', plan='professional'):
+    tenant = Tenant.objects.create(name='MFA Corp', slug=slug, subdomain=slug)
+    if plan != 'free':
+        tenant.plan = plan
+        tenant.save(update_fields=['plan'])
+    return tenant
 
 
 def _create_user(tenant, email='mfa@test.com', password='ValidPass1!', verified=True):
@@ -223,3 +227,33 @@ class MFARecoveryViewTest(TestCase):
             'recovery_code': self.plain_code,
         }, format='json')
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+
+class MFAFeatureGateTest(TestCase):
+    """MFA endpoints must be blocked for plans without the 'mfa' feature."""
+
+    def _setup_user(self, plan: str, slug: str):
+        tenant = _create_tenant(slug, plan=plan)
+        user = _create_user(tenant, email=f'{plan}@gate.test')
+        return _auth_client(user)
+
+    def test_free_plan_cannot_enable_mfa(self):
+        client = self._setup_user('free', 'free-gate')
+        response = client.post(MFA_ENABLE_URL)
+        self.assertEqual(response.status_code, status.HTTP_402_PAYMENT_REQUIRED)
+
+    def test_starter_plan_can_enable_mfa(self):
+        client = self._setup_user('starter', 'starter-gate')
+        response = client.post(MFA_ENABLE_URL)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn('provisioning_uri', response.json())
+
+    def test_free_plan_cannot_disable_mfa(self):
+        client = self._setup_user('free', 'free-gate-disable')
+        response = client.post(MFA_DISABLE_URL, {'password': 'ValidPass1!'}, format='json')
+        self.assertEqual(response.status_code, status.HTTP_402_PAYMENT_REQUIRED)
+
+    def test_free_plan_cannot_verify_mfa_setup(self):
+        client = self._setup_user('free', 'free-gate-verify')
+        response = client.post(MFA_VERIFY_SETUP_URL, {'totp_code': '000000'}, format='json')
+        self.assertEqual(response.status_code, status.HTTP_402_PAYMENT_REQUIRED)

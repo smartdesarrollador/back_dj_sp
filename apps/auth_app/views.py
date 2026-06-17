@@ -16,6 +16,8 @@ from decimal import Decimal, InvalidOperation
 from rest_framework import status
 from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.permissions import AllowAny, IsAuthenticated
+
+from apps.rbac.permissions import HasFeature
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.exceptions import TokenError
@@ -358,7 +360,7 @@ class ResetPasswordView(APIView):
 # ─── MFA views ────────────────────────────────────────────────────────────────
 
 class MFAEnableView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, HasFeature('mfa')]
 
     @extend_schema(
         tags=['auth'],
@@ -385,7 +387,7 @@ class MFAEnableView(APIView):
 
 
 class MFAVerifySetupView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, HasFeature('mfa')]
 
     @extend_schema(
         tags=['auth'],
@@ -461,7 +463,7 @@ class MFAValidateView(APIView):
 
 
 class MFADisableView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, HasFeature('mfa')]
 
     @extend_schema(
         tags=['auth'],

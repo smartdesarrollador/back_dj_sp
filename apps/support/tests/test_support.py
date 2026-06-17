@@ -206,7 +206,7 @@ class TestSupportCommentsAndFeatures(APITestCase):
         response = self.client.get(
             f'{BASE_URL}export/', **{'HTTP_X_TENANT_SLUG': 'starter-sup'}
         )
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(response.status_code, status.HTTP_402_PAYMENT_REQUIRED)
 
     # ── 10. Export returns CSV for professional plan ──────────────────────────
 
