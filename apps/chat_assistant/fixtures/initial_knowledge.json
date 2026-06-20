@@ -1,0 +1,142 @@
+[
+  {
+    "model": "chat_assistant.chatknowledgearticle",
+    "pk": "10000000-0000-0000-0000-000000000001",
+    "fields": {
+      "title": "¿Qué es Digisider?",
+      "content": "**Digisider** es una empresa tecnológica peruana especializada en transformación digital para negocios modernos. Ofrecemos una suite integrada de soluciones que cubre las tres dimensiones clave del negocio digital:\n\n- **Workspace** — herramientas de productividad para equipos\n- **Vista Digital** — presencia en internet (tarjeta digital, landing page, portafolio, CV)\n- **App Desktop** — sidebar nativa para Windows y macOS\n- **Automatizaciones con IA** — flujos de negocio con n8n e inteligencia artificial\n- **Marketing Digital** — gestión de campañas Google Ads, Meta Ads y redes sociales\n- **Desarrollo Web** — portales, tiendas virtuales, landing pages y más\n\nNuestro equipo combina más de 4 años en automatización, 5 años en marketing digital y 3 años en desarrollo web. Hemos implementado más de 500 flujos de automatización y ejecutado más de 200 campañas digitales, con un índice de satisfacción del 98–100%.\n\nSitio web: digisider.com",
+      "category": "general",
+      "keywords": ["digisider", "qué es", "empresa", "plataforma", "saas", "peruana", "transformación digital"],
+      "is_active": true,
+      "order": 0,
+      "created_at": "2026-01-01T00:00:00Z",
+      "updated_at": "2026-01-01T00:00:00Z"
+    }
+  },
+  {
+    "model": "chat_assistant.chatknowledgearticle",
+    "pk": "10000000-0000-0000-0000-000000000002",
+    "fields": {
+      "title": "Planes y precios de Digisider",
+      "content": "Digisider ofrece 4 planes de suscripción:\n\n| Plan | Precio mensual | Precio anual |\n|------|---------------|-------------|\n| **Free** | $0 | $0 |\n| **Starter** | $29/mes | $313/año |\n| **Professional** ⭐ | $79/mes | $854/año |\n| **Enterprise** | $199/mes | $2,149/año |\n\n### ¿Qué incluye cada plan?\n\n**Free — $0**\n- Workspace con acceso limitado\n- 1 usuario\n- Soporte por email\n- Sin Vista Digital ni App Desktop\n\n**Starter — $29/mes**\n- Workspace completo\n- Vista Digital incluida (tarjeta digital, landing page, CV)\n- Hasta 5 usuarios\n- Soporte prioritario\n- Exportar CV a PDF, código QR, vCard, estadísticas de tarjeta\n\n**Professional — $79/mes** *(el más popular)*\n- Todo lo de Starter\n- App Desktop para Windows y macOS\n- Hasta 20 usuarios\n- Analytics Pro\n- Portafolio digital, múltiples versiones de CV, dominio personalizado\n- Soporte 24/7\n\n**Enterprise — $199/mes**\n- Todo lo de Professional\n- Usuarios ilimitados\n- Soporte dedicado\n- Funciones avanzadas para organizaciones grandes\n\nEl precio anual representa un ahorro significativo respecto al precio mensual.",
+      "category": "pricing",
+      "keywords": ["precio", "plan", "costo", "free", "starter", "professional", "enterprise", "suscripción", "mensual", "anual", "cuánto cuesta"],
+      "is_active": true,
+      "order": 1,
+      "created_at": "2026-01-01T00:00:00Z",
+      "updated_at": "2026-01-01T00:00:00Z"
+    }
+  },
+  {
+    "model": "chat_assistant.chatknowledgearticle",
+    "pk": "10000000-0000-0000-0000-000000000003",
+    "fields": {
+      "title": "Workspace — Plataforma de Productividad",
+      "content": "El **Workspace** es la plataforma de productividad colaborativa de Digisider. Disponible desde el plan Starter (completo) o Free (acceso limitado).\n\n### Módulos de Productividad\n- **Dashboard** — Vista general del equipo: tareas pendientes, próximos eventos, acciones rápidas y consumo del plan.\n- **Tareas** — Gestión completa con estados (pendiente, en progreso, en revisión, hecho), prioridades (baja, media, alta, urgente), asignación a miembros, fecha límite y subtareas. Vista lista y tablero Kanban.\n- **Calendario** — Agenda de eventos con vistas de día, semana y mes.\n- **Notas** — Notas organizadas por categorías, con soporte para notas fijadas.\n- **Contactos** — Directorio con agrupación y filtros: teléfonos, emails, empresas.\n- **Bookmarks** — Guarda y organiza enlaces en colecciones temáticas.\n\n### Proyectos y DevOps\n- **Proyectos** — Organiza el trabajo en proyectos con secciones, ítems y campos personalizados.\n- **Variables de Entorno** — Almacenamiento cifrado por ambiente (desarrollo, staging, producción).\n- **Snippets de código** — Biblioteca de fragmentos con resaltado de sintaxis para JavaScript, TypeScript, Python, Bash, SQL, HTML, CSS, JSON, YAML, Dockerfile, Go, Rust, Java y más.\n\n### Administración\n- **Formularios** — Crea formularios con URL pública para recibir respuestas.\n- **Log de Auditoría** — Registro inmutable de todas las acciones del equipo.\n- **Reportes** — Dashboards con métricas de uso y actividad.\n- **Soporte** — Sistema de tickets integrado.",
+      "category": "features",
+      "keywords": ["workspace", "productividad", "tareas", "kanban", "calendario", "notas", "contactos", "proyectos", "snippets", "variables de entorno", "formularios"],
+      "is_active": true,
+      "order": 2,
+      "created_at": "2026-01-01T00:00:00Z",
+      "updated_at": "2026-01-01T00:00:00Z"
+    }
+  },
+  {
+    "model": "chat_assistant.chatknowledgearticle",
+    "pk": "10000000-0000-0000-0000-000000000004",
+    "fields": {
+      "title": "Vista Digital — Presencia Digital Personal",
+      "content": "**Vista Digital** es la plataforma para construir y gestionar tu identidad profesional en internet, sin necesidad de conocimientos técnicos. Disponible desde el plan **Starter**.\n\n### Tarjeta Digital *(todos los planes con Vista)*\nTu tarjeta de presentación online siempre actualizada. Incluye foto, nombre, título, biografía, especialidades, datos de contacto y enlaces a redes sociales (LinkedIn, Twitter/X, GitHub, Instagram, Facebook). Personalizable con tus colores de marca. URL pública única para compartir.\n- **Código QR** *(Starter+)*: Comparte tu tarjeta escaneando.\n- **Exportar vCard** *(Starter+)*: Tus visitantes guardan tus datos en su teléfono.\n- **Estadísticas de visitas** *(Starter+)*: Ve quién visita tu tarjeta.\n\n### Landing Page *(Starter+)*\nEditor visual por secciones sin código. Plantillas: Básico, Corporate, Creativo, Minimal.\nSecciones disponibles: Hero, Sobre mí, Servicios, Testimonios, Estadísticas, Contacto, FAQ, Características.\n- **Formulario de contacto** *(Starter+)*\n- **CSS personalizado** *(Professional+)*\n- **Optimización SEO** *(Professional+)*\n- **Google Analytics** *(Professional+)*\n\n### Portafolio *(Professional+)*\nMuestra tus mejores trabajos con galería de fotos, demo, repositorio, tecnologías, cliente, categoría y duración. Plantillas: Claro, Oscuro, Creativo, Minimal.\n\n### CV Online *(todos los planes con Vista)*\nEditor guiado con secciones de resumen, experiencia, educación, habilidades, idiomas y certificaciones. URL pública para compartir con reclutadores. Plantillas: Classic, Modern, Minimal.\n- **Exportar a PDF** *(Starter+)*\n- **Múltiples versiones de CV** *(Professional+)*\n- **Color de acento personalizado** *(Professional+)*\n\n### Dominio Personalizado *(Professional+)*\nConecta tu dominio propio (ej. `tunombre.com`) con instrucciones DNS, verificación automática y SSL incluido.",
+      "category": "features",
+      "keywords": ["vista digital", "tarjeta digital", "landing page", "portafolio", "cv", "presencia digital", "qr", "vcard", "dominio", "url pública"],
+      "is_active": true,
+      "order": 3,
+      "created_at": "2026-01-01T00:00:00Z",
+      "updated_at": "2026-01-01T00:00:00Z"
+    }
+  },
+  {
+    "model": "chat_assistant.chatknowledgearticle",
+    "pk": "10000000-0000-0000-0000-000000000005",
+    "fields": {
+      "title": "App Desktop — Sidebar Nativa para Windows y macOS",
+      "content": "La **App Desktop** de Digisider es una aplicación nativa que se instala como barra lateral en tu escritorio. Disponible desde el plan **Professional**.\n\nPermite acceder a tus herramientas sin cambiar de ventana mientras trabajas en otras aplicaciones.\n\n### Paneles disponibles\n- **Home** — Resumen del estado de tu cuenta.\n- **Tareas** — Gestión completa sincronizada con tu Workspace: crea, edita, filtra y busca tareas.\n- **Notas** — Crea y consulta notas rápidas.\n- **Snippets** — Copia cualquier fragmento de código al portapapeles con un clic. +14 lenguajes.\n- **Contactos** — Consulta tu agenda del Workspace.\n- **Bookmarks** — Accede a tus marcadores guardados.\n- **Proyectos** — Vista rápida de tus proyectos activos.\n- **Calendario** — Consulta tu agenda y próximos eventos.\n- **Chat** — Asistente de inteligencia artificial integrado.\n- **Alertas** — Notificaciones y alertas en tiempo real.\n\n### Características destacadas\n- Acceso offline a tus datos más recientes.\n- Notificaciones nativas del sistema operativo.\n- Interfaz oscura optimizada para no distraer.\n- Panel redimensionable.\n- Sincronización automática con tu Workspace.\n- Autenticación segura desde el Hub (sin contraseñas adicionales).\n\n**Compatible con:** Windows y macOS.",
+      "category": "features",
+      "keywords": ["app desktop", "aplicación escritorio", "windows", "macos", "sidebar", "barra lateral", "nativa", "offline"],
+      "is_active": true,
+      "order": 4,
+      "created_at": "2026-01-01T00:00:00Z",
+      "updated_at": "2026-01-01T00:00:00Z"
+    }
+  },
+  {
+    "model": "chat_assistant.chatknowledgearticle",
+    "pk": "10000000-0000-0000-0000-000000000006",
+    "fields": {
+      "title": "Servicios de Automatización con IA",
+      "content": "Digisider ofrece **automatización de procesos de negocio** con n8n e Inteligencia Artificial. Más de 400 integraciones disponibles. n8n self-hosted: tus datos permanecen en tu infraestructura.\n\n### Servicios disponibles\n- **Automatización de Ventas** — Pipeline completo con seguimiento de oportunidades, notificaciones automáticas y cierre asistido por IA.\n- **Generación de Leads** — Captura, calificación y nurturing desde formularios, redes sociales y ads hacia tu CRM.\n- **Automatización de CRM** — Sincronización en tiempo real, actualización de registros y reportes automáticos.\n- **Chatbots WhatsApp con IA** — Bots conversacionales que atienden, califican y derivan clientes en WhatsApp 24/7.\n- **Atención al Cliente** — Respuestas automáticas, creación de tickets, escalamiento y seguimiento postventa.\n- **Email Marketing Automatizado** — Secuencias personalizadas, triggers por comportamiento y campañas en piloto automático.\n\n### Integraciones destacadas\nWhatsApp, Slack, Gmail, HubSpot, Salesforce y +400 más.\n\nPara contratar este servicio o solicitar información, contacta a nuestro equipo:\n- Email: soportesmart18@gmail.com\n- WhatsApp: +51 955 365 043",
+      "category": "features",
+      "keywords": ["automatización", "n8n", "inteligencia artificial", "ia", "chatbot", "whatsapp", "leads", "crm", "email marketing", "flujos"],
+      "is_active": true,
+      "order": 5,
+      "created_at": "2026-01-01T00:00:00Z",
+      "updated_at": "2026-01-01T00:00:00Z"
+    }
+  },
+  {
+    "model": "chat_assistant.chatknowledgearticle",
+    "pk": "10000000-0000-0000-0000-000000000007",
+    "fields": {
+      "title": "Servicios de Marketing Digital y Desarrollo Web",
+      "content": "Además de la plataforma SaaS, Digisider ofrece servicios de agencia:\n\n## Marketing Digital\nEspecialistas certificados en Google, Meta y HubSpot.\n\n- **SEO & Posicionamiento** — Optimización web para aparecer en los primeros resultados de Google.\n- **Publicidad Digital** — Campañas de Google Ads y Meta Ads con máximo ROI.\n- **Gestión de Redes Sociales** — Instagram, Facebook, LinkedIn y TikTok.\n- **Marketing de Contenidos** — Estrategias editoriales, blogs y artículos que posicionan la marca.\n- **Email Marketing** — Flujos de automatización y newsletters.\n- **Analítica & Reportes** — Dashboards en tiempo real y decisiones basadas en datos.\n\n**Diferenciadores:** Certificados Google & Meta Ads · Reportes semanales · Sin permanencia mínima · Gestión 360°.\n\n## Desarrollo Web\nDiseño y desarrollo web profesional. Responsive (mobile-first), SEO incluido, soporte post-entrega.\n\n- **Portales Web** — Plataformas con áreas privadas y contenido dinámico.\n- **Tiendas Virtuales** — E-commerce completo con carrito, pagos y gestión de inventario.\n- **Landing Pages** — Páginas de alta conversión para campañas y captación de leads.\n- **Blogs & Contenido** — Plataformas SEO-optimizadas con editor visual.\n- **Portafolios** — Showcases para creativos, agencias y freelancers.\n- **Páginas Institucionales** — Sitios corporativos con servicios, equipo y contacto.\n\n**Incluye:** Diseño responsive · SEO optimizado · Velocidad <2s · Panel de administración · Integración con redes sociales.\n\nPara cotizaciones: soportesmart18@gmail.com o WhatsApp +51 955 365 043.",
+      "category": "features",
+      "keywords": ["marketing digital", "desarrollo web", "seo", "google ads", "meta ads", "redes sociales", "tienda virtual", "landing page", "e-commerce", "web"],
+      "is_active": true,
+      "order": 6,
+      "created_at": "2026-01-01T00:00:00Z",
+      "updated_at": "2026-01-01T00:00:00Z"
+    }
+  },
+  {
+    "model": "chat_assistant.chatknowledgearticle",
+    "pk": "10000000-0000-0000-0000-000000000008",
+    "fields": {
+      "title": "Cómo registrarse e iniciar sesión en Digisider",
+      "content": "## Registro\n1. Visita digisider.com y haz clic en **\"Prueba gratis\"**.\n2. Completa el formulario con tu nombre, email y contraseña.\n3. Recibirás un **email de verificación** — confírmalo para activar tu cuenta.\n4. Una vez verificado, accedes al **Hub** (tu punto de entrada a todos los servicios).\n\n## Inicio de sesión\n- Haz clic en **\"Iniciar sesión\"** e ingresa tu email y contraseña.\n- Si tienes MFA activado *(planes Professional+)*, ingresa también tu código TOTP.\n\n## Desde el Hub accedes a\n- **Workspace** — Herramientas de productividad y colaboración.\n- **Vista Digital** — Tu presencia digital profesional.\n- **App Desktop** — Descarga e instala la sidebar nativa *(Professional+)*.\n\n## Invitar a tu equipo\nDesde el Hub puedes invitar usuarios por email. Límites según plan:\n- Free: 1 usuario\n- Starter: hasta 5 usuarios\n- Professional: hasta 20 usuarios\n- Enterprise: ilimitados\n\n## ¿Olvidaste tu contraseña?\nUsa la opción **\"¿Olvidaste tu contraseña?\"** en la pantalla de login. Recibirás un email con el enlace de restablecimiento.",
+      "category": "onboarding",
+      "keywords": ["registro", "crear cuenta", "login", "iniciar sesión", "contraseña", "verificar email", "invitar", "equipo", "primeros pasos"],
+      "is_active": true,
+      "order": 7,
+      "created_at": "2026-01-01T00:00:00Z",
+      "updated_at": "2026-01-01T00:00:00Z"
+    }
+  },
+  {
+    "model": "chat_assistant.chatknowledgearticle",
+    "pk": "10000000-0000-0000-0000-000000000009",
+    "fields": {
+      "title": "Preguntas frecuentes (FAQ)",
+      "content": "**¿Puedo cambiar de plan en cualquier momento?**\nSí. Puedes actualizar o cancelar tu plan desde el Hub en la sección Suscripción. Los cambios aplican de inmediato.\n\n**¿Hay un período de prueba?**\nEl plan Free no tiene límite de tiempo: puedes explorar la plataforma sin costo. Para funciones avanzadas, puedes contratar cualquier plan de pago y cancelar cuando quieras.\n\n**¿Mis datos están seguros?**\nSí. Usamos cifrado AES para datos sensibles, autenticación JWT, PostgreSQL con seguridad a nivel de fila (RLS) y logs de auditoría inmutables. Cada acción queda registrada.\n\n**¿Puedo usar Digisider sin la App Desktop?**\nSí. El Workspace y Vista Digital funcionan completamente desde el navegador. La App Desktop es un complemento opcional disponible desde Professional.\n\n**¿Qué pasa si cancelo mi suscripción?**\nMantienen acceso hasta el final del período facturado. Al vencer, la cuenta pasa a Free (con las limitaciones de ese plan).\n\n**¿La plataforma está en español?**\nSí. La interfaz está disponible en español e inglés.\n\n**¿Digisider tiene app móvil?**\nActualmente la plataforma web es completamente responsive (mobile-first). La App Desktop es para Windows y macOS. No hay app móvil separada por el momento.\n\n**¿Los servicios de automatización y marketing están incluidos en la suscripción?**\nNo. Los servicios de Automatización con IA, Marketing Digital y Desarrollo Web son servicios de agencia separados que se contratan aparte. Contacta al equipo para cotizaciones.\n\n**¿Puedo usar mi propio dominio?**\nSí, desde el plan Professional puedes conectar tu dominio personalizado a tu Vista Digital. Incluye verificación automática y SSL.",
+      "category": "faq",
+      "keywords": ["faq", "preguntas frecuentes", "dudas", "cancelar", "prueba", "seguridad", "datos", "móvil", "dominio", "español", "cambiar plan"],
+      "is_active": true,
+      "order": 8,
+      "created_at": "2026-01-01T00:00:00Z",
+      "updated_at": "2026-01-01T00:00:00Z"
+    }
+  },
+  {
+    "model": "chat_assistant.chatknowledgearticle",
+    "pk": "10000000-0000-0000-0000-000000000010",
+    "fields": {
+      "title": "Contacto y Soporte",
+      "content": "## Canales de contacto\n\n| Canal | Dato |\n|-------|------|\n| **Email** | soportesmart18@gmail.com |\n| **WhatsApp** | +51 955 365 043 |\n| **Sitio web** | digisider.com |\n\n## Soporte técnico\n- **Plan Free** — Soporte por email.\n- **Plan Starter** — Soporte prioritario.\n- **Plan Professional** — Soporte 24/7.\n- **Plan Enterprise** — Soporte dedicado con gestor asignado.\n\nSi ya eres cliente, puedes abrir un ticket directamente desde el Hub: **Menú → Soporte**. Un agente revisará tu caso y te responderá a la brevedad.\n\n## Para cotizaciones y servicios de agencia\nLos servicios de Automatización, Marketing Digital y Desarrollo Web se contratan directamente con el equipo:\n- Email: soportesmart18@gmail.com\n- WhatsApp: +51 955 365 043\n\n**Horario de atención:** Lunes a viernes (soporte 24/7 para planes Professional y Enterprise).",
+      "category": "support",
+      "keywords": ["contacto", "soporte", "ayuda", "email", "whatsapp", "ticket", "atención", "problema", "error", "consulta"],
+      "is_active": true,
+      "order": 9,
+      "created_at": "2026-01-01T00:00:00Z",
+      "updated_at": "2026-01-01T00:00:00Z"
+    }
+  }
+]

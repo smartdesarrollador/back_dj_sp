@@ -68,6 +68,7 @@ LOCAL_APPS = [
     'apps.notifications',
     'apps.releases',
     'apps.licenses',
+    'apps.chat_assistant',
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
@@ -181,6 +182,7 @@ REST_FRAMEWORK = {
         'register': '10/hour',
         'mfa': '5/minute',
         'forgot_password': '5/hour',
+        'chat': '30/hour',
     },
     'EXCEPTION_HANDLER': 'core.exceptions.custom_exception_handler',
 }
@@ -293,6 +295,10 @@ APP_BASE_URL = env('APP_BASE_URL', default='http://localhost:8000')
 FRONTEND_URL = env('FRONTEND_URL', default='http://localhost:5173')
 FRONTEND_ADMIN_URL = env('FRONTEND_ADMIN_URL', default='http://localhost:5173')
 FRONTEND_HUB_URL = env('FRONTEND_HUB_URL', default='http://localhost:5175')
+
+# ─── OpenAI ───────────────────────────────────────────────────────────────────
+OPENAI_API_KEY = env('OPENAI_API_KEY', default='')
+OPENAI_CHAT_MODEL = env('OPENAI_CHAT_MODEL', default='gpt-4o-mini')
 
 # ─── n8n Webhooks ─────────────────────────────────────────────────────────────
 N8N_WEBHOOK_REGISTRO_URL    = env('N8N_WEBHOOK_REGISTRO_URL', default='')

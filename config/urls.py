@@ -46,6 +46,7 @@ urlpatterns = [
         path('licenses/', include('apps.licenses.admin_urls')),
         path('organization/', include('apps.tenants.organization_urls')),
         path('yape/', include('apps.subscriptions.yape_admin_urls')),
+        path('knowledge-base/', include('apps.chat_assistant.admin_urls')),
     ])),
 
     # App API (per-user resources)
@@ -79,6 +80,7 @@ urlpatterns = [
         path('desktop-license/', include('apps.licenses.public_urls')),
         path('branding/', include('apps.tenants.public_branding_urls')),
         path('yape-payment/', include('apps.subscriptions.yape_public_urls')),
+        path('chat/', include('apps.chat_assistant.public_urls')),
     ])),
 
     # Support

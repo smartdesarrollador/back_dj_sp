@@ -10,6 +10,7 @@ TENANT_CACHE_TTL = 300  # 5 min
 
 _PUBLIC_PATH_PREFIXES = (
     '/api/v1/auth/',
+    '/api/v1/public/',
     '/api/health/',
     '/api/schema/',
     '/api/docs/',
