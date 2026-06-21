@@ -249,6 +249,14 @@ CELERY_BEAT_SCHEDULE = {
         'task': 'apps.referrals.tasks.activate_pending_referrals',
         'schedule': crontab(hour=3, minute=0),  # Daily at 3:00 AM UTC
     },
+    'expire-professional-trials': {
+        'task': 'apps.subscriptions.tasks.expire_professional_trials',
+        'schedule': crontab(hour=4, minute=0),  # Daily at 4:00 AM UTC
+    },
+    'remind-professional-trial-expiry': {
+        'task': 'apps.subscriptions.tasks.remind_professional_trial_expiry',
+        'schedule': crontab(hour=10, minute=0),  # Daily at 10:00 AM UTC
+    },
 }
 
 # ─── Email ────────────────────────────────────────────────────────────────────

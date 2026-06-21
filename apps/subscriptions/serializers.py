@@ -157,6 +157,7 @@ class CurrentSubscriptionSerializer(serializers.ModelSerializer):
     usage = serializers.SerializerMethodField()
     plan_display = serializers.SerializerMethodField()
     mrr = serializers.SerializerMethodField()
+    professional_trial_used = serializers.SerializerMethodField()
 
     class Meta:
         model = Subscription
@@ -174,11 +175,15 @@ class CurrentSubscriptionSerializer(serializers.ModelSerializer):
             'mrr',
             'created_at',
             'usage',
+            'professional_trial_used',
         ]
         read_only_fields = fields
 
     def get_plan_display(self, obj) -> str:
         return PLAN_DISPLAY_NAMES.get(obj.plan, obj.plan.capitalize())
+
+    def get_professional_trial_used(self, obj) -> bool:
+        return obj.tenant.professional_trial_used
 
     def get_mrr(self, obj) -> float:
         last_paid = (

@@ -395,6 +395,55 @@ class AdminPlanDetailView(APIView):
         return Response({'plan': PlanSerializer(plan).data})
 
 
+class StartTrialView(APIView):
+    """
+    POST /api/v1/admin/subscriptions/trial
+    Activates a 30-day Professional trial for the current tenant.
+    Only available to Free-plan tenants that haven't used their trial.
+    """
+    permission_classes = [IsAuthenticated, HasPermission('subscriptions.manage')]
+
+    def post(self, request) -> Response:
+        tenant = _get_tenant(request)
+        if not tenant:
+            return Response(
+                {'error': {'code': 'tenant_not_found', 'message': 'Tenant no encontrado.'}},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if tenant.professional_trial_used:
+            return Response(
+                {'error': {'code': 'trial_already_used',
+                           'message': 'Tu organización ya usó el período de prueba Professional.'}},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if tenant.plan != 'free':
+            return Response(
+                {'error': {'code': 'ineligible_plan',
+                           'message': 'La prueba gratuita solo está disponible para el plan Free.'}},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        with transaction.atomic():
+            now = timezone.now()
+            trial_end = now + timedelta(days=30)
+            Subscription.objects.filter(tenant=tenant).update(
+                plan='professional',
+                status='trialing',
+                trial_start=now,
+                trial_end=trial_end,
+                current_period_start=now,
+                current_period_end=trial_end,
+            )
+            tenant.plan = 'professional'
+            tenant.professional_trial_used = True
+            tenant.save(update_fields=['plan', 'professional_trial_used', 'updated_at'])
+
+        subscription = Subscription.objects.get(tenant=tenant)
+        return Response({
+            'subscription': CurrentSubscriptionSerializer(subscription).data,
+            'trial_end': trial_end.isoformat(),
+        })
+
+
 def _extract_plan_from_items(items: list) -> str | None:
     """Extract plan name from Stripe subscription items price metadata."""
     for item in items:

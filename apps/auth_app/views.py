@@ -102,7 +102,7 @@ class RegisterView(APIView):
     def post(self, request):
         serializer = RegisterSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        user, tenant, plan = serializer.save()
+        user, tenant, plan, is_trial = serializer.save()
 
         import threading
         import requests as _requests
@@ -144,6 +144,16 @@ class RegisterView(APIView):
             },
             'message': 'Account created. Please check your email to verify your account.',
         }
+
+        if plan == 'professional' and is_trial:
+            from datetime import timedelta
+            from django.utils import timezone as _tz
+            trial_end = (_tz.now() + timedelta(days=30)).isoformat()
+            return Response(
+                {**base_response, 'requires_payment': False,
+                 'trial_active': True, 'trial_end': trial_end},
+                status=status.HTTP_201_CREATED,
+            )
 
         if plan in ('starter', 'professional', 'enterprise'):
             upload_token = create_payment_upload_token(str(tenant.id))

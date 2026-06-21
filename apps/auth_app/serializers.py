@@ -77,6 +77,7 @@ class RegisterSerializer(serializers.Serializer):
         required=False,
         default='free',
     )
+    is_trial = serializers.BooleanField(required=False, default=False)
 
     def validate_email(self, value):
         value = value.lower()
@@ -101,6 +102,7 @@ class RegisterSerializer(serializers.Serializer):
     def save(self):
         data = self.validated_data
         plan = data.get('plan', 'free')
+        is_trial = data.get('is_trial', False)
         slug = self._unique_slug(data['organization_name'])
         tenant = Tenant.objects.create(
             name=data['organization_name'],
@@ -120,7 +122,21 @@ class RegisterSerializer(serializers.Serializer):
 
         # For paid plans: update the auto-created subscription (created by signal with free/trialing)
         # and block login until admin confirms payment.
-        if plan in ('starter', 'professional', 'enterprise'):
+        if plan == 'professional' and is_trial:
+            from apps.subscriptions.models import Subscription
+            from datetime import timedelta
+            from django.utils import timezone as _tz
+            now = _tz.now()
+            Subscription.objects.filter(tenant=tenant).update(
+                plan='professional',
+                status='trialing',
+                trial_start=now,
+                trial_end=now + timedelta(days=30),
+            )
+            tenant.plan = 'professional'
+            tenant.professional_trial_used = True
+            tenant.save(update_fields=['plan', 'professional_trial_used', 'updated_at'])
+        elif plan in ('starter', 'professional', 'enterprise'):
             from apps.subscriptions.models import Subscription
             Subscription.objects.filter(tenant=tenant).update(
                 plan=plan,
@@ -154,7 +170,7 @@ class RegisterSerializer(serializers.Serializer):
             except (ReferralCode.DoesNotExist, Exception):
                 pass
 
-        return user, tenant, plan
+        return user, tenant, plan, is_trial
 
 
 class LoginSerializer(serializers.Serializer):

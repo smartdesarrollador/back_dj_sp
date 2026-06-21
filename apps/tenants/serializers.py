@@ -39,7 +39,7 @@ class ClientUserSerializer(serializers.Serializer):
 
 class ClientSubscriptionSerializer(serializers.Serializer):
     status = serializers.SerializerMethodField()
-    plan = serializers.CharField(source='plan')
+    plan = serializers.CharField()
     plan_name = serializers.SerializerMethodField()
     mrr = serializers.SerializerMethodField()
     trial_ends_at = serializers.SerializerMethodField()
@@ -52,6 +52,8 @@ class ClientSubscriptionSerializer(serializers.Serializer):
         return PLAN_NAME_MAP.get(obj.plan, obj.plan.title())
 
     def get_mrr(self, obj) -> int:
+        if obj.status == 'trialing':
+            return 0
         return PLAN_MRR_MAP.get(obj.plan, 0)
 
     def get_trial_ends_at(self, obj):

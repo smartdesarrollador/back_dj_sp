@@ -33,6 +33,7 @@ class Tenant(BaseModel):
     logo    = models.ImageField(upload_to='tenants/logos/',    null=True, blank=True)
     favicon = models.ImageField(upload_to='tenants/favicons/', null=True, blank=True)
     is_active = models.BooleanField(default=True)
+    professional_trial_used = models.BooleanField(default=False)
 
     class Meta:
         db_table = 'tenants'
