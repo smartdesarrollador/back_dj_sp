@@ -69,6 +69,7 @@ LOCAL_APPS = [
     'apps.releases',
     'apps.licenses',
     'apps.chat_assistant',
+    'apps.site_config',
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
