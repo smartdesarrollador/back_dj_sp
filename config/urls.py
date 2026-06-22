@@ -48,6 +48,7 @@ urlpatterns = [
         path('yape/', include('apps.subscriptions.yape_admin_urls')),
         path('knowledge-base/', include('apps.chat_assistant.admin_urls')),
         path('footer/', include('apps.site_config.urls')),
+        path('contact/', include('apps.contact.admin_urls')),
     ])),
 
     # App API (per-user resources)
@@ -82,6 +83,7 @@ urlpatterns = [
         path('branding/', include('apps.tenants.public_branding_urls')),
         path('yape-payment/', include('apps.subscriptions.yape_public_urls')),
         path('chat/', include('apps.chat_assistant.public_urls')),
+        path('contact/', include('apps.contact.public_urls')),
         path('', include('apps.site_config.public_urls')),
     ])),
 

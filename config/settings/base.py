@@ -70,6 +70,7 @@ LOCAL_APPS = [
     'apps.licenses',
     'apps.chat_assistant',
     'apps.site_config',
+    'apps.contact',
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
@@ -259,6 +260,11 @@ CELERY_BEAT_SCHEDULE = {
         'schedule': crontab(hour=10, minute=0),  # Daily at 10:00 AM UTC
     },
 }
+
+# ─── reCAPTCHA ────────────────────────────────────────────────────────────────
+RECAPTCHA_SECRET_KEY = env('RECAPTCHA_SECRET_KEY', default='')
+RECAPTCHA_VERIFY_URL = 'https://www.google.com/recaptcha/api/siteverify'
+RECAPTCHA_MIN_SCORE  = 0.5
 
 # ─── Email ────────────────────────────────────────────────────────────────────
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
