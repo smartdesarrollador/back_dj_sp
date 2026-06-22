@@ -1,3 +1,5 @@
+import logging
+
 import requests
 from django.conf import settings
 from django.core.mail import send_mail
@@ -14,6 +16,8 @@ from apps.contact.serializers import (
     ContactMessageUpdateSerializer,
 )
 
+logger = logging.getLogger(__name__)
+
 
 def _get_client_ip(request) -> str | None:
     x_fwd = request.META.get('HTTP_X_FORWARDED_FOR')
@@ -23,6 +27,7 @@ def _get_client_ip(request) -> str | None:
 def _verify_recaptcha(token: str) -> bool:
     """Verifica el token con Google. Sin clave configurada (dev), permite siempre."""
     if not settings.RECAPTCHA_SECRET_KEY:
+        logger.warning('reCAPTCHA: sin secret key configurada — se permite el envío (modo dev).')
         return True
     try:
         resp = requests.post(
@@ -31,8 +36,17 @@ def _verify_recaptcha(token: str) -> bool:
             timeout=5,
         )
         data = resp.json()
-        return bool(data.get('success')) and data.get('score', 0) >= settings.RECAPTCHA_MIN_SCORE
-    except Exception:
+        ok = bool(data.get('success')) and data.get('score', 0) >= settings.RECAPTCHA_MIN_SCORE
+        if not ok:
+            logger.warning(
+                'reCAPTCHA rechazado: success=%s score=%s errors=%s',
+                data.get('success'),
+                data.get('score'),
+                data.get('error-codes'),
+            )
+        return ok
+    except Exception as exc:
+        logger.error('reCAPTCHA: error al verificar token: %s', exc)
         return False
 
 
