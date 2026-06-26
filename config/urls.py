@@ -72,6 +72,7 @@ urlpatterns = [
         path('notifications/', include('apps.notifications.hub_urls')),
         path('team/', include('apps.auth_app.team_urls')),
         path('desktop-license/', include('apps.licenses.app_urls')),
+        path('chat/', include('apps.chat.urls')),
     ])),
 
     # Public endpoints (no auth)
@@ -106,3 +107,10 @@ urlpatterns = [
 urlpatterns += [
     re_path(r'^media/(?P<path>.*)$', media_serve, {'document_root': settings.MEDIA_ROOT}),
 ]
+
+# Django Debug Toolbar URLs (dev only) — required so the 'djdt' namespace
+# resolves; otherwise the toolbar raises NoReverseMatch while rendering.
+if settings.DEBUG and 'debug_toolbar' in settings.INSTALLED_APPS:
+    import debug_toolbar
+
+    urlpatterns += [path('__debug__/', include(debug_toolbar.urls))]

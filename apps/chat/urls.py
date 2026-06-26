@@ -1,0 +1,25 @@
+from django.urls import path
+
+from apps.chat.views import (
+    ChatUsersView,
+    ConnectionListCreateView,
+    ConnectionRespondView,
+    ConversationDetailView,
+    ConversationListCreateView,
+    GroupMemberView,
+    MarkReadView,
+    MessageConvertView,
+    MessageListCreateView,
+)
+
+urlpatterns = [
+    path('users/', ChatUsersView.as_view(), name='chat-users'),
+    path('connections/', ConnectionListCreateView.as_view(), name='chat-connection-list'),
+    path('connections/<uuid:pk>/respond/', ConnectionRespondView.as_view(), name='chat-connection-respond'),
+    path('conversations/', ConversationListCreateView.as_view(), name='chat-conversation-list'),
+    path('conversations/<uuid:pk>/', ConversationDetailView.as_view(), name='chat-conversation-detail'),
+    path('conversations/<uuid:pk>/read/', MarkReadView.as_view(), name='chat-conversation-read'),
+    path('conversations/<uuid:pk>/members/', GroupMemberView.as_view(), name='chat-conversation-members'),
+    path('messages/', MessageListCreateView.as_view(), name='chat-message-list'),
+    path('messages/<uuid:pk>/convert/', MessageConvertView.as_view(), name='chat-message-convert'),
+]

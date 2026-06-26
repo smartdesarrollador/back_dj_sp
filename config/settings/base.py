@@ -21,6 +21,7 @@ ALLOWED_HOSTS = env('ALLOWED_HOSTS')
 
 # Application definition
 DJANGO_APPS = [
+    'daphne',  # must precede django.contrib.staticfiles to provide the ASGI runserver
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -39,6 +40,7 @@ THIRD_PARTY_APPS = [
     'drf_spectacular',
     'django_celery_beat',
     'django_celery_results',
+    'channels',
 ]
 
 LOCAL_APPS = [
@@ -71,6 +73,7 @@ LOCAL_APPS = [
     'apps.chat_assistant',
     'apps.site_config',
     'apps.contact',
+    'apps.chat',
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
@@ -123,6 +126,16 @@ CACHES = {
         },
         'KEY_PREFIX': 'rbac',
         'TIMEOUT': 300,
+    }
+}
+
+# Channels (WebSockets) — Redis-backed channel layer (dedicated DB /3)
+CHANNEL_LAYERS = {
+    'default': {
+        'BACKEND': 'channels_redis.core.RedisChannelLayer',
+        'CONFIG': {
+            'hosts': [env('CHANNEL_REDIS_URL', default='redis://redis:6379/3')],
+        },
     }
 }
 
