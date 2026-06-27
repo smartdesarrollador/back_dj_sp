@@ -176,6 +176,46 @@ class ConversationListCreateView(AuditMixin, APIView):
         return Response(data, status=status.HTTP_201_CREATED)
 
 
+class SelfConversationView(AuditMixin, APIView):
+    """Get-or-create the user's personal "Mensajes guardados" thread.
+
+    A self-chat is a ``type='self'`` conversation with a single member (the
+    user). Idempotent: repeated calls return the same thread.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(tags=['app-chat'], summary='Get or create my saved-messages chat')
+    def post(self, request):
+        existing = (
+            Conversation.objects.filter(
+                type='self', tenant=request.tenant, members__user=request.user
+            )
+            .order_by('created_at')
+            .first()
+        )
+        if existing:
+            conv = _member_qs(request.user).get(pk=existing.pk)
+            return Response(
+                ConversationDetailSerializer(conv, context={'request': request}).data,
+                status=status.HTTP_200_OK,
+            )
+
+        with transaction.atomic():
+            conv = Conversation.objects.create(
+                tenant=request.tenant, type='self', created_by=request.user,
+            )
+            ConversationMember.objects.create(
+                conversation=conv, user=request.user, role='owner'
+            )
+        self.log_action(request, 'chat.conversation.create', 'conversation', conv.id, {'type': 'self'})
+        conv = _member_qs(request.user).get(pk=conv.pk)
+        return Response(
+            ConversationDetailSerializer(conv, context={'request': request}).data,
+            status=status.HTTP_201_CREATED,
+        )
+
+
 class ConversationDetailView(AuditMixin, APIView):
     permission_classes = [IsAuthenticated]
 

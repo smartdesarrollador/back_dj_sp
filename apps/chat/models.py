@@ -29,6 +29,7 @@ class Conversation(BaseModel):
     TYPE_CHOICES = [
         ('direct', 'Direct'),
         ('group', 'Group'),
+        ('self', 'Self'),
     ]
 
     tenant = models.ForeignKey(

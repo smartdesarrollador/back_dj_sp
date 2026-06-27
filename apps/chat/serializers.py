@@ -150,12 +150,16 @@ class ConversationListSerializer(serializers.ModelSerializer):
         return None
 
     def get_display_name(self, obj) -> str:
+        if obj.type == 'self':
+            return 'Mensajes guardados'
         if obj.type == 'group':
             return obj.name or 'Grupo'
         other = self._other_member(obj)
         return other.user.name if other else 'Chat'
 
     def get_display_avatar(self, obj) -> dict:
+        if obj.type == 'self':
+            return {'type': 'self', 'name': 'Mensajes guardados', 'color': obj.avatar_color}
         if obj.type == 'group':
             return {'type': 'group', 'name': obj.name or 'Grupo', 'color': obj.avatar_color}
         other = self._other_member(obj)
