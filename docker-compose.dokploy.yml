@@ -84,7 +84,7 @@ services:
     build:
       context: .
       target: prod
-    command: gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 2 --worker-class gthread --threads 2 --timeout 120 --access-logfile - --error-logfile -
+    command: gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 2 --worker-class gthread --threads 2 --timeout 120 --max-requests 500 --max-requests-jitter 50 --access-logfile - --error-logfile -
     environment:
       DJANGO_SETTINGS_MODULE: config.settings.prod
     env_file:
@@ -104,9 +104,9 @@ services:
       resources:
         limits:
           cpus: '0.6'
-          memory: 400M
+          memory: 512M
         reservations:
-          memory: 200M
+          memory: 256M
     healthcheck:
       # Host header needed for Django ALLOWED_HOSTS; X-Forwarded-Proto avoids SSL redirect loop
       test:
@@ -159,9 +159,9 @@ services:
       resources:
         limits:
           cpus: '0.4'
-          memory: 300M
+          memory: 384M
         reservations:
-          memory: 128M
+          memory: 160M
 
   celery-beat:
     build:
