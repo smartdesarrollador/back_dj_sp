@@ -74,6 +74,7 @@ LOCAL_APPS = [
     'apps.site_config',
     'apps.contact',
     'apps.chat',
+    'apps.vault',
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
@@ -238,6 +239,7 @@ CORS_ALLOW_HEADERS = [
     'x-csrftoken',
     'x-requested-with',
     'x-tenant-slug',
+    'x-vault-token',
 ]
 
 # ─── Celery ───────────────────────────────────────────────────────────────────
@@ -311,6 +313,9 @@ STRIPE_PLAN_PRICES: dict[str, dict[str, str]] = {
 
 # ─── Encryption ───────────────────────────────────────────────────────────────
 ENCRYPTION_KEY = env('ENCRYPTION_KEY', default='')
+
+# Vault: how long an unlock token (cached DEK) stays valid, in seconds (default 15 min).
+VAULT_UNLOCK_TTL = env.int('VAULT_UNLOCK_TTL', default=900)
 
 # ─── Desktop App Licenses ─────────────────────────────────────────────────────
 LICENSE_SIGNING_SECRET = env('LICENSE_SIGNING_SECRET', default='change-me-in-production')

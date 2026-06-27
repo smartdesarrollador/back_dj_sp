@@ -73,6 +73,7 @@ urlpatterns = [
         path('team/', include('apps.auth_app.team_urls')),
         path('desktop-license/', include('apps.licenses.app_urls')),
         path('chat/', include('apps.chat.urls')),
+        path('vault/', include('apps.vault.urls')),
     ])),
 
     # Public endpoints (no auth)

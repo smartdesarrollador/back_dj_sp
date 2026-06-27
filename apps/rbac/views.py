@@ -71,6 +71,7 @@ class FeaturesView(APIView):
             'projects': plan_config.get('max_projects'),
             'storage_gb': plan_config.get('storage_gb'),
             'api_calls_per_month': plan_config.get('api_calls_per_month'),
+            'vault_items': plan_config.get('max_vault_items'),
         }
 
         return Response({'plan': plan, 'features': feature_flags, 'limits': limits})
