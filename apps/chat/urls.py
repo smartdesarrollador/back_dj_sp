@@ -1,6 +1,7 @@
 from django.urls import path
 
 from apps.chat.views import (
+    ChatSearchView,
     ChatUsersView,
     ConnectionListCreateView,
     ConnectionRespondView,
@@ -24,4 +25,5 @@ urlpatterns = [
     path('conversations/<uuid:pk>/members/', GroupMemberView.as_view(), name='chat-conversation-members'),
     path('messages/', MessageListCreateView.as_view(), name='chat-message-list'),
     path('messages/<uuid:pk>/convert/', MessageConvertView.as_view(), name='chat-message-convert'),
+    path('search/', ChatSearchView.as_view(), name='chat-search'),
 ]

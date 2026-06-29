@@ -619,3 +619,82 @@ class ConnectionRespondView(AuditMixin, APIView):
         conn.save(update_fields=['status', 'responded_at', 'updated_at'])
         self.log_action(request, f'chat.connection.{action}', 'connection', pk, {})
         return Response(ChatConnectionSerializer(conn, context={'request': request}).data)
+
+
+_CHAT_SEARCH_MIN_LEN = 2
+_CHAT_SEARCH_LIMIT = 50
+
+
+def _conversation_display_name(conv, user_id) -> str:
+    """Mirror ConversationListSerializer.get_display_name for a prefetched conv."""
+    if conv.type == 'self':
+        return 'Mensajes guardados'
+    if conv.type == 'group':
+        return conv.name or 'Grupo'
+    for member in conv.members.all():
+        if member.user_id != user_id:
+            return member.user.name or 'Chat'
+    return 'Chat'
+
+
+def _chat_snippet(content: str, query: str, radius: int = 60) -> str:
+    """Trim ``content`` to a window around the first match of ``query``."""
+    if not content:
+        return ''
+    idx = content.lower().find(query.lower())
+    if idx == -1:
+        return content[: 2 * radius].strip()
+    start = max(0, idx - radius)
+    end = min(len(content), idx + len(query) + radius)
+    prefix = '…' if start > 0 else ''
+    suffix = '…' if end < len(content) else ''
+    return f'{prefix}{content[start:end].strip()}{suffix}'
+
+
+class ChatSearchView(APIView):
+    """Search message content across all conversations the user belongs to."""
+
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        tags=['app-chat'],
+        summary='Search messages across the user conversations',
+        parameters=[
+            OpenApiParameter('q', OpenApiTypes.STR, required=True, description='Search term (min 2 chars)'),
+        ],
+    )
+    def get(self, request):
+        q = (request.query_params.get('q') or '').strip()
+        if len(q) < _CHAT_SEARCH_MIN_LEN:
+            return Response({'query': q, 'messages': []})
+
+        messages = list(
+            Message.objects.filter(
+                conversation__members__user=request.user,
+                deleted_at__isnull=True,
+                content__icontains=q,
+            )
+            .select_related('sender')
+            .order_by('-created_at')[:_CHAT_SEARCH_LIMIT]
+        )
+
+        conv_ids = {m.conversation_id for m in messages}
+        convs = {
+            c.id: c
+            for c in Conversation.objects.filter(id__in=conv_ids).prefetch_related('members__user')
+        }
+
+        results = []
+        for m in messages:
+            conv = convs.get(m.conversation_id)
+            name = _conversation_display_name(conv, request.user.id) if conv else 'Chat'
+            results.append({
+                'message_id': str(m.id),
+                'conversation_id': str(m.conversation_id),
+                'conversation_name': name,
+                'snippet': _chat_snippet(m.content, q),
+                'sender_name': m.sender.name,
+                'created_at': m.created_at,
+            })
+
+        return Response({'query': q, 'messages': results})
