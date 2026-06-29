@@ -74,6 +74,7 @@ urlpatterns = [
         path('desktop-license/', include('apps.licenses.app_urls')),
         path('chat/', include('apps.chat.urls')),
         path('vault/', include('apps.vault.urls')),
+        path('search/', include('apps.search.urls')),
     ])),
 
     # Public endpoints (no auth)
