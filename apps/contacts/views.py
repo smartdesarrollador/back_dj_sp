@@ -33,6 +33,10 @@ from apps.contacts.serializers import (
 )
 from apps.rbac.permissions import HasFeature, HasPermission, check_plan_limit, _user_has_permission
 from apps.sharing.models import Share
+from core.mixins import AuditMixin
+from utils.plans import get_plan_limit
+
+_IMPORT_MAX_ROWS = 1000
 
 _NOT_FOUND = Response(
     {'error': {'code': 'not_found', 'message': 'Not found.'}}, status=404
@@ -111,6 +115,68 @@ class ContactListCreateView(APIView):
             **data,
         )
         return Response(ContactSerializer(contact).data, status=status.HTTP_201_CREATED)
+
+
+class ContactImportView(AuditMixin, APIView):
+    """Bulk import contacts from a parsed file (client sends validated JSON rows)."""
+
+    permission_classes = [HasPermission('contacts.create'), HasFeature('contact_import')]
+
+    @extend_schema(tags=['app-contacts'], summary='Bulk import contacts')
+    def post(self, request):
+        items = request.data.get('items')
+        if not isinstance(items, list):
+            return Response(
+                {'error': {'code': 'invalid', 'message': '"items" debe ser una lista.'}},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if len(items) > _IMPORT_MAX_ROWS:
+            return Response(
+                {'error': {'code': 'too_many', 'message': f'Máximo {_IMPORT_MAX_ROWS} filas por importación.'}},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Validate every row; invalid rows are reported but don't abort the batch.
+        valid: list[dict] = []
+        errors: list[dict] = []
+        for idx, raw in enumerate(items):
+            serializer = ContactCreateUpdateSerializer(data=raw if isinstance(raw, dict) else {})
+            if not serializer.is_valid():
+                errors.append({'index': idx, 'errors': serializer.errors})
+                continue
+            data = serializer.validated_data.copy()
+            data.pop('group', None)  # imports ignore group FK
+            full_name = data.pop('name', '').strip()
+            if full_name and not data.get('first_name'):
+                parts = full_name.split(' ', 1)
+                data['first_name'] = parts[0]
+                data['last_name'] = parts[1] if len(parts) > 1 else data.get('last_name', '')
+            valid.append(data)
+
+        # Enforce the plan limit partially: create up to the remaining slots, skip the rest.
+        current = Contact.objects.filter(tenant=request.tenant, user=request.user).count()
+        plan = getattr(request.tenant, 'plan', 'free')
+        limit = get_plan_limit(plan, 'contacts')
+        allowed = len(valid) if limit is None else max(0, limit - current)
+        to_create = valid[:allowed]
+        skipped = len(valid) - len(to_create)
+
+        created = len(Contact.objects.bulk_create(
+            [Contact(tenant=request.tenant, user=request.user, **d) for d in to_create]
+        ))
+
+        self.log_action(
+            request,
+            action='contacts.import',
+            resource_type='Contact',
+            extra={
+                'created': created,
+                'skipped': skipped,
+                'errors': len(errors),
+                'source': request.data.get('source', ''),
+            },
+        )
+        return Response({'created': created, 'skipped': skipped, 'errors': errors})
 
 
 class ContactDetailView(APIView):

@@ -36,7 +36,9 @@ from apps.tasks.serializers import (
     TaskSerializer,
 )
 from core.mixins import AuditMixin
-from utils.plans import plan_has_feature
+from utils.plans import get_plan_limit, plan_has_feature
+
+_IMPORT_MAX_ROWS = 1000
 
 User = get_user_model()
 
@@ -224,6 +226,73 @@ class TaskListCreateView(APIView):
             **data,
         )
         return Response(TaskSerializer(task).data, status=status.HTTP_201_CREATED)
+
+
+class TasksImportView(AuditMixin, APIView):
+    """Bulk import tasks from a parsed file (client sends validated JSON rows)."""
+
+    permission_classes = [HasPermission('tasks.create'), HasFeature('tasks_import')]
+
+    @extend_schema(tags=['app-tasks'], summary='Bulk import tasks')
+    def post(self, request):
+        items = request.data.get('items')
+        if not isinstance(items, list):
+            return Response(
+                {'error': {'code': 'invalid', 'message': '"items" debe ser una lista.'}},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if len(items) > _IMPORT_MAX_ROWS:
+            return Response(
+                {'error': {'code': 'too_many', 'message': f'Máximo {_IMPORT_MAX_ROWS} filas por importación.'}},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        valid: list[dict] = []
+        errors: list[dict] = []
+        for idx, raw in enumerate(items):
+            serializer = TaskCreateUpdateSerializer(data=raw if isinstance(raw, dict) else {})
+            if not serializer.is_valid():
+                errors.append({'index': idx, 'errors': serializer.errors})
+                continue
+            data = serializer.validated_data.copy()
+            # Imports go to the default board with no assignee/parent.
+            data.pop('board', None)
+            data.pop('assignee', None)
+            data.pop('parent_task', None)
+            valid.append(data)
+
+        # Tasks count is tenant-wide (matches the single-create view).
+        current = Task.objects.filter(tenant=request.tenant).count()
+        plan = getattr(request.tenant, 'plan', 'free')
+        limit = get_plan_limit(plan, 'tasks')
+        allowed = len(valid) if limit is None else max(0, limit - current)
+        to_create = valid[:allowed]
+        skipped = len(valid) - len(to_create)
+
+        created = 0
+        if to_create:
+            board, _ = TaskBoard.objects.get_or_create(
+                tenant=request.tenant,
+                name='General',
+                defaults={'created_by': request.user},
+            )
+            created = len(Task.objects.bulk_create([
+                Task(tenant=request.tenant, board=board, created_by=request.user, **d)
+                for d in to_create
+            ]))
+
+        self.log_action(
+            request,
+            action='tasks.import',
+            resource_type='Task',
+            extra={
+                'created': created,
+                'skipped': skipped,
+                'errors': len(errors),
+                'source': request.data.get('source', ''),
+            },
+        )
+        return Response({'created': created, 'skipped': skipped, 'errors': errors})
 
 
 class TaskReorderView(APIView):

@@ -75,6 +75,7 @@ urlpatterns = [
         path('chat/', include('apps.chat.urls')),
         path('vault/', include('apps.vault.urls')),
         path('search/', include('apps.search.urls')),
+        path('workspace/', include('apps.exports.urls')),
     ])),
 
     # Public endpoints (no auth)

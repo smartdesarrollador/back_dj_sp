@@ -20,12 +20,16 @@ from rest_framework.views import APIView
 
 from apps.notes.models import Note
 from apps.notes.serializers import NoteCreateUpdateSerializer, NoteSerializer
-from apps.rbac.permissions import HasPermission, check_plan_limit, _user_has_permission
+from apps.rbac.permissions import HasFeature, HasPermission, check_plan_limit, _user_has_permission
 from apps.sharing.models import Share
+from core.mixins import AuditMixin
+from utils.plans import get_plan_limit
 
 _NOT_FOUND = Response(
     {'error': {'code': 'not_found', 'message': 'Not found.'}}, status=404
 )
+
+_IMPORT_MAX_ROWS = 1000
 
 
 def _get_note(pk, tenant, user):
@@ -80,6 +84,61 @@ class NoteListCreateView(APIView):
             **data,
         )
         return Response(NoteSerializer(note).data, status=status.HTTP_201_CREATED)
+
+
+class NotesImportView(AuditMixin, APIView):
+    """Bulk import notes from a parsed file (client sends validated JSON rows)."""
+
+    permission_classes = [HasPermission('notes.create'), HasFeature('notes_import')]
+
+    @extend_schema(tags=['app-notes'], summary='Bulk import notes')
+    def post(self, request):
+        items = request.data.get('items')
+        if not isinstance(items, list):
+            return Response(
+                {'error': {'code': 'invalid', 'message': '"items" debe ser una lista.'}},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if len(items) > _IMPORT_MAX_ROWS:
+            return Response(
+                {'error': {'code': 'too_many', 'message': f'Máximo {_IMPORT_MAX_ROWS} filas por importación.'}},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        valid: list[dict] = []
+        errors: list[dict] = []
+        for idx, raw in enumerate(items):
+            serializer = NoteCreateUpdateSerializer(data=raw if isinstance(raw, dict) else {})
+            if not serializer.is_valid():
+                errors.append({'index': idx, 'errors': serializer.errors})
+                continue
+            data = dict(serializer.validated_data)
+            data.pop('tags', None)  # model has no tags field
+            valid.append(data)
+
+        current = Note.objects.filter(tenant=request.tenant, user=request.user).count()
+        plan = getattr(request.tenant, 'plan', 'free')
+        limit = get_plan_limit(plan, 'notes')
+        allowed = len(valid) if limit is None else max(0, limit - current)
+        to_create = valid[:allowed]
+        skipped = len(valid) - len(to_create)
+
+        created = len(Note.objects.bulk_create(
+            [Note(tenant=request.tenant, user=request.user, **d) for d in to_create]
+        ))
+
+        self.log_action(
+            request,
+            action='notes.import',
+            resource_type='Note',
+            extra={
+                'created': created,
+                'skipped': skipped,
+                'errors': len(errors),
+                'source': request.data.get('source', ''),
+            },
+        )
+        return Response({'created': created, 'skipped': skipped, 'errors': errors})
 
 
 class NoteDetailView(APIView):

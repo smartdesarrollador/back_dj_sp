@@ -29,8 +29,11 @@ from apps.calendar_app.serializers import (
 )
 from apps.rbac.permissions import HasFeature, HasPermission, check_plan_limit, _user_has_permission
 from core.mixins import AuditMixin
+from utils.plans import get_plan_limit
 
 User = get_user_model()
+
+_IMPORT_MAX_ROWS = 1000
 
 _NOT_FOUND = Response(
     {'error': {'code': 'not_found', 'message': 'Not found.'}}, status=404
@@ -103,6 +106,59 @@ class CalendarEventListCreateView(APIView):
             **serializer.validated_data,
         )
         return Response(CalendarEventSerializer(event).data, status=status.HTTP_201_CREATED)
+
+
+class CalendarImportView(AuditMixin, APIView):
+    """Bulk import calendar events from a parsed file (client sends validated JSON rows)."""
+
+    permission_classes = [HasPermission('calendar.create'), HasFeature('calendar_import')]
+
+    @extend_schema(tags=['app-calendar'], summary='Bulk import calendar events')
+    def post(self, request):
+        items = request.data.get('items')
+        if not isinstance(items, list):
+            return Response(
+                {'error': {'code': 'invalid', 'message': '"items" debe ser una lista.'}},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if len(items) > _IMPORT_MAX_ROWS:
+            return Response(
+                {'error': {'code': 'too_many', 'message': f'Máximo {_IMPORT_MAX_ROWS} filas por importación.'}},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        valid: list[dict] = []
+        errors: list[dict] = []
+        for idx, raw in enumerate(items):
+            serializer = CalendarEventCreateUpdateSerializer(data=raw if isinstance(raw, dict) else {})
+            if not serializer.is_valid():
+                errors.append({'index': idx, 'errors': serializer.errors})
+                continue
+            valid.append(dict(serializer.validated_data))
+
+        current = CalendarEvent.objects.filter(tenant=request.tenant, user=request.user).count()
+        plan = getattr(request.tenant, 'plan', 'free')
+        limit = get_plan_limit(plan, 'calendar_events')
+        allowed = len(valid) if limit is None else max(0, limit - current)
+        to_create = valid[:allowed]
+        skipped = len(valid) - len(to_create)
+
+        created = len(CalendarEvent.objects.bulk_create(
+            [CalendarEvent(tenant=request.tenant, user=request.user, **d) for d in to_create]
+        ))
+
+        self.log_action(
+            request,
+            action='calendar.import',
+            resource_type='CalendarEvent',
+            extra={
+                'created': created,
+                'skipped': skipped,
+                'errors': len(errors),
+                'source': request.data.get('source', ''),
+            },
+        )
+        return Response({'created': created, 'skipped': skipped, 'errors': errors})
 
 
 class CalendarEventDetailView(AuditMixin, APIView):

@@ -27,10 +27,14 @@ from apps.bookmarks.serializers import (
     BookmarkSerializer,
 )
 from apps.rbac.permissions import HasFeature, HasPermission, check_plan_limit, _user_has_permission
+from core.mixins import AuditMixin
+from utils.plans import get_plan_limit
 
 _NOT_FOUND = Response(
     {'error': {'code': 'not_found', 'message': 'Not found.'}}, status=404
 )
+
+_IMPORT_MAX_ROWS = 1000
 
 
 def _get_bookmark(pk, tenant, user):
@@ -97,6 +101,61 @@ class BookmarkListCreateView(APIView):
             **data,
         )
         return Response(BookmarkSerializer(bookmark).data, status=status.HTTP_201_CREATED)
+
+
+class BookmarkImportView(AuditMixin, APIView):
+    """Bulk import bookmarks from a parsed file (client sends validated JSON rows)."""
+
+    permission_classes = [HasPermission('bookmarks.create'), HasFeature('bookmark_import')]
+
+    @extend_schema(tags=['app-bookmarks'], summary='Bulk import bookmarks')
+    def post(self, request):
+        items = request.data.get('items')
+        if not isinstance(items, list):
+            return Response(
+                {'error': {'code': 'invalid', 'message': '"items" debe ser una lista.'}},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if len(items) > _IMPORT_MAX_ROWS:
+            return Response(
+                {'error': {'code': 'too_many', 'message': f'Máximo {_IMPORT_MAX_ROWS} filas por importación.'}},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        valid: list[dict] = []
+        errors: list[dict] = []
+        for idx, raw in enumerate(items):
+            serializer = BookmarkCreateUpdateSerializer(data=raw if isinstance(raw, dict) else {})
+            if not serializer.is_valid():
+                errors.append({'index': idx, 'errors': serializer.errors})
+                continue
+            data = serializer.validated_data.copy()
+            data.pop('collection', None)  # imports ignore collection FK
+            valid.append(data)
+
+        current = Bookmark.objects.filter(tenant=request.tenant, user=request.user).count()
+        plan = getattr(request.tenant, 'plan', 'free')
+        limit = get_plan_limit(plan, 'bookmarks')
+        allowed = len(valid) if limit is None else max(0, limit - current)
+        to_create = valid[:allowed]
+        skipped = len(valid) - len(to_create)
+
+        created = len(Bookmark.objects.bulk_create(
+            [Bookmark(tenant=request.tenant, user=request.user, **d) for d in to_create]
+        ))
+
+        self.log_action(
+            request,
+            action='bookmarks.import',
+            resource_type='Bookmark',
+            extra={
+                'created': created,
+                'skipped': skipped,
+                'errors': len(errors),
+                'source': request.data.get('source', ''),
+            },
+        )
+        return Response({'created': created, 'skipped': skipped, 'errors': errors})
 
 
 class BookmarkDetailView(APIView):
