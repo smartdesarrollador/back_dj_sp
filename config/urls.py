@@ -49,6 +49,7 @@ urlpatterns = [
         path('knowledge-base/', include('apps.chat_assistant.admin_urls')),
         path('footer/', include('apps.site_config.urls')),
         path('contact/', include('apps.contact.admin_urls')),
+        path('catalog/', include('apps.catalog.admin_urls')),
     ])),
 
     # App API (per-user resources)
@@ -89,6 +90,7 @@ urlpatterns = [
         path('chat/', include('apps.chat_assistant.public_urls')),
         path('contact/', include('apps.contact.public_urls')),
         path('', include('apps.site_config.public_urls')),
+        path('catalog/', include('apps.catalog.public_urls')),
     ])),
 
     # Support
