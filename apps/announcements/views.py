@@ -23,6 +23,8 @@ def _require_staff(request: Request) -> Response | None:
 def _invalidate_announcement_cache() -> None:
     for placement in ('home', 'dashboard'):
         cache.delete(make_cache_key('announcement_active', placement))
+        for limit in range(1, 6):
+            cache.delete(f'announcement_top:{placement}:{limit}')
 
 
 @cache_result(timeout=300, key_prefix='announcement_active')
@@ -125,4 +127,34 @@ class HubActiveAnnouncementView(APIView):
         if not item:
             return Response(status=status.HTTP_204_NO_CONTENT)
         serializer = AnnouncementSerializer(item, context={'request': request})
+        return Response(serializer.data)
+
+
+class HubAnnouncementsTopView(APIView):
+    """GET /api/v1/app/announcements/top/?placement=dashboard&limit=2 — top N anuncios activos (autenticado)."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request: Request) -> Response:
+        placement = request.query_params.get('placement', 'dashboard')
+        try:
+            limit = min(max(int(request.query_params.get('limit', 2)), 1), 5)
+        except (ValueError, TypeError):
+            limit = 2
+
+        cache_key = f'announcement_top:{placement}:{limit}'
+        cached = cache.get(cache_key)
+        if cached is not None:
+            serializer = AnnouncementSerializer(cached, many=True, context={'request': request})
+            return Response(serializer.data)
+
+        now = timezone.now()
+        items = list(
+            Announcement.objects.filter(is_active=True)
+            .filter(Q(starts_at__isnull=True) | Q(starts_at__lte=now))
+            .filter(Q(ends_at__isnull=True) | Q(ends_at__gte=now))
+            .filter(Q(placement=placement) | Q(placement='both'))
+            .order_by('-priority', '-created_at')[:limit]
+        )
+        cache.set(cache_key, items, 300)
+        serializer = AnnouncementSerializer(items, many=True, context={'request': request})
         return Response(serializer.data)
