@@ -50,6 +50,7 @@ urlpatterns = [
         path('footer/', include('apps.site_config.urls')),
         path('contact/', include('apps.contact.admin_urls')),
         path('catalog/', include('apps.catalog.admin_urls')),
+        path('announcements/', include('apps.announcements.admin_urls')),
     ])),
 
     # App API (per-user resources)
@@ -71,6 +72,7 @@ urlpatterns = [
         path('services/', include('apps.services.urls')),
         path('referrals/', include('apps.referrals.urls')),
         path('notifications/', include('apps.notifications.hub_urls')),
+        path('announcements/', include('apps.announcements.hub_urls')),
         path('team/', include('apps.auth_app.team_urls')),
         path('desktop-license/', include('apps.licenses.app_urls')),
         path('chat/', include('apps.chat.urls')),
@@ -91,6 +93,7 @@ urlpatterns = [
         path('contact/', include('apps.contact.public_urls')),
         path('', include('apps.site_config.public_urls')),
         path('catalog/', include('apps.catalog.public_urls')),
+        path('announcements/', include('apps.announcements.public_urls')),
     ])),
 
     # Support

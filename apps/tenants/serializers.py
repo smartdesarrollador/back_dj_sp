@@ -4,6 +4,7 @@ Tenant serializers for the Admin Panel clients view.
 from rest_framework import serializers
 
 from apps.tenants.models import Tenant
+from utils.media import build_media_url
 from utils.plans import PLAN_FEATURES
 
 PLAN_NAME_MAP = {
@@ -145,23 +146,7 @@ class OrganizationSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'subdomain']
 
     def _abs(self, field_file):
-        if not field_file:
-            return None
-        url = field_file.url
-        # S3 or any absolute URL from external storage — return as-is
-        if url.startswith(('http://', 'https://')):
-            return url
-        # Use APP_BASE_URL so production always returns HTTPS
-        # (request.build_absolute_uri can return http:// when Traefik
-        #  terminates SSL and X-Forwarded-Proto is not forwarded correctly)
-        from django.conf import settings as _s
-        base = getattr(_s, 'APP_BASE_URL', '').rstrip('/')
-        if base:
-            return f"{base}{url}"
-        request = self.context.get('request')
-        if request:
-            return request.build_absolute_uri(url)
-        return None
+        return build_media_url(field_file, self.context.get('request'))
 
     def get_logo_url(self, obj):      return self._abs(obj.logo)
     def get_favicon_url(self, obj):   return self._abs(obj.favicon)

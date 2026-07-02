@@ -1,5 +1,7 @@
 from rest_framework import serializers
 
+from utils.media import build_media_url
+
 from .models import CatalogItem
 
 
@@ -26,12 +28,7 @@ class CatalogItemSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'created_at', 'image_url']
 
     def get_image_url(self, obj: CatalogItem) -> str | None:
-        if not obj.image:
-            return None
-        request = self.context.get('request')
-        if request:
-            return request.build_absolute_uri(obj.image.url)
-        return obj.image.url
+        return build_media_url(obj.image, self.context.get('request'))
 
     def to_internal_value(self, data):
         # Accept 'image' as file upload alongside other fields
