@@ -96,6 +96,13 @@ class LandingTemplate(BaseModel):
         ('corporate', 'Corporate'),
         ('creative', 'Creative'),
     ]
+    STYLE_PRESET_CHOICES = [
+        ('modern', 'Modern'),
+        ('classic', 'Classic'),
+        ('soft', 'Soft'),
+        ('editorial', 'Editorial'),
+        ('bold', 'Bold'),
+    ]
 
     profile = models.OneToOneField(
         PublicProfile,
@@ -106,6 +113,11 @@ class LandingTemplate(BaseModel):
         max_length=20,
         choices=TEMPLATE_CHOICES,
         default='basic',
+    )
+    style_preset = models.CharField(
+        max_length=20,
+        choices=STYLE_PRESET_CHOICES,
+        default='modern',
     )
     sections = models.JSONField(default=list)
     contact_email = models.EmailField(blank=True)
@@ -121,7 +133,7 @@ class LandingTemplate(BaseModel):
     theme_colors = models.JSONField(
         default=dict,
         blank=True,
-        help_text='{"hero_bg":"","hero_text":"","button_bg":"","nav_bg":""}',
+        help_text='{"hero_bg":"","hero_text":"","button_bg":"","nav_bg":"","nav_text":""}',
     )
 
     class Meta:

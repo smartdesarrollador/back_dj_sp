@@ -177,7 +177,44 @@ class TestLandingAndPortfolio(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         body = response.json()['landing']
         self.assertEqual(body['template_type'], 'minimal')
+        self.assertEqual(body['style_preset'], 'modern')
         self.assertTrue(LandingTemplate.objects.filter(profile__user=starter_user).exists())
+
+    # ── Test 7b ──────────────────────────────────────────────────────────────
+
+    def test_create_landing_with_style_preset(self):
+        """POST landing/ persists a custom style_preset."""
+        starter_tenant = _create_tenant('style-landing', plan='starter')
+        starter_user = _create_superuser(starter_tenant, 'u@style-landing.com')
+        _make_profile(starter_user, username='stylelander')
+        self.client.force_authenticate(user=starter_user)
+        data = {'template_type': 'basic', 'style_preset': 'soft'}
+        response = self.client.post(
+            f'{BASE_URL}landing/',
+            data,
+            **{'HTTP_X_TENANT_SLUG': 'style-landing'},
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        body = response.json()['landing']
+        self.assertEqual(body['style_preset'], 'soft')
+
+    # ── Test 7c ──────────────────────────────────────────────────────────────
+
+    def test_create_landing_with_style_preset_bold(self):
+        """POST landing/ persiste un style_preset de Fase 2 (editorial/bold)."""
+        starter_tenant = _create_tenant('style-landing-f2', plan='starter')
+        starter_user = _create_superuser(starter_tenant, 'u@style-landing-f2.com')
+        _make_profile(starter_user, username='stylelanderf2')
+        self.client.force_authenticate(user=starter_user)
+        data = {'template_type': 'basic', 'style_preset': 'bold'}
+        response = self.client.post(
+            f'{BASE_URL}landing/',
+            data,
+            **{'HTTP_X_TENANT_SLUG': 'style-landing-f2'},
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        body = response.json()['landing']
+        self.assertEqual(body['style_preset'], 'bold')
 
     # ── Test 8 ───────────────────────────────────────────────────────────────
 
