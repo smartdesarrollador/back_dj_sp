@@ -9,6 +9,7 @@ Endpoints:
   GET  portafolio/<username>/                 → Public portfolio list
   GET  portafolio/<username>/<slug>/          → Single portfolio item
   GET  cv/<username>/                         → Public CV
+  POST track-share/<username>/                → Track a share event
 """
 from collections import Counter
 
@@ -17,10 +18,12 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.digital_services.analytics import track_share, track_view
 from apps.digital_services.models import (
     CVDocument,
     DigitalCard,
     LandingTemplate,
+    PageEvent,
     PortfolioItem,
     PublicProfile,
 )
@@ -59,6 +62,7 @@ class PublicProfileDetailView(APIView):
         profile = _get_public_profile(username)
         if not profile:
             return _NOT_FOUND
+        track_view(request, profile, 'tarjeta')
         card = DigitalCard.objects.filter(profile=profile).first()
         return Response({
             'profile': PublicProfileSerializer(profile).data,
@@ -82,6 +86,7 @@ class PublicLandingView(APIView):
         landing = LandingTemplate.objects.filter(profile=profile).first()
         if not landing:
             return _NOT_FOUND
+        track_view(request, profile, 'landing')
         return Response({
             'profile': PublicProfileSerializer(profile).data,
             'landing': LandingTemplateSerializer(landing).data,
@@ -101,6 +106,7 @@ class PublicPortfolioView(APIView):
         profile = _get_public_profile(username)
         if not profile:
             return _NOT_FOUND
+        track_view(request, profile, 'portafolio')
         items = PortfolioItem.objects.filter(profile=profile, is_published=True)
         portfolio_settings = getattr(profile, 'portfolio_settings', None)
         style_preset = portfolio_settings.style_preset if portfolio_settings else 'modern'
@@ -151,6 +157,7 @@ class PublicPortfolioItemView(APIView):
             item = PortfolioItem.objects.get(profile=profile, slug=slug, is_published=True)
         except PortfolioItem.DoesNotExist:
             return _NOT_FOUND
+        track_view(request, profile, 'portafolio')
         return Response({'item': PortfolioItemSerializer(item).data})
 
 
@@ -170,7 +177,31 @@ class PublicCVView(APIView):
         cv = CVDocument.objects.filter(profile=profile).first()
         if not cv or not cv.is_published:
             return _NOT_FOUND
+        track_view(request, profile, 'cv')
         return Response({
             'profile': PublicProfileSerializer(profile).data,
             'cv': CVDocumentSerializer(cv).data,
         })
+
+
+class TrackShareView(APIView):
+    permission_classes = [AllowAny]
+    authentication_classes = []
+
+    @extend_schema(
+        tags=['public'],
+        summary='Track a share event for a public digital-service page',
+        auth=[],
+    )
+    def post(self, request, username: str):
+        profile = _get_public_profile(username)
+        if not profile:
+            return _NOT_FOUND
+        service = request.data.get('service')
+        if service not in dict(PageEvent.SERVICE_CHOICES):
+            return Response(
+                {'error': {'code': 'invalid_service', 'message': 'Invalid service.'}},
+                status=400,
+            )
+        track_share(profile, service)
+        return Response(status=204)

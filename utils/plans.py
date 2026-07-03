@@ -73,6 +73,7 @@ PLAN_FEATURES: dict[str, dict[str, Any]] = {
         'cv_pdf_export': False,
         'custom_domain': False,
         'digital_analytics': False,
+        'digital_analytics_days': 7,
         'qr_vcard_export': False,
         'max_portfolio_items': 0,
         # Support
@@ -143,6 +144,7 @@ PLAN_FEATURES: dict[str, dict[str, Any]] = {
         'cv_pdf_export': True,
         'custom_domain': False,
         'digital_analytics': True,
+        'digital_analytics_days': 7,
         'qr_vcard_export': True,
         'max_portfolio_items': 0,
         # Support
@@ -213,6 +215,7 @@ PLAN_FEATURES: dict[str, dict[str, Any]] = {
         'cv_pdf_export': True,
         'custom_domain': False,
         'digital_analytics': True,
+        'digital_analytics_days': 30,
         'qr_vcard_export': True,
         'max_portfolio_items': None,
         # Support
@@ -283,6 +286,7 @@ PLAN_FEATURES: dict[str, dict[str, Any]] = {
         'cv_pdf_export': True,
         'custom_domain': True,
         'digital_analytics': True,
+        'digital_analytics_days': 365,
         'qr_vcard_export': True,
         'max_portfolio_items': None,
         # Support

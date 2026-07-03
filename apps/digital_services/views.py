@@ -12,7 +12,7 @@ Endpoints:
   PATCH/DEL portafolio/<uuid:pk>/     → PortfolioItem detail
   GET/POST  cv/                       → CVDocument upsert
   GET       cv/export/                → Export CV as PDF
-  GET       analytics/<str:service>/  → Basic analytics counters
+  GET       analytics/<str:service>/  → Traffic analytics (views/shares) for a service
   GET/POST  custom-domain/            → CustomDomain upsert
   POST      custom-domain/verify/     → Trigger domain verification
 """
@@ -20,18 +20,18 @@ import base64
 import io
 import secrets
 
-from django.shortcuts import get_object_or_404
-
 import weasyprint
+from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import extend_schema
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.digital_services.analytics import build_service_analytics
 from apps.digital_services.models import (
-    CVDocument,
     CustomDomain,
+    CVDocument,
     DigitalCard,
     LandingTemplate,
     PortfolioItem,
@@ -39,8 +39,8 @@ from apps.digital_services.models import (
     PublicProfile,
 )
 from apps.digital_services.serializers import (
-    CVDocumentSerializer,
     CustomDomainSerializer,
+    CVDocumentSerializer,
     DigitalCardSerializer,
     LandingTemplateSerializer,
     PortfolioItemSerializer,
@@ -48,6 +48,7 @@ from apps.digital_services.serializers import (
     PublicProfileSerializer,
 )
 from apps.rbac.permissions import HasFeature, check_plan_limit
+from utils.plans import PLAN_FEATURES
 
 _NOT_FOUND = Response(
     {'error': {'code': 'not_found', 'message': 'Not found.'}},
@@ -387,27 +388,20 @@ def _render_cv_html(profile, cv) -> str:
 class DigitalAnalyticsView(APIView):
     permission_classes = [IsAuthenticated, HasFeature('digital_analytics')]
 
-    @extend_schema(tags=['app-digital'], summary='Get basic analytics for a digital service')
+    @extend_schema(tags=['app-digital'], summary='Get traffic analytics for a digital service')
     def get(self, request, service: str):
         profile = _get_profile(request.user)
         if not profile:
             return _NOT_FOUND
 
-        data: dict = {'service': service, 'profile_username': profile.username}
+        try:
+            tenant_plan = request.user.tenant.plan
+        except AttributeError:
+            tenant_plan = 'free'
+        max_days = PLAN_FEATURES.get(tenant_plan, PLAN_FEATURES['free'])['digital_analytics_days']
+        days = min(int(request.query_params.get('days', 30)), max_days)
 
-        if service == 'portafolio':
-            data['portfolio_items'] = PortfolioItem.objects.filter(profile=profile).count()
-            data['featured_items'] = PortfolioItem.objects.filter(
-                profile=profile, is_featured=True
-            ).count()
-        elif service == 'tarjeta':
-            data['has_card'] = DigitalCard.objects.filter(profile=profile).exists()
-        elif service == 'landing':
-            data['has_landing'] = LandingTemplate.objects.filter(profile=profile).exists()
-        elif service == 'cv':
-            data['has_cv'] = CVDocument.objects.filter(profile=profile).exists()
-
-        return Response({'analytics': data})
+        return Response({'analytics': build_service_analytics(profile, service, days)})
 
 
 # ─── Custom Domain ────────────────────────────────────────────────────────────

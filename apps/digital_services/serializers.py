@@ -6,8 +6,8 @@ import re
 from rest_framework import serializers
 
 from apps.digital_services.models import (
-    CVDocument,
     CustomDomain,
+    CVDocument,
     DigitalCard,
     LandingTemplate,
     PortfolioItem,
@@ -50,10 +50,21 @@ class DigitalCardSerializer(serializers.ModelSerializer):
             'linkedin_url', 'twitter_url', 'github_url',
             'instagram_url', 'facebook_url', 'website_url',
             'primary_color', 'background_color', 'qr_code_url',
-            'specialties', 'years_experience',
+            'specialties', 'years_experience', 'custom_links',
             'created_at', 'updated_at',
         ]
         read_only_fields = ['id', 'qr_code_url', 'created_at', 'updated_at']
+
+    def validate_custom_links(self, value):
+        if not isinstance(value, list):
+            raise serializers.ValidationError('Debe ser una lista.')
+        if len(value) > 10:
+            raise serializers.ValidationError('Máximo 10 enlaces.')
+        for item in value:
+            if not isinstance(item, dict) or not str(item.get('label', '')).strip() \
+                    or not str(item.get('url', '')).strip():
+                raise serializers.ValidationError('Cada enlace necesita label y url.')
+        return value
 
 
 class LandingTemplateSerializer(serializers.ModelSerializer):

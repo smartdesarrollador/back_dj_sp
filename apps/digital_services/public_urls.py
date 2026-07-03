@@ -6,6 +6,7 @@ from apps.digital_services.public_views import (
     PublicPortfolioItemView,
     PublicPortfolioView,
     PublicProfileDetailView,
+    TrackShareView,
 )
 
 urlpatterns = [
@@ -14,4 +15,5 @@ urlpatterns = [
     path('portafolio/<slug:username>/', PublicPortfolioView.as_view()),
     path('portafolio/<slug:username>/<slug:slug>/', PublicPortfolioItemView.as_view()),
     path('cv/<slug:username>/', PublicCVView.as_view()),
+    path('track-share/<slug:username>/', TrackShareView.as_view()),
 ]

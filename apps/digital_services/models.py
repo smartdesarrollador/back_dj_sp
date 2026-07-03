@@ -8,6 +8,7 @@ Models:
   PortfolioItem    — portfolio case study
   CVDocument       — curriculum vitae content
   CustomDomain     — enterprise custom domain mapping
+  PageEvent        — analytics event log (views/shares) for public pages
 """
 from django.conf import settings
 from django.db import models
@@ -77,6 +78,8 @@ class DigitalCard(BaseModel):
     # Professional info shown in the About section
     specialties = models.JSONField(default=list, blank=True)
     years_experience = models.PositiveSmallIntegerField(null=True, blank=True)
+    # Free-form links beyond the fixed social platforms above: [{id, label, url, icon}]
+    custom_links = models.JSONField(default=list, blank=True)
 
     class Meta:
         db_table = 'digital_cards'
@@ -355,3 +358,41 @@ class CustomDomain(BaseModel):
 
     def __str__(self) -> str:
         return self.domain
+
+
+class PageEvent(BaseModel):
+    """
+    Analytics event (view or share) for a public digital-service page.
+    session_hash rotates daily and is peppered with SECRET_KEY — never stores raw IP/UA.
+    """
+    EVENT_VIEW = 'view'
+    EVENT_SHARE = 'share'
+    EVENT_TYPE_CHOICES = [
+        (EVENT_VIEW, 'View'),
+        (EVENT_SHARE, 'Share'),
+    ]
+    SERVICE_CHOICES = [
+        ('tarjeta', 'Tarjeta'),
+        ('landing', 'Landing'),
+        ('portafolio', 'Portafolio'),
+        ('cv', 'CV'),
+    ]
+
+    profile = models.ForeignKey(
+        PublicProfile,
+        on_delete=models.CASCADE,
+        related_name='page_events',
+    )
+    service = models.CharField(max_length=20, choices=SERVICE_CHOICES)
+    event_type = models.CharField(max_length=10, choices=EVENT_TYPE_CHOICES, default=EVENT_VIEW)
+    session_hash = models.CharField(max_length=32, blank=True)
+    referrer = models.CharField(max_length=255, blank=True)
+
+    class Meta:
+        db_table = 'digital_page_events'
+        indexes = [
+            models.Index(fields=['profile', 'service', 'event_type', 'created_at']),
+        ]
+
+    def __str__(self) -> str:
+        return f'{self.event_type}:{self.service} @ {self.profile.username}'

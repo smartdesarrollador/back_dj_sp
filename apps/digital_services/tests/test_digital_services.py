@@ -108,6 +108,45 @@ class TestPublicProfileAndCard(APITestCase):
         self.assertEqual(body['primary_color'], '#FF5733')
         self.assertTrue(DigitalCard.objects.filter(profile__user=self.user).exists())
 
+    # ── Test 3b ──────────────────────────────────────────────────────────────
+
+    def test_custom_links_roundtrip(self):
+        """POST tarjeta/ persists custom_links and the public endpoint exposes them."""
+        _make_profile(self.user, username='linksuser', is_public=True)
+        data = {
+            'custom_links': [
+                {'id': 'a1', 'label': 'Mi tienda', 'url': 'https://tienda.example.com', 'icon': 'store'},
+            ],
+        }
+        response = self.client.post(f'{BASE_URL}tarjeta/', data, format='json', **self.slug)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        body = response.json()['card']
+        self.assertEqual(body['custom_links'][0]['label'], 'Mi tienda')
+        self.assertEqual(body['custom_links'][0]['icon'], 'store')
+
+        public_response = self.client.get(f'{PUBLIC_URL}profiles/linksuser/')
+        self.assertEqual(public_response.status_code, status.HTTP_200_OK)
+        public_links = public_response.json()['digital_card']['custom_links']
+        self.assertEqual(public_links[0]['url'], 'https://tienda.example.com')
+
+    def test_custom_links_missing_label_or_url_rejected(self):
+        """POST tarjeta/ with a custom_links item missing label or url returns 400."""
+        _make_profile(self.user, username='badlinksuser')
+        data = {'custom_links': [{'id': 'a1', 'label': '', 'url': 'https://example.com', 'icon': 'link'}]}
+        response = self.client.post(f'{BASE_URL}tarjeta/', data, format='json', **self.slug)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_custom_links_over_limit_rejected(self):
+        """POST tarjeta/ with more than 10 custom_links returns 400."""
+        _make_profile(self.user, username='toomanylinksuser')
+        links = [
+            {'id': str(i), 'label': f'Link {i}', 'url': 'https://example.com', 'icon': 'link'}
+            for i in range(11)
+        ]
+        data = {'custom_links': links}
+        response = self.client.post(f'{BASE_URL}tarjeta/', data, format='json', **self.slug)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
     # ── Test 4 ───────────────────────────────────────────────────────────────
 
     def test_generate_qr_requires_starter(self):
