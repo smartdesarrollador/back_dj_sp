@@ -535,6 +535,34 @@ class TestCVAndDomain(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.json()['profile']['username'], 'cvprofileuser')
 
+    # ── Test 11c ─────────────────────────────────────────────────────────────
+
+    def test_cv_theme_colors_roundtrip(self):
+        """POST cv/ persiste theme_colors (background/sidebar_bg) y el endpoint público lo expone."""
+        _make_profile(self.user, username='cvthemeuser', is_public=True)
+        data = {'theme_colors': {'background': '#fdf6ec', 'sidebar_bg': '#eef2ff'}}
+        response = self.client.post(f'{BASE_URL}cv/', data, format='json', **self.slug)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.json()['cv']['theme_colors']['background'], '#fdf6ec')
+
+        public_response = self.client.get(f'{PUBLIC_URL}cv/cvthemeuser/')
+        self.assertEqual(public_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(public_response.json()['cv']['theme_colors']['sidebar_bg'], '#eef2ff')
+
+    # ── Test 11d ─────────────────────────────────────────────────────────────
+
+    def test_cv_style_preset_roundtrip(self):
+        """POST cv/ persiste style_preset y el endpoint público lo expone."""
+        _make_profile(self.user, username='cvstyleuser', is_public=True)
+        data = {'style_preset': 'soft'}
+        response = self.client.post(f'{BASE_URL}cv/', data, format='json', **self.slug)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.json()['cv']['style_preset'], 'soft')
+
+        public_response = self.client.get(f'{PUBLIC_URL}cv/cvstyleuser/')
+        self.assertEqual(public_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(public_response.json()['cv']['style_preset'], 'soft')
+
     # ── Test 12 ──────────────────────────────────────────────────────────────
 
     def test_cv_pdf_export_requires_starter(self):

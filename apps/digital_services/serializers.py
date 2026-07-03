@@ -108,8 +108,8 @@ class CVDocumentSerializer(serializers.ModelSerializer):
             'skills', 'languages', 'certifications',
             'template_type', 'show_photo', 'show_contact',
             'headline', 'location', 'website_url', 'linkedin_url', 'github_url',
-            'accent_color', 'is_published', 'projects', 'volunteer', 'awards',
-            'created_at', 'updated_at',
+            'accent_color', 'theme_colors', 'style_preset', 'is_published', 'projects',
+            'volunteer', 'awards', 'created_at', 'updated_at',
         ]
         read_only_fields = ['id', 'created_at', 'updated_at']
 

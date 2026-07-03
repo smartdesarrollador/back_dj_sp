@@ -266,6 +266,12 @@ class CVDocument(BaseModel):
     Curriculum Vitae content for a public profile.
     All sections (experience, education, skills…) stored as JSON arrays.
     """
+    STYLE_PRESET_CHOICES = [
+        ('modern', 'Modern'),
+        ('classic', 'Classic'),
+        ('soft', 'Soft'),
+    ]
+
     profile = models.OneToOneField(
         PublicProfile,
         on_delete=models.CASCADE,
@@ -291,6 +297,16 @@ class CVDocument(BaseModel):
     linkedin_url = models.URLField(blank=True)
     github_url = models.URLField(blank=True)
     accent_color = models.CharField(max_length=7, blank=True)
+    theme_colors = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text='{"background":"","sidebar_bg":""}',
+    )
+    style_preset = models.CharField(
+        max_length=20,
+        choices=STYLE_PRESET_CHOICES,
+        default='modern',
+    )
     is_published = models.BooleanField(default=True)
     # [{name, description, url, year, technologies[]}]
     projects = models.JSONField(default=list)
