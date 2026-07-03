@@ -132,5 +132,8 @@ class CustomDomainSerializer(serializers.ModelSerializer):
 class PortfolioSettingsSerializer(serializers.ModelSerializer):
     class Meta:
         model = PortfolioSettings
-        fields = ['id', 'theme_colors', 'created_at', 'updated_at']
+        fields = [
+            'id', 'style_preset', 'theme_colors', 'hero_content', 'contact_content', 'about_content',
+            'skills_content', 'services_content', 'testimonials_content', 'created_at', 'updated_at',
+        ]
         read_only_fields = ['id', 'created_at', 'updated_at']

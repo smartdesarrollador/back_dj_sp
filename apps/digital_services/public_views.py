@@ -10,6 +10,8 @@ Endpoints:
   GET  portafolio/<username>/<slug>/          → Single portfolio item
   GET  cv/<username>/                         → Public CV
 """
+from collections import Counter
+
 from drf_spectacular.utils import extend_schema
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
@@ -101,11 +103,34 @@ class PublicPortfolioView(APIView):
             return _NOT_FOUND
         items = PortfolioItem.objects.filter(profile=profile, is_published=True)
         portfolio_settings = getattr(profile, 'portfolio_settings', None)
+        style_preset = portfolio_settings.style_preset if portfolio_settings else 'modern'
         theme_colors = portfolio_settings.theme_colors if portfolio_settings else {}
+        hero_content = portfolio_settings.hero_content if portfolio_settings else {}
+        contact_content = portfolio_settings.contact_content if portfolio_settings else {}
+        about_content = portfolio_settings.about_content if portfolio_settings else {}
+        skills_content = portfolio_settings.skills_content if portfolio_settings else {}
+        services_content = portfolio_settings.services_content if portfolio_settings else {}
+        testimonials_content = portfolio_settings.testimonials_content if portfolio_settings else {}
+        card = DigitalCard.objects.filter(profile=profile).first()
+
+        tech_counter = Counter()
+        for item in items:
+            tech_counter.update(item.technologies or [])
+        skills = [name for name, _ in tech_counter.most_common()]
+
         return Response({
             'profile': PublicProfileSerializer(profile).data,
             'items': PortfolioItemSerializer(items, many=True).data,
+            'style_preset': style_preset,
             'theme_colors': theme_colors,
+            'hero_content': hero_content,
+            'contact_content': contact_content,
+            'about_content': about_content,
+            'skills_content': skills_content,
+            'services_content': services_content,
+            'testimonials_content': testimonials_content,
+            'skills': skills,
+            'digital_card': DigitalCardSerializer(card).data if card else None,
         })
 
 

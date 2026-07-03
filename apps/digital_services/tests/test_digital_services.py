@@ -20,6 +20,7 @@ from apps.digital_services.models import (
     DigitalCard,
     LandingTemplate,
     PortfolioItem,
+    PortfolioSettings,
     PublicProfile,
 )
 from apps.tenants.models import Tenant
@@ -269,6 +270,229 @@ class TestLandingAndPortfolio(APITestCase):
         self.assertEqual(len(body['items']), 1)
         self.assertEqual(body['items'][0]['title'], 'Demo Project')
 
+    # ── Test 10b ─────────────────────────────────────────────────────────────
+
+    def test_portfolio_settings_hero_content_roundtrip(self):
+        """POST portfolio-settings/ persists hero_content (badge/CTA/social toggle)."""
+        _make_profile(self.user, username='herouser')
+        data = {
+            'hero_content': {
+                'badge': 'Disponible para proyectos',
+                'ctaText': 'Contáctame',
+                'ctaUrl': 'mailto:hola@example.com',
+                'showSocialLinks': True,
+            },
+        }
+        response = self.client.post(
+            f'{BASE_URL}portfolio-settings/', data, format='json', **self.slug,
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        body = response.json()
+        self.assertEqual(body['hero_content']['badge'], 'Disponible para proyectos')
+        self.assertTrue(body['hero_content']['showSocialLinks'])
+
+    # ── Test 10c ─────────────────────────────────────────────────────────────
+
+    def test_public_portfolio_includes_digital_card_and_hero_content(self):
+        """GET /public/portafolio/<username>/ includes digital_card + hero_content."""
+        profile = _make_profile(self.user, username='herouser2', is_public=True)
+        DigitalCard.objects.create(profile=profile, linkedin_url='https://linkedin.com/in/x')
+        PortfolioSettings.objects.create(
+            profile=profile,
+            hero_content={'badge': 'Hola', 'showSocialLinks': True},
+        )
+        response = self.client.get(f'{PUBLIC_URL}portafolio/herouser2/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        body = response.json()
+        self.assertIn('digital_card', body)
+        self.assertEqual(body['digital_card']['linkedin_url'], 'https://linkedin.com/in/x')
+        self.assertEqual(body['hero_content']['badge'], 'Hola')
+
+    # ── Test 10d ─────────────────────────────────────────────────────────────
+
+    def test_portfolio_settings_contact_content_roundtrip(self):
+        """POST portfolio-settings/ persists contact_content (title/description) and
+        the public endpoint returns it alongside digital_card contact fields."""
+        profile = _make_profile(self.user, username='contactuser', is_public=True)
+        DigitalCard.objects.create(profile=profile, email='hola@example.com', phone='+1-555-0100')
+        data = {
+            'contact_content': {
+                'title': '¿Trabajamos juntos?',
+                'description': 'Envíame un mensaje y conversemos sobre tu proyecto.',
+            },
+        }
+        response = self.client.post(
+            f'{BASE_URL}portfolio-settings/', data, format='json', **self.slug,
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        body = response.json()
+        self.assertEqual(body['contact_content']['title'], '¿Trabajamos juntos?')
+
+        public_response = self.client.get(f'{PUBLIC_URL}portafolio/contactuser/')
+        self.assertEqual(public_response.status_code, status.HTTP_200_OK)
+        public_body = public_response.json()
+        self.assertEqual(public_body['contact_content']['title'], '¿Trabajamos juntos?')
+        self.assertEqual(public_body['digital_card']['email'], 'hola@example.com')
+
+    # ── Test 10e ─────────────────────────────────────────────────────────────
+
+    def test_portfolio_settings_about_content_roundtrip(self):
+        """POST portfolio-settings/ persists about_content (title/text/highlights)."""
+        _make_profile(self.user, username='aboutuser', is_public=True)
+        data = {
+            'about_content': {
+                'title': 'Sobre mí',
+                'text': 'Cuento largo sobre mi trayectoria profesional.',
+                'highlights': ['+10 años de experiencia', '50+ proyectos entregados'],
+            },
+        }
+        response = self.client.post(
+            f'{BASE_URL}portfolio-settings/', data, format='json', **self.slug,
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        body = response.json()
+        self.assertEqual(body['about_content']['title'], 'Sobre mí')
+        self.assertEqual(len(body['about_content']['highlights']), 2)
+
+        public_response = self.client.get(f'{PUBLIC_URL}portafolio/aboutuser/')
+        self.assertEqual(public_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(public_response.json()['about_content']['title'], 'Sobre mí')
+
+    # ── Test 10f ─────────────────────────────────────────────────────────────
+
+    def test_portfolio_settings_skills_content_roundtrip(self):
+        """POST portfolio-settings/ persists skills_content (title/showSkills)."""
+        _make_profile(self.user, username='skillsuser')
+        data = {'skills_content': {'title': 'Stack Tecnológico', 'showSkills': True}}
+        response = self.client.post(
+            f'{BASE_URL}portfolio-settings/', data, format='json', **self.slug,
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        body = response.json()
+        self.assertEqual(body['skills_content']['title'], 'Stack Tecnológico')
+        self.assertTrue(body['skills_content']['showSkills'])
+
+    # ── Test 10g ─────────────────────────────────────────────────────────────
+
+    def test_public_portfolio_aggregates_skills_from_published_projects(self):
+        """GET /public/portafolio/<username>/ returns unique skills ordered by frequency,
+        derived from technologies of published projects only."""
+        profile = _make_profile(self.user, username='skillsagg', is_public=True)
+        PortfolioItem.objects.create(
+            profile=profile, title='Proyecto 1', slug='proyecto-1',
+            description_short='Desc', project_date=datetime.date(2024, 1, 15),
+            technologies=['React', 'Django', 'React'],
+        )
+        PortfolioItem.objects.create(
+            profile=profile, title='Proyecto 2', slug='proyecto-2',
+            description_short='Desc', project_date=datetime.date(2024, 2, 15),
+            technologies=['React', 'Stripe'],
+        )
+        PortfolioItem.objects.create(
+            profile=profile, title='Proyecto no publicado', slug='no-publicado',
+            description_short='Desc', project_date=datetime.date(2024, 3, 15),
+            technologies=['Vue'], is_published=False,
+        )
+        response = self.client.get(f'{PUBLIC_URL}portafolio/skillsagg/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        body = response.json()
+        self.assertEqual(body['skills'][0], 'React')
+        self.assertEqual(set(body['skills']), {'React', 'Django', 'Stripe'})
+        self.assertNotIn('Vue', body['skills'])
+
+    # ── Test 10h ─────────────────────────────────────────────────────────────
+
+    def test_portfolio_settings_services_content_roundtrip(self):
+        """POST portfolio-settings/ persists services_content (title + items[])."""
+        _make_profile(self.user, username='servicesuser', is_public=True)
+        data = {
+            'services_content': {
+                'title': 'Servicios',
+                'items': [
+                    {'icon': 'code', 'title': 'Desarrollo web', 'description': 'Sitios a medida', 'link': ''},
+                ],
+            },
+        }
+        response = self.client.post(
+            f'{BASE_URL}portfolio-settings/', data, format='json', **self.slug,
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        body = response.json()
+        self.assertEqual(body['services_content']['title'], 'Servicios')
+        self.assertEqual(len(body['services_content']['items']), 1)
+        self.assertEqual(body['services_content']['items'][0]['title'], 'Desarrollo web')
+
+        public_response = self.client.get(f'{PUBLIC_URL}portafolio/servicesuser/')
+        self.assertEqual(public_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(public_response.json()['services_content']['items']), 1)
+
+    # ── Test 10i ─────────────────────────────────────────────────────────────
+
+    def test_portfolio_settings_testimonials_content_roundtrip(self):
+        """POST portfolio-settings/ persists testimonials_content (title + items[])."""
+        _make_profile(self.user, username='testimonialsuser', is_public=True)
+        data = {
+            'testimonials_content': {
+                'title': 'Lo que dicen mis clientes',
+                'items': [
+                    {'name': 'Ana Pérez', 'role': 'CEO', 'company': 'Acme', 'text': 'Excelente trabajo.', 'rating': 5},
+                ],
+            },
+        }
+        response = self.client.post(
+            f'{BASE_URL}portfolio-settings/', data, format='json', **self.slug,
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        body = response.json()
+        self.assertEqual(len(body['testimonials_content']['items']), 1)
+        self.assertEqual(body['testimonials_content']['items'][0]['name'], 'Ana Pérez')
+
+        public_response = self.client.get(f'{PUBLIC_URL}portafolio/testimonialsuser/')
+        self.assertEqual(public_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(public_response.json()['testimonials_content']['items']), 1)
+
+    # ── Test 10j ─────────────────────────────────────────────────────────────
+
+    def test_portfolio_settings_style_preset_roundtrip(self):
+        """POST portfolio-settings/ persiste style_preset y el endpoint público lo expone."""
+        _make_profile(self.user, username='styleportuser', is_public=True)
+        data = {'style_preset': 'soft'}
+        response = self.client.post(
+            f'{BASE_URL}portfolio-settings/', data, format='json', **self.slug,
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.json()['style_preset'], 'soft')
+
+        public_response = self.client.get(f'{PUBLIC_URL}portafolio/styleportuser/')
+        self.assertEqual(public_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(public_response.json()['style_preset'], 'soft')
+
+    # ── Test 10k ─────────────────────────────────────────────────────────────
+
+    def test_public_portfolio_style_preset_defaults_to_modern(self):
+        """GET público retorna 'modern' cuando el usuario nunca configuró un preset."""
+        profile = _make_profile(self.user, username='defaultstyleuser', is_public=True)
+        PortfolioSettings.objects.create(profile=profile)
+        response = self.client.get(f'{PUBLIC_URL}portafolio/defaultstyleuser/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.json()['style_preset'], 'modern')
+
+    # ── Test 10l ─────────────────────────────────────────────────────────────
+
+    def test_portfolio_settings_style_preset_accepts_fase2_presets(self):
+        """POST portfolio-settings/ acepta los presets de Fase 2 (editorial/bold)."""
+        _make_profile(self.user, username='fase2styleuser', is_public=True)
+        data = {'style_preset': 'editorial'}
+        response = self.client.post(
+            f'{BASE_URL}portfolio-settings/', data, format='json', **self.slug,
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.json()['style_preset'], 'editorial')
+
+        public_response = self.client.get(f'{PUBLIC_URL}portafolio/fase2styleuser/')
+        self.assertEqual(public_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(public_response.json()['style_preset'], 'editorial')
+
 
 # ══════════════════════════════════════════════════════════════════════════════
 # Group 3: CV + PDF + Analytics + Custom Domain
@@ -300,6 +524,16 @@ class TestCVAndDomain(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         body = response.json()['cv']
         self.assertEqual(body['professional_summary'], 'I am a developer.')
+
+    # ── Test 11b ─────────────────────────────────────────────────────────────
+
+    def test_cv_get_includes_profile_for_public_url(self):
+        """GET cv/ includes 'profile' (username) so the dashboard can build the public CV link."""
+        profile = _make_profile(self.user, username='cvprofileuser')
+        CVDocument.objects.create(profile=profile, professional_summary='Dev.')
+        response = self.client.get(f'{BASE_URL}cv/', **self.slug)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.json()['profile']['username'], 'cvprofileuser')
 
     # ── Test 12 ──────────────────────────────────────────────────────────────
 

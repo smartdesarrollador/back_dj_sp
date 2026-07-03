@@ -297,7 +297,10 @@ class CVView(APIView):
         cv = CVDocument.objects.filter(profile=profile).first()
         if not cv:
             return _NOT_FOUND
-        return Response({'cv': CVDocumentSerializer(cv).data})
+        return Response({
+            'profile': PublicProfileSerializer(profile).data,
+            'cv': CVDocumentSerializer(cv).data,
+        })
 
     @extend_schema(tags=['app-digital'], summary='Create or update CV document')
     def post(self, request):

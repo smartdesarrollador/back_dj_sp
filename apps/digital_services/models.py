@@ -144,13 +144,56 @@ class LandingTemplate(BaseModel):
 
 
 class PortfolioSettings(BaseModel):
+    STYLE_PRESET_CHOICES = [
+        ('modern', 'Modern'),
+        ('classic', 'Classic'),
+        ('soft', 'Soft'),
+        ('editorial', 'Editorial'),
+        ('bold', 'Bold'),
+    ]
+
     profile = models.OneToOneField(
         PublicProfile, on_delete=models.CASCADE, related_name='portfolio_settings'
+    )
+    style_preset = models.CharField(
+        max_length=20,
+        choices=STYLE_PRESET_CHOICES,
+        default='modern',
     )
     theme_colors = models.JSONField(
         default=dict,
         blank=True,
         help_text='{"header_bg":"","header_text":"","accent":"","nav_bg":""}',
+    )
+    hero_content = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text='{"badge":"","ctaText":"","ctaUrl":"","showSocialLinks":false}',
+    )
+    contact_content = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text='{"title":"","description":""}',
+    )
+    about_content = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text='{"title":"","text":"","highlights":[]}',
+    )
+    skills_content = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text='{"title":"","showSkills":false}',
+    )
+    services_content = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text='{"title":"","items":[]}',
+    )
+    testimonials_content = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text='{"title":"","items":[]}',
     )
 
     class Meta:
