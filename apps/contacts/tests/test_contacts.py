@@ -11,6 +11,7 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from apps.contacts.models import Contact
+from apps.sharing.models import Share
 from apps.tenants.models import Tenant
 
 User = get_user_model()
@@ -70,6 +71,28 @@ class TestContactViews(APITestCase):
             data = {'first_name': 'X'}
             response = self.client.post(BASE_URL, data, **self.slug)
         self.assertEqual(response.status_code, status.HTTP_402_PAYMENT_REQUIRED)
+
+    # ── Shared contacts flagging ──────────────────────────────────────────────
+
+    def test_shared_contact_is_flagged_with_sharer_name(self):
+        owner = _create_superuser(self.tenant, 'owner2@contacts.com')
+        owner.name = 'Contact Owner'
+        owner.save(update_fields=['name'])
+        contact = Contact.objects.create(
+            tenant=self.tenant, user=owner, first_name='Shared', last_name='Contact'
+        )
+        Share.objects.create(
+            tenant=self.tenant,
+            resource_type='contact',
+            resource_id=contact.id,
+            shared_by=owner,
+            shared_with=self.user,
+            permission_level='viewer',
+        )
+        response = self.client.get(BASE_URL, **self.slug)
+        data = next(c for c in response.json()['contacts'] if c['id'] == str(contact.id))
+        self.assertTrue(data['is_shared'])
+        self.assertEqual(data['shared_by_name'], 'Contact Owner')
 
     # ── Group feature gate ─────────────────────────────────────────────────────
 

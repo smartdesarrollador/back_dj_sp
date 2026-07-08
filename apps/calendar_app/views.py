@@ -14,6 +14,7 @@ Endpoints:
   DELETE /app/calendar/<event_pk>/attendees/<user_pk>/ → remove attendee
 """
 from django.contrib.auth import get_user_model
+from django.db.models import Q
 from drf_spectacular.utils import OpenApiParameter, extend_schema
 from drf_spectacular.types import OpenApiTypes
 from rest_framework import status
@@ -47,6 +48,19 @@ def _get_event(pk, tenant, user):
         return None
 
 
+def _get_visible_event(pk, tenant, user):
+    """Read-only lookup: event visible to its owner or a confirmed attendee."""
+    try:
+        return (
+            CalendarEvent.objects.filter(Q(user=user) | Q(attendees__user=user))
+            .select_related('user')
+            .distinct()
+            .get(pk=pk, tenant=tenant)
+        )
+    except CalendarEvent.DoesNotExist:
+        return None
+
+
 def _get_event_for_tenant(pk, tenant):
     """Get event by tenant regardless of owner (used for attendee views)."""
     try:
@@ -67,7 +81,12 @@ class CalendarEventListCreateView(APIView):
         ],
     )
     def get(self, request):
-        qs = CalendarEvent.objects.filter(tenant=request.tenant, user=request.user)
+        qs = (
+            CalendarEvent.objects.filter(tenant=request.tenant)
+            .filter(Q(user=request.user) | Q(attendees__user=request.user))
+            .select_related('user')
+            .distinct()
+        )
         start = request.query_params.get('start')
         end = request.query_params.get('end')
         month = request.query_params.get('month')
@@ -86,7 +105,7 @@ class CalendarEventListCreateView(APIView):
             qs = qs.filter(start_datetime__gte=start)
         if end:
             qs = qs.filter(end_datetime__lte=end)
-        events = CalendarEventSerializer(qs, many=True).data
+        events = CalendarEventSerializer(qs, many=True, context={'request': request}).data
         return Response({'results': events, 'count': len(events), 'events': events})
 
     @extend_schema(tags=['app-calendar'], summary='Create calendar event')
@@ -105,7 +124,10 @@ class CalendarEventListCreateView(APIView):
             user=request.user,
             **serializer.validated_data,
         )
-        return Response(CalendarEventSerializer(event).data, status=status.HTTP_201_CREATED)
+        return Response(
+            CalendarEventSerializer(event, context={'request': request}).data,
+            status=status.HTTP_201_CREATED,
+        )
 
 
 class CalendarImportView(AuditMixin, APIView):
@@ -166,10 +188,10 @@ class CalendarEventDetailView(AuditMixin, APIView):
 
     @extend_schema(tags=['app-calendar'], summary='Get calendar event detail')
     def get(self, request, pk):
-        event = _get_event(pk, request.tenant, request.user)
+        event = _get_visible_event(pk, request.tenant, request.user)
         if not event:
             return _NOT_FOUND
-        return Response({'event': CalendarEventSerializer(event).data})
+        return Response({'event': CalendarEventSerializer(event, context={'request': request}).data})
 
     @extend_schema(tags=['app-calendar'], summary='Update calendar event')
     def patch(self, request, pk):
@@ -190,7 +212,7 @@ class CalendarEventDetailView(AuditMixin, APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
         event.save()
-        return Response(CalendarEventSerializer(event).data)
+        return Response(CalendarEventSerializer(event, context={'request': request}).data)
 
     @extend_schema(tags=['app-calendar'], summary='Delete calendar event')
     def delete(self, request, pk):

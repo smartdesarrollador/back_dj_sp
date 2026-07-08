@@ -1,5 +1,5 @@
 """
-Sharing models — resource sharing between users within the same tenant.
+Sharing models — resource sharing between users, including across tenants.
 
 Hierarchy:
   Share  — tracks who shared what with whom (polymorphic by resource_type)
@@ -14,8 +14,10 @@ from core.models import BaseModel
 
 class Share(BaseModel):
     """
-    A share grants a user access to a specific resource within a tenant.
-    Supports project, section, and item resource types.
+    A share grants a user access to a specific resource owned by another tenant.
+    `shared_with` is resolved by email with no tenant filter, so sharing across
+    tenants is allowed by design (e.g. collaborating with an external contractor).
+    Supports project, section, item, snippet, note, and contact resource types.
     Cascade shares (is_inherited=True) are auto-created for child resources
     when a project is shared.
     """

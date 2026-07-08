@@ -52,9 +52,11 @@ class NoteListCreateView(APIView):
         ],
     )
     def get(self, request):
-        shared_ids = Share.objects.filter(
+        shares = Share.objects.filter(
             shared_with=request.user, resource_type='note'
-        ).values_list('resource_id', flat=True)
+        ).select_related('shared_by')
+        shared_ids = [share.resource_id for share in shares]
+        shared_by_map = {share.resource_id: share.shared_by.name for share in shares}
         qs = Note.objects.filter(
             Q(tenant=request.tenant, user=request.user) | Q(pk__in=shared_ids)
         ).distinct()
@@ -64,7 +66,9 @@ class NoteListCreateView(APIView):
             qs = qs.filter(category=category)
         if search:
             qs = qs.filter(Q(title__icontains=search) | Q(content__icontains=search))
-        notes = NoteSerializer(qs, many=True).data
+        notes = NoteSerializer(
+            qs, many=True, context={'request': request, 'shared_by_map': shared_by_map}
+        ).data
         return Response({'results': notes, 'count': len(notes), 'notes': notes})
 
     @extend_schema(tags=['app-notes'], summary='Create note')

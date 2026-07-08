@@ -10,6 +10,8 @@ class CalendarEventSerializer(serializers.ModelSerializer):
     attendees_count = serializers.SerializerMethodField()
     start_date = serializers.SerializerMethodField()
     end_date = serializers.SerializerMethodField()
+    is_attendee = serializers.SerializerMethodField()
+    organizer_name = serializers.SerializerMethodField()
 
     class Meta:
         model = CalendarEvent
@@ -17,7 +19,8 @@ class CalendarEventSerializer(serializers.ModelSerializer):
             'id', 'title', 'description', 'start_datetime', 'end_datetime',
             'start_date', 'end_date',
             'is_all_day', 'location', 'rrule', 'color',
-            'attendees_count', 'created_at', 'updated_at',
+            'attendees_count', 'is_attendee', 'organizer_name',
+            'created_at', 'updated_at',
         ]
         read_only_fields = ['id', 'created_at', 'updated_at']
 
@@ -29,6 +32,16 @@ class CalendarEventSerializer(serializers.ModelSerializer):
 
     def get_end_date(self, obj) -> str:
         return obj.end_datetime.strftime('%Y-%m-%dT%H:%M:%S') if obj.end_datetime else ''
+
+    def get_is_attendee(self, obj) -> bool:
+        request = self.context.get('request')
+        return bool(request) and obj.user_id != request.user.id
+
+    def get_organizer_name(self, obj) -> str | None:
+        request = self.context.get('request')
+        if request and obj.user_id != request.user.id:
+            return obj.user.name
+        return None
 
 
 class CalendarEventCreateUpdateSerializer(serializers.Serializer):

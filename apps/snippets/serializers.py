@@ -7,13 +7,23 @@ from apps.snippets.models import CodeSnippet
 
 
 class CodeSnippetSerializer(serializers.ModelSerializer):
+    is_shared = serializers.SerializerMethodField()
+    shared_by_name = serializers.SerializerMethodField()
+
     class Meta:
         model = CodeSnippet
         fields = [
             'id', 'title', 'description', 'code', 'language',
-            'tags', 'created_at', 'updated_at',
+            'tags', 'is_shared', 'shared_by_name', 'created_at', 'updated_at',
         ]
         read_only_fields = ['id', 'created_at', 'updated_at']
+
+    def get_is_shared(self, obj) -> bool:
+        request = self.context.get('request')
+        return bool(request) and obj.user_id != request.user.id
+
+    def get_shared_by_name(self, obj) -> str | None:
+        return self.context.get('shared_by_map', {}).get(obj.id)
 
 
 class CodeSnippetCreateUpdateSerializer(serializers.Serializer):

@@ -186,3 +186,45 @@ class TestAdminUserViews(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         target.refresh_from_db()
         self.assertEqual(target.name, 'Updated Name')
+
+
+DIRECTORY_URL = '/api/v1/app/team/directory/'
+
+
+@override_settings(PASSWORD_HASHERS=_FAST_HASHERS, CACHES=_LOCMEM_CACHE)
+class TestTeamDirectoryView(APITestCase):
+    """TeamDirectoryView must be usable by non-admin roles (Member), unlike UserListView."""
+
+    def setUp(self):
+        cache.clear()
+        self.tenant = _create_tenant('corp2')
+        self.other_tenant = _create_tenant('other2')
+        self.member_role, _ = Role.objects.get_or_create(
+            name='Member', tenant=None, defaults={'is_system_role': True}
+        )
+        self.member = _create_user(self.tenant, 'member@corp2.com')
+        UserRole.objects.create(user=self.member, role=self.member_role)
+        self.teammate = _create_user(self.tenant, 'teammate@corp2.com')
+        self.outsider = _create_user(self.other_tenant, 'outsider@other2.com')
+        self.client.force_authenticate(user=self.member)
+
+    def test_requires_auth(self):
+        client = APIClient()
+        response = client.get(DIRECTORY_URL, HTTP_X_TENANT_SLUG='corp2')
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_member_role_can_list_teammates(self):
+        response = self.client.get(DIRECTORY_URL, HTTP_X_TENANT_SLUG='corp2')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        emails = [m['email'] for m in response.data['members']]
+        self.assertIn('teammate@corp2.com', emails)
+
+    def test_excludes_requesting_user(self):
+        response = self.client.get(DIRECTORY_URL, HTTP_X_TENANT_SLUG='corp2')
+        emails = [m['email'] for m in response.data['members']]
+        self.assertNotIn('member@corp2.com', emails)
+
+    def test_excludes_other_tenants(self):
+        response = self.client.get(DIRECTORY_URL, HTTP_X_TENANT_SLUG='corp2')
+        emails = [m['email'] for m in response.data['members']]
+        self.assertNotIn('outsider@other2.com', emails)

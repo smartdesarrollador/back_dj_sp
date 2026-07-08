@@ -48,9 +48,11 @@ class CodeSnippetListCreateView(APIView):
         ],
     )
     def get(self, request):
-        shared_ids = Share.objects.filter(
+        shares = Share.objects.filter(
             shared_with=request.user, resource_type='snippet'
-        ).values_list('resource_id', flat=True)
+        ).select_related('shared_by')
+        shared_ids = [share.resource_id for share in shares]
+        shared_by_map = {share.resource_id: share.shared_by.name for share in shares}
         qs = CodeSnippet.objects.filter(
             Q(tenant=request.tenant, user=request.user) | Q(pk__in=shared_ids)
         ).distinct()
@@ -67,7 +69,10 @@ class CodeSnippetListCreateView(APIView):
                 Q(description__icontains=search) |
                 Q(code__icontains=search)
             )
-        return Response({'snippets': CodeSnippetSerializer(qs, many=True).data})
+        snippets = CodeSnippetSerializer(
+            qs, many=True, context={'request': request, 'shared_by_map': shared_by_map}
+        ).data
+        return Response({'snippets': snippets})
 
     @extend_schema(tags=['app-devops'], summary='Create code snippet')
     def post(self, request):

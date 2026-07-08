@@ -11,6 +11,7 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from apps.notes.models import Note
+from apps.sharing.models import Share
 from apps.tenants.models import Tenant
 
 User = get_user_model()
@@ -87,6 +88,33 @@ class TestNoteViews(APITestCase):
         self.assertEqual(response2.status_code, status.HTTP_200_OK)
         note.refresh_from_db()
         self.assertFalse(note.is_pinned)
+
+    # ── Shared notes flagging ────────────────────────────────────────────────
+
+    def test_own_note_is_not_shared(self):
+        Note.objects.create(tenant=self.tenant, user=self.user, title='Mine')
+        response = self.client.get(BASE_URL, **self.slug)
+        note_data = response.json()['notes'][0]
+        self.assertFalse(note_data['is_shared'])
+        self.assertIsNone(note_data['shared_by_name'])
+
+    def test_shared_note_is_flagged_with_sharer_name(self):
+        owner = _create_superuser(self.tenant, 'owner2@notes.com')
+        owner.name = 'Nota Owner'
+        owner.save(update_fields=['name'])
+        note = Note.objects.create(tenant=self.tenant, user=owner, title='Shared with me')
+        Share.objects.create(
+            tenant=self.tenant,
+            resource_type='note',
+            resource_id=note.id,
+            shared_by=owner,
+            shared_with=self.user,
+            permission_level='viewer',
+        )
+        response = self.client.get(BASE_URL, **self.slug)
+        note_data = next(n for n in response.json()['notes'] if n['id'] == str(note.id))
+        self.assertTrue(note_data['is_shared'])
+        self.assertEqual(note_data['shared_by_name'], 'Nota Owner')
 
     # ── Cross-tenant isolation ────────────────────────────────────────────────
 

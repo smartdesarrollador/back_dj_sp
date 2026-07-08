@@ -17,13 +17,15 @@ class ContactSerializer(serializers.ModelSerializer):
     group_name = serializers.CharField(source='group.name', read_only=True, default=None)
     name = serializers.SerializerMethodField()
     group = serializers.SerializerMethodField()
+    is_shared = serializers.SerializerMethodField()
+    shared_by_name = serializers.SerializerMethodField()
 
     class Meta:
         model = Contact
         fields = [
             'id', 'name', 'first_name', 'last_name', 'email', 'phone',
             'company', 'job_title', 'notes', 'group', 'group_name',
-            'created_at', 'updated_at',
+            'is_shared', 'shared_by_name', 'created_at', 'updated_at',
         ]
         read_only_fields = ['id', 'name', 'group_name', 'created_at', 'updated_at']
 
@@ -34,6 +36,13 @@ class ContactSerializer(serializers.ModelSerializer):
         if obj.group:
             return {'id': str(obj.group.id), 'name': obj.group.name, 'color': obj.group.color, 'contacts_count': 0}
         return None
+
+    def get_is_shared(self, obj) -> bool:
+        request = self.context.get('request')
+        return bool(request) and obj.user_id != request.user.id
+
+    def get_shared_by_name(self, obj) -> str | None:
+        return self.context.get('shared_by_map', {}).get(obj.id)
 
 
 class ContactCreateUpdateSerializer(serializers.Serializer):

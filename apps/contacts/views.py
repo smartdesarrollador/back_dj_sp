@@ -69,9 +69,11 @@ class ContactListCreateView(APIView):
         ],
     )
     def get(self, request):
-        shared_ids = Share.objects.filter(
+        shares = Share.objects.filter(
             shared_with=request.user, resource_type='contact'
-        ).values_list('resource_id', flat=True)
+        ).select_related('shared_by')
+        shared_ids = [share.resource_id for share in shares]
+        shared_by_map = {share.resource_id: share.shared_by.name for share in shares}
         qs = Contact.objects.filter(
             Q(tenant=request.tenant, user=request.user) | Q(pk__in=shared_ids)
         ).distinct()
@@ -85,7 +87,9 @@ class ContactListCreateView(APIView):
                 Q(last_name__icontains=search) |
                 Q(email__icontains=search)
             )
-        contacts = ContactSerializer(qs, many=True).data
+        contacts = ContactSerializer(
+            qs, many=True, context={'request': request, 'shared_by_map': shared_by_map}
+        ).data
         return Response({'results': contacts, 'count': len(contacts), 'contacts': contacts})
 
     @extend_schema(tags=['app-contacts'], summary='Create contact')

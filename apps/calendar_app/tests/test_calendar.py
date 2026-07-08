@@ -10,7 +10,7 @@ from django.test import override_settings
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from apps.calendar_app.models import CalendarEvent
+from apps.calendar_app.models import CalendarEvent, EventAttendee
 from apps.tenants.models import Tenant
 
 User = get_user_model()
@@ -109,6 +109,62 @@ class TestCalendarViews(APITestCase):
         titles = [e['title'] for e in response.json()['events']]
         self.assertIn('In Range', titles)
         self.assertNotIn('Out of Range', titles)
+
+    # ── Attendee visibility ───────────────────────────────────────────────────
+
+    def test_own_event_is_not_flagged_as_attendee(self):
+        CalendarEvent.objects.create(
+            tenant=self.tenant, user=self.user, title='Mine',
+            start_datetime='2026-03-10T09:00:00Z', end_datetime='2026-03-10T10:00:00Z',
+        )
+        response = self.client.get(BASE_URL, **self.slug)
+        event_data = response.json()['events'][0]
+        self.assertFalse(event_data['is_attendee'])
+        self.assertIsNone(event_data['organizer_name'])
+
+    def test_attendee_sees_event_in_own_list(self):
+        organizer = _create_superuser(self.tenant, 'organizer@cal.com')
+        organizer.name = 'Event Organizer'
+        organizer.save(update_fields=['name'])
+        event = CalendarEvent.objects.create(
+            tenant=self.tenant, user=organizer, title='Team Sync',
+            start_datetime='2026-03-10T09:00:00Z', end_datetime='2026-03-10T10:00:00Z',
+        )
+        EventAttendee.objects.create(event=event, user=self.user, status='accepted')
+
+        response = self.client.get(BASE_URL, **self.slug)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        event_data = next(e for e in response.json()['events'] if e['id'] == str(event.id))
+        self.assertTrue(event_data['is_attendee'])
+        self.assertEqual(event_data['organizer_name'], 'Event Organizer')
+
+    def test_attendee_can_view_event_detail(self):
+        organizer = _create_superuser(self.tenant, 'organizer2@cal.com')
+        event = CalendarEvent.objects.create(
+            tenant=self.tenant, user=organizer, title='Detail Test',
+            start_datetime='2026-03-10T09:00:00Z', end_datetime='2026-03-10T10:00:00Z',
+        )
+        EventAttendee.objects.create(event=event, user=self.user, status='invited')
+
+        response = self.client.get(f'{BASE_URL}{event.pk}/', **self.slug)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_attendee_cannot_update_or_delete_event(self):
+        """Being an attendee grants read access only — not edit/delete rights."""
+        organizer = _create_superuser(self.tenant, 'organizer3@cal.com')
+        event = CalendarEvent.objects.create(
+            tenant=self.tenant, user=organizer, title='Protected',
+            start_datetime='2026-03-10T09:00:00Z', end_datetime='2026-03-10T10:00:00Z',
+        )
+        EventAttendee.objects.create(event=event, user=self.user, status='accepted')
+
+        patch_response = self.client.patch(
+            f'{BASE_URL}{event.pk}/', {'title': 'Hijacked'}, format='json', **self.slug
+        )
+        self.assertEqual(patch_response.status_code, status.HTTP_404_NOT_FOUND)
+
+        delete_response = self.client.delete(f'{BASE_URL}{event.pk}/', **self.slug)
+        self.assertEqual(delete_response.status_code, status.HTTP_404_NOT_FOUND)
 
     # ── Plan limit ────────────────────────────────────────────────────────────
 

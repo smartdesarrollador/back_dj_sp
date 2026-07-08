@@ -10,6 +10,7 @@ from django.test import override_settings
 from rest_framework import status
 from rest_framework.test import APITestCase
 
+from apps.sharing.models import Share
 from apps.snippets.models import CodeSnippet
 from apps.tenants.models import Tenant
 
@@ -95,6 +96,29 @@ class TestSnippetViews(APITestCase):
         snippets = response.json()['snippets']
         self.assertEqual(len(snippets), 1)
         self.assertEqual(snippets[0]['language'], 'python')
+
+    # ── Shared snippets flagging ──────────────────────────────────────────────
+
+    def test_shared_snippet_is_flagged_with_sharer_name(self):
+        owner = _create_superuser(self.tenant, 'owner2@sn.com')
+        owner.name = 'Snippet Owner'
+        owner.save(update_fields=['name'])
+        snippet = CodeSnippet.objects.create(
+            tenant=self.tenant, user=owner, title='Shared snippet',
+            code='x = 1', language='python',
+        )
+        Share.objects.create(
+            tenant=self.tenant,
+            resource_type='snippet',
+            resource_id=snippet.id,
+            shared_by=owner,
+            shared_with=self.user,
+            permission_level='viewer',
+        )
+        response = self.client.get(BASE_URL, **self.slug)
+        data = next(s for s in response.json()['snippets'] if s['id'] == str(snippet.id))
+        self.assertTrue(data['is_shared'])
+        self.assertEqual(data['shared_by_name'], 'Snippet Owner')
 
     # ── Cross-tenant isolation ────────────────────────────────────────────────
 

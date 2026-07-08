@@ -21,6 +21,7 @@ from django.core.mail import send_mail
 logger = logging.getLogger(__name__)
 from drf_spectacular.utils import OpenApiResponse, extend_schema
 from rest_framework import status
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -77,6 +78,26 @@ class UserCreateView(APIView):
         check_plan_limit(request.user, 'users', current_count)
         user = serializer.save()
         return Response(AdminUserListSerializer(user).data, status=status.HTTP_201_CREATED)
+
+
+class TeamDirectoryView(APIView):
+    """
+    GET /api/v1/app/team/directory/
+    Lista mínima (id/name/email) de compañeros activos del tenant, para selectores
+    de UI (ej. "compartir con"). Accesible a cualquier miembro autenticado del tenant
+    — no requiere el permiso RBAC 'users.read', a diferencia de UserListView.
+    """
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(tags=['app-team'], summary='List tenant teammates (name/email only)')
+    def get(self, request):
+        users = (
+            User.objects.filter(tenant=request.tenant, is_active=True)
+            .exclude(pk=request.user.pk)
+            .order_by('name')
+        )
+        members = [{'id': str(u.id), 'name': u.name, 'email': u.email} for u in users]
+        return Response({'members': members})
 
 
 class UserInviteView(APIView):
