@@ -6,7 +6,8 @@ from django.test import override_settings
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from apps.vault.models import VaultItem, VaultKey
+from apps.vault import crypto
+from apps.vault.models import VaultItem, VaultKey, VaultShare
 from apps.vault.tests.conftest_helpers import (
     ENC_KEY,
     FAST_HASHERS,
@@ -240,3 +241,212 @@ class TestVault(APITestCase):
             format='json', **th,
         )
         self.assertEqual(over.status_code, status.HTTP_402_PAYMENT_REQUIRED)
+
+
+class TestVaultCryptoRoundtrip(APITestCase):
+    """Pure crypto tests — no HTTP, no DB. A bug here is far more serious than
+    anywhere else in this feature: it could silently corrupt or expose secrets."""
+
+    def test_seal_and_unseal_roundtrip(self):
+        private_key, public_key = crypto.generate_keypair()
+        sealed = crypto.seal_for_recipient('{"password": "s3cr3t"}', public_key)
+        opened = crypto.unseal_with_private_key(sealed, private_key)
+        self.assertEqual(opened, '{"password": "s3cr3t"}')
+
+    def test_wrong_private_key_cannot_unseal(self):
+        _, public_key = crypto.generate_keypair()
+        other_private_key, _ = crypto.generate_keypair()
+        sealed = crypto.seal_for_recipient('top secret', public_key)
+        with self.assertRaises(crypto.VaultCryptoError):
+            crypto.unseal_with_private_key(sealed, other_private_key)
+
+    def test_sealing_is_not_deterministic(self):
+        """Each seal uses a fresh ephemeral keypair — same plaintext, different output."""
+        _, public_key = crypto.generate_keypair()
+        sealed_a = crypto.seal_for_recipient('same plaintext', public_key)
+        sealed_b = crypto.seal_for_recipient('same plaintext', public_key)
+        self.assertNotEqual(sealed_a, sealed_b)
+
+
+@override_settings(PASSWORD_HASHERS=FAST_HASHERS, CACHES=LOCMEM_CACHE, ENCRYPTION_KEY=ENC_KEY)
+class TestVaultSharing(APITestCase):
+    def setUp(self):
+        cache.clear()
+        self.tenant = create_tenant('vault-share-corp', plan='professional')
+        self.alice = create_user(self.tenant, 'alice@vshare.com', 'Alice')
+        self.bob = create_user(self.tenant, 'bob@vshare.com', 'Bob')
+        self.headers = {'HTTP_X_TENANT_SLUG': 'vault-share-corp'}
+
+    def _auth(self, user):
+        self.client.force_authenticate(user=user)
+
+    def _setup_and_unlock(self, user, master=MASTER):
+        self._auth(user)
+        self.client.post(
+            f'{BASE}master-password/', {'master_password': master}, format='json', **self.headers
+        )
+        token = self.client.post(
+            f'{BASE}unlock/', {'master_password': master}, format='json', **self.headers
+        ).json()['unlock_token']
+        return token
+
+    def _token_headers(self, token):
+        return {**self.headers, 'HTTP_X_VAULT_TOKEN': token}
+
+    def _create_item(self, token, title='Shared Login', data=None):
+        res = self.client.post(
+            f'{BASE}items/',
+            {'title': title, 'item_type': 'login', 'data': data or {'username': 'a', 'password': 's3cr3t'}},
+            format='json', **self._token_headers(token),
+        )
+        return res.json()['id']
+
+    def test_share_then_recipient_reveals_with_own_unlock(self):
+        alice_token = self._setup_and_unlock(self.alice)
+        item_id = self._create_item(alice_token, data={'password': 'hunter2'})
+        # Bob must have his own vault configured to receive a share.
+        bob_token = self._setup_and_unlock(self.bob)
+
+        self._auth(self.alice)
+        share_res = self.client.post(
+            f'{BASE}items/{item_id}/share/',
+            {'shared_with_email': 'bob@vshare.com'},
+            format='json', **self._token_headers(alice_token),
+        )
+        self.assertEqual(share_res.status_code, status.HTTP_201_CREATED)
+        share_id = share_res.json()['id']
+
+        self._auth(self.bob)
+        listed = self.client.get(f'{BASE}shared-with-me/', **self.headers)
+        self.assertEqual(listed.json()['items'][0]['title'], 'Shared Login')
+
+        revealed = self.client.get(
+            f'{BASE}shared-with-me/{share_id}/', **self._token_headers(bob_token)
+        )
+        self.assertEqual(revealed.status_code, status.HTTP_200_OK)
+        self.assertEqual(revealed.json()['data'], {'password': 'hunter2'})
+        self.assertEqual(revealed.json()['shared_by_name'], 'Alice')
+
+    def test_recipient_locked_cannot_reveal(self):
+        alice_token = self._setup_and_unlock(self.alice)
+        item_id = self._create_item(alice_token)
+        self._setup_and_unlock(self.bob)
+
+        self._auth(self.alice)
+        share_id = self.client.post(
+            f'{BASE}items/{item_id}/share/', {'shared_with_email': 'bob@vshare.com'},
+            format='json', **self._token_headers(alice_token),
+        ).json()['id']
+
+        self._auth(self.bob)
+        # Bob is authenticated but has NOT unlocked in this request context.
+        res = self.client.get(f'{BASE}shared-with-me/{share_id}/', **self.headers)
+        self.assertEqual(res.status_code, status.HTTP_423_LOCKED)
+
+    def test_share_requires_recipient_to_have_configured_vault(self):
+        alice_token = self._setup_and_unlock(self.alice)
+        item_id = self._create_item(alice_token)
+        self._auth(self.alice)
+        res = self.client.post(
+            f'{BASE}items/{item_id}/share/', {'shared_with_email': 'bob@vshare.com'},
+            format='json', **self._token_headers(alice_token),
+        )
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(res.json()['error']['code'], 'recipient_no_vault_key')
+
+    def test_share_requires_sharing_feature_gate(self):
+        free_tenant = create_tenant('vault-share-free', plan='free')
+        owner = create_user(free_tenant, 'owner@vsfree.com', 'Owner')
+        recipient = create_user(free_tenant, 'recipient@vsfree.com', 'Recipient')
+        free_headers = {'HTTP_X_TENANT_SLUG': 'vault-share-free'}
+
+        self._auth(owner)
+        self.client.post(f'{BASE}master-password/', {'master_password': MASTER}, format='json', **free_headers)
+        owner_token = self.client.post(
+            f'{BASE}unlock/', {'master_password': MASTER}, format='json', **free_headers
+        ).json()['unlock_token']
+        item_id = self.client.post(
+            f'{BASE}items/', {'title': 'X', 'item_type': 'login', 'data': {'p': '1'}},
+            format='json', **{**free_headers, 'HTTP_X_VAULT_TOKEN': owner_token},
+        ).json()['id']
+
+        self._auth(recipient)
+        self.client.post(f'{BASE}master-password/', {'master_password': MASTER}, format='json', **free_headers)
+
+        self._auth(owner)
+        res = self.client.post(
+            f'{BASE}items/{item_id}/share/', {'shared_with_email': 'recipient@vsfree.com'},
+            format='json', **{**free_headers, 'HTTP_X_VAULT_TOKEN': owner_token},
+        )
+        self.assertEqual(res.status_code, status.HTTP_402_PAYMENT_REQUIRED)
+
+    def test_self_share_rejected(self):
+        alice_token = self._setup_and_unlock(self.alice)
+        item_id = self._create_item(alice_token)
+        self._auth(self.alice)
+        res = self.client.post(
+            f'{BASE}items/{item_id}/share/', {'shared_with_email': 'alice@vshare.com'},
+            format='json', **self._token_headers(alice_token),
+        )
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(res.json()['error']['code'], 'self_share')
+
+    def test_revoke_share_removes_recipient_access(self):
+        alice_token = self._setup_and_unlock(self.alice)
+        item_id = self._create_item(alice_token)
+        bob_token = self._setup_and_unlock(self.bob)
+
+        self._auth(self.alice)
+        share_id = self.client.post(
+            f'{BASE}items/{item_id}/share/', {'shared_with_email': 'bob@vshare.com'},
+            format='json', **self._token_headers(alice_token),
+        ).json()['id']
+        revoke = self.client.delete(
+            f'{BASE}items/{item_id}/share/{share_id}/', **self._token_headers(alice_token)
+        )
+        self.assertEqual(revoke.status_code, status.HTTP_204_NO_CONTENT)
+
+        self._auth(self.bob)
+        listed = self.client.get(f'{BASE}shared-with-me/', **self.headers)
+        self.assertEqual(listed.json()['items'], [])
+        reveal = self.client.get(
+            f'{BASE}shared-with-me/{share_id}/', **self._token_headers(bob_token)
+        )
+        self.assertEqual(reveal.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_updating_item_reseals_existing_shares(self):
+        alice_token = self._setup_and_unlock(self.alice)
+        item_id = self._create_item(alice_token, data={'password': 'old-pass'})
+        bob_token = self._setup_and_unlock(self.bob)
+
+        self._auth(self.alice)
+        share_id = self.client.post(
+            f'{BASE}items/{item_id}/share/', {'shared_with_email': 'bob@vshare.com'},
+            format='json', **self._token_headers(alice_token),
+        ).json()['id']
+
+        # Owner edits the secret after sharing it.
+        self.client.patch(
+            f'{BASE}items/{item_id}/', {'data': {'password': 'new-pass'}},
+            format='json', **self._token_headers(alice_token),
+        )
+
+        self._auth(self.bob)
+        revealed = self.client.get(
+            f'{BASE}shared-with-me/{share_id}/', **self._token_headers(bob_token)
+        )
+        self.assertEqual(revealed.json()['data'], {'password': 'new-pass'})
+
+    def test_other_tenant_user_cannot_be_shared_with_via_wrong_scoping(self):
+        """Sanity check: VaultShare rows are tenant-scoped like every other model here."""
+        alice_token = self._setup_and_unlock(self.alice)
+        item_id = self._create_item(alice_token)
+        bob_token = self._setup_and_unlock(self.bob)
+        self._auth(self.alice)
+        self.client.post(
+            f'{BASE}items/{item_id}/share/', {'shared_with_email': 'bob@vshare.com'},
+            format='json', **self._token_headers(alice_token),
+        )
+        self.assertEqual(
+            VaultShare.objects.filter(tenant=self.tenant, shared_with=self.bob).count(), 1
+        )
