@@ -20,7 +20,7 @@ class BookmarkSerializer(serializers.ModelSerializer):
         model = Bookmark
         fields = [
             'id', 'url', 'title', 'description', 'tags', 'favicon_url',
-            'collection', 'collection_name', 'created_at', 'updated_at',
+            'is_favorite', 'collection', 'collection_name', 'created_at', 'updated_at',
         ]
         read_only_fields = ['id', 'collection_name', 'created_at', 'updated_at']
 
@@ -36,3 +36,4 @@ class BookmarkCreateUpdateSerializer(serializers.Serializer):
     )
     favicon_url = serializers.URLField(required=False, allow_blank=True, default='')
     collection = serializers.UUIDField(required=False, allow_null=True, default=None)
+    is_favorite = serializers.BooleanField(required=False, default=False)

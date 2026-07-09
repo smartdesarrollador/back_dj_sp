@@ -2,6 +2,7 @@
 Notes models — simple text notes with categories and pinning.
 """
 from django.conf import settings
+from django.contrib.postgres.fields import ArrayField
 from django.db import models
 
 from core.models import BaseModel
@@ -28,6 +29,7 @@ class Note(BaseModel):
     title = models.CharField(max_length=255)
     content = models.TextField(blank=True)
     category = models.CharField(max_length=20, choices=CATEGORY_CHOICES, default='personal')
+    tags = ArrayField(models.CharField(max_length=50), default=list, blank=True)
     is_pinned = models.BooleanField(default=False)
     color = models.CharField(max_length=20, default='gray')
 

@@ -13,10 +13,11 @@ class CodeSnippetSerializer(serializers.ModelSerializer):
     class Meta:
         model = CodeSnippet
         fields = [
-            'id', 'title', 'description', 'code', 'language',
-            'tags', 'is_shared', 'shared_by_name', 'created_at', 'updated_at',
+            'id', 'title', 'description', 'code', 'language', 'tags',
+            'is_favorite', 'usage_count', 'is_shared', 'shared_by_name',
+            'created_at', 'updated_at',
         ]
-        read_only_fields = ['id', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'usage_count', 'created_at', 'updated_at']
 
     def get_is_shared(self, obj) -> bool:
         request = self.context.get('request')
@@ -36,3 +37,4 @@ class CodeSnippetCreateUpdateSerializer(serializers.Serializer):
     tags = serializers.ListField(
         child=serializers.CharField(max_length=50), required=False, default=list
     )
+    is_favorite = serializers.BooleanField(required=False, default=False)

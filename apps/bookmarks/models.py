@@ -53,13 +53,15 @@ class Bookmark(BaseModel):
     description = models.TextField(blank=True)
     tags = ArrayField(models.CharField(max_length=50), default=list, blank=True)
     favicon_url = models.URLField(blank=True)
+    is_favorite = models.BooleanField(default=False)
 
     class Meta:
         db_table = 'bookmarks'
-        ordering = ['-created_at']
+        ordering = ['-is_favorite', '-created_at']
         indexes = [
             models.Index(fields=['tenant', 'user', 'collection']),
             models.Index(fields=['tenant', 'user', 'created_at']),
+            models.Index(fields=['tenant', 'user', 'is_favorite']),
         ]
 
     def __str__(self) -> str:

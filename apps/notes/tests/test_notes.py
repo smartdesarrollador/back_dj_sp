@@ -127,3 +127,70 @@ class TestNoteViews(APITestCase):
         url = f'{BASE_URL}{note.pk}/'
         response = self.client.get(url, **self.slug)
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    # ── Tags: normalization ──────────────────────────────────────────────────
+
+    def test_create_note_normalizes_tags(self):
+        data = {
+            'title': 'Tagged',
+            'tags': ['Urgente', ' urgente ', 'Trabajo', 'trabajo', ''],
+        }
+        response = self.client.post(BASE_URL, data, **self.slug)
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.json()['tags'], ['urgente', 'trabajo'])
+
+    def test_update_note_normalizes_tags(self):
+        note = Note.objects.create(tenant=self.tenant, user=self.user, title='X')
+        url = f'{BASE_URL}{note.pk}/'
+        response = self.client.patch(
+            url, {'tags': ['Cliente', ' cliente ', 'cliente']}, **self.slug
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.json()['tags'], ['cliente'])
+
+    # ── Tags: suggestions endpoint ───────────────────────────────────────────
+
+    def test_note_tags_endpoint_returns_distinct_sorted(self):
+        Note.objects.create(tenant=self.tenant, user=self.user, title='A', tags=['zebra', 'apple'])
+        Note.objects.create(tenant=self.tenant, user=self.user, title='B', tags=['apple', 'mango'])
+        response = self.client.get(f'{BASE_URL}tags/', **self.slug)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.json()['tags'], ['apple', 'mango', 'zebra'])
+
+    def test_note_tags_endpoint_scoped_to_user(self):
+        Note.objects.create(tenant=self.tenant, user=self.user, title='Mine', tags=['mine'])
+        other_user = _create_superuser(self.tenant, 'other-user@notes.com')
+        Note.objects.create(tenant=self.tenant, user=other_user, title='Theirs', tags=['theirs'])
+        response = self.client.get(f'{BASE_URL}tags/', **self.slug)
+        self.assertEqual(response.json()['tags'], ['mine'])
+
+    def test_note_tags_endpoint_empty_state(self):
+        response = self.client.get(f'{BASE_URL}tags/', **self.slug)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.json()['tags'], [])
+
+    def test_import_notes_normalizes_tags(self):
+        items = [{'title': 'Imported', 'tags': ['Urgente', 'urgente', ' Trabajo ']}]
+        response = self.client.post(
+            f'{BASE_URL}import/', {'items': items}, format='json', **self.slug
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        note = Note.objects.get(tenant=self.tenant, title='Imported')
+        self.assertEqual(note.tags, ['urgente', 'trabajo'])
+
+    # ── Tags: filtering ──────────────────────────────────────────────────────
+
+    def test_filter_notes_by_tag(self):
+        Note.objects.create(tenant=self.tenant, user=self.user, title='A', tags=['urgente'])
+        Note.objects.create(tenant=self.tenant, user=self.user, title='B', tags=['personal'])
+        response = self.client.get(f'{BASE_URL}?tag=urgente', **self.slug)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        notes = response.json()['notes']
+        self.assertEqual(len(notes), 1)
+        self.assertEqual(notes[0]['title'], 'A')
+
+    def test_filter_notes_by_tag_no_match_returns_empty(self):
+        Note.objects.create(tenant=self.tenant, user=self.user, title='A', tags=['urgente'])
+        response = self.client.get(f'{BASE_URL}?tag=inexistente', **self.slug)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.json()['notes'], [])

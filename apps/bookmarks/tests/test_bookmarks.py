@@ -66,6 +66,93 @@ class TestBookmarkViews(APITestCase):
         bm = Bookmark.objects.get(tenant=self.tenant, title='Example')
         self.assertIn('python', bm.tags)
 
+    # ── Filter by tag ─────────────────────────────────────────────────────────
+
+    def test_filter_bookmarks_by_tag(self):
+        Bookmark.objects.create(
+            tenant=self.tenant, user=self.user, url='https://a.com', title='A',
+            tags=['urgente'],
+        )
+        Bookmark.objects.create(
+            tenant=self.tenant, user=self.user, url='https://b.com', title='B',
+            tags=['personal'],
+        )
+        response = self.client.get(f'{BASE_URL}?tag=urgente', **self.slug)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        bookmarks = response.json()['bookmarks']
+        self.assertEqual(len(bookmarks), 1)
+        self.assertEqual(bookmarks[0]['title'], 'A')
+
+    # ── Tags: suggestions ────────────────────────────────────────────────────
+
+    def test_bookmark_tags_endpoint_returns_distinct_sorted(self):
+        Bookmark.objects.create(
+            tenant=self.tenant, user=self.user, url='https://a.com', title='A',
+            tags=['zebra', 'apple'],
+        )
+        Bookmark.objects.create(
+            tenant=self.tenant, user=self.user, url='https://b.com', title='B',
+            tags=['apple', 'mango'],
+        )
+        response = self.client.get(f'{BASE_URL}tags/', **self.slug)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.json()['tags'], ['apple', 'mango', 'zebra'])
+
+    def test_bookmark_tags_endpoint_scoped_to_user(self):
+        Bookmark.objects.create(
+            tenant=self.tenant, user=self.user, url='https://a.com', title='Mine',
+            tags=['mine'],
+        )
+        other_user = _create_superuser(self.tenant, 'other-user@bm.com')
+        Bookmark.objects.create(
+            tenant=self.tenant, user=other_user, url='https://b.com', title='Theirs',
+            tags=['theirs'],
+        )
+        response = self.client.get(f'{BASE_URL}tags/', **self.slug)
+        self.assertEqual(response.json()['tags'], ['mine'])
+
+    def test_bookmark_tags_endpoint_empty_state(self):
+        response = self.client.get(f'{BASE_URL}tags/', **self.slug)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.json()['tags'], [])
+
+    # ── is_favorite ───────────────────────────────────────────────────────────
+
+    def test_create_bookmark_with_is_favorite(self):
+        data = {
+            'url': 'https://fav.com', 'title': 'Favorite one', 'is_favorite': True,
+        }
+        response = self.client.post(BASE_URL, data, format='json', **self.slug)
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertTrue(response.json()['is_favorite'])
+        bm = Bookmark.objects.get(tenant=self.tenant, title='Favorite one')
+        self.assertTrue(bm.is_favorite)
+
+    def test_update_bookmark_toggles_is_favorite(self):
+        bm = Bookmark.objects.create(
+            tenant=self.tenant, user=self.user, url='https://x.com', title='X',
+            is_favorite=False,
+        )
+        url = f'{BASE_URL}{bm.pk}/'
+        response = self.client.patch(url, {'is_favorite': True}, format='json', **self.slug)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(response.json()['is_favorite'])
+        bm.refresh_from_db()
+        self.assertTrue(bm.is_favorite)
+
+    def test_favorite_bookmarks_ordered_first(self):
+        Bookmark.objects.create(
+            tenant=self.tenant, user=self.user, url='https://old.com', title='Old normal',
+            is_favorite=False,
+        )
+        Bookmark.objects.create(
+            tenant=self.tenant, user=self.user, url='https://fav.com', title='Old favorite',
+            is_favorite=True,
+        )
+        response = self.client.get(BASE_URL, **self.slug)
+        bookmarks = response.json()['bookmarks']
+        self.assertEqual(bookmarks[0]['title'], 'Old favorite')
+
     # ── Plan limit ────────────────────────────────────────────────────────────
 
     def test_create_bookmark_exceeds_plan_limit(self):

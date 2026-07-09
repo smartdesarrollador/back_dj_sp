@@ -6,6 +6,7 @@ URL namespace: /api/v1/app/snippets/
 Endpoints:
   GET    /app/snippets/        → list snippets (supports ?language= ?tag= ?search=)
   POST   /app/snippets/        → create snippet
+  GET    /app/snippets/tags/   → list distinct tags used by the current user
   GET    /app/snippets/<pk>/   → snippet detail
   PATCH  /app/snippets/<pk>/   → update snippet
   DELETE /app/snippets/<pk>/   → delete snippet
@@ -89,6 +90,20 @@ class CodeSnippetListCreateView(APIView):
             **serializer.validated_data,
         )
         return Response(CodeSnippetSerializer(snippet).data, status=status.HTTP_201_CREATED)
+
+
+class SnippetTagsView(APIView):
+    """Distinct tags the current user has used across their own snippets."""
+
+    permission_classes = [HasPermission('snippets.read')]
+
+    @extend_schema(tags=['app-devops'], summary='List distinct tags used by the current user')
+    def get(self, request):
+        snippets = CodeSnippet.objects.filter(tenant=request.tenant, user=request.user).only('tags')
+        all_tags: set[str] = set()
+        for snippet in snippets:
+            all_tags.update(snippet.tags)
+        return Response({'tags': sorted(all_tags)})
 
 
 class CodeSnippetDetailView(APIView):

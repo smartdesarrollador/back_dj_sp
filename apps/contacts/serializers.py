@@ -7,10 +7,15 @@ from apps.contacts.models import Contact, ContactGroup
 
 
 class ContactGroupSerializer(serializers.ModelSerializer):
+    contacts_count = serializers.SerializerMethodField()
+
     class Meta:
         model = ContactGroup
-        fields = ['id', 'name', 'color', 'created_at', 'updated_at']
-        read_only_fields = ['id', 'created_at', 'updated_at']
+        fields = ['id', 'name', 'color', 'contacts_count', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'contacts_count', 'created_at', 'updated_at']
+
+    def get_contacts_count(self, obj) -> int:
+        return obj.contacts.count()
 
 
 class ContactSerializer(serializers.ModelSerializer):

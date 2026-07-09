@@ -4,8 +4,9 @@ Notes views — CRUD for personal notes with category filtering and pinning.
 URL namespace: /api/v1/app/notes/
 
 Endpoints:
-  GET    /app/notes/           → list notes (supports ?category= ?search=)
+  GET    /app/notes/           → list notes (supports ?category= ?search= ?tag=)
   POST   /app/notes/           → create note
+  GET    /app/notes/tags/      → list distinct tags used by the current user
   GET    /app/notes/<pk>/      → note detail
   PATCH  /app/notes/<pk>/      → update note
   DELETE /app/notes/<pk>/      → delete note
@@ -49,6 +50,7 @@ class NoteListCreateView(APIView):
         parameters=[
             OpenApiParameter('category', OpenApiTypes.STR, description='Filter by category'),
             OpenApiParameter('search', OpenApiTypes.STR, description='Search in title/content'),
+            OpenApiParameter('tag', OpenApiTypes.STR, description='Filter by tag'),
         ],
     )
     def get(self, request):
@@ -62,10 +64,13 @@ class NoteListCreateView(APIView):
         ).distinct()
         category = request.query_params.get('category')
         search = request.query_params.get('search')
+        tag = request.query_params.get('tag')
         if category:
             qs = qs.filter(category=category)
         if search:
             qs = qs.filter(Q(title__icontains=search) | Q(content__icontains=search))
+        if tag:
+            qs = qs.filter(tags__contains=[tag])
         notes = NoteSerializer(
             qs, many=True, context={'request': request, 'shared_by_map': shared_by_map}
         ).data
@@ -81,13 +86,26 @@ class NoteListCreateView(APIView):
         serializer = NoteCreateUpdateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         data = dict(serializer.validated_data)
-        data.pop('tags', None)  # model has no tags field
         note = Note.objects.create(
             tenant=request.tenant,
             user=request.user,
             **data,
         )
         return Response(NoteSerializer(note).data, status=status.HTTP_201_CREATED)
+
+
+class NoteTagsView(APIView):
+    """Distinct tags the current user has used across their own notes."""
+
+    permission_classes = [HasPermission('notes.read')]
+
+    @extend_schema(tags=['app-notes'], summary='List distinct tags used by the current user')
+    def get(self, request):
+        notes = Note.objects.filter(tenant=request.tenant, user=request.user).only('tags')
+        all_tags: set[str] = set()
+        for note in notes:
+            all_tags.update(note.tags)
+        return Response({'tags': sorted(all_tags)})
 
 
 class NotesImportView(AuditMixin, APIView):
@@ -117,7 +135,6 @@ class NotesImportView(AuditMixin, APIView):
                 errors.append({'index': idx, 'errors': serializer.errors})
                 continue
             data = dict(serializer.validated_data)
-            data.pop('tags', None)  # model has no tags field
             valid.append(data)
 
         current = Note.objects.filter(tenant=request.tenant, user=request.user).count()
@@ -166,8 +183,6 @@ class NoteDetailView(APIView):
         serializer = NoteCreateUpdateSerializer(data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         for field, value in serializer.validated_data.items():
-            if field == 'tags':
-                continue  # model has no tags field
             setattr(note, field, value)
         note.save()
         return Response(NoteSerializer(note).data)

@@ -7,7 +7,6 @@ from apps.notes.models import Note
 
 
 class NoteSerializer(serializers.ModelSerializer):
-    tags = serializers.SerializerMethodField()
     is_shared = serializers.SerializerMethodField()
     shared_by_name = serializers.SerializerMethodField()
 
@@ -18,9 +17,6 @@ class NoteSerializer(serializers.ModelSerializer):
             'tags', 'is_shared', 'shared_by_name', 'created_at', 'updated_at',
         ]
         read_only_fields = ['id', 'created_at', 'updated_at']
-
-    def get_tags(self, obj) -> list:
-        return []
 
     def get_is_shared(self, obj) -> bool:
         request = self.context.get('request')
@@ -37,5 +33,18 @@ class NoteCreateUpdateSerializer(serializers.Serializer):
         choices=Note.CATEGORY_CHOICES, required=False, default='personal'
     )
     is_pinned = serializers.BooleanField(required=False, default=False)
-    tags = serializers.ListField(child=serializers.CharField(), required=False, default=list)
+    tags = serializers.ListField(
+        child=serializers.CharField(max_length=50, allow_blank=True), required=False, default=list
+    )
     color = serializers.CharField(required=False, max_length=20, default='gray')
+
+    def validate_tags(self, value):
+        seen = set()
+        normalized = []
+        for raw in value:
+            tag = raw.strip().lower()
+            if not tag or tag in seen:
+                continue
+            seen.add(tag)
+            normalized.append(tag)
+        return normalized

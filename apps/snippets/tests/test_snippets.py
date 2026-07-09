@@ -70,6 +70,54 @@ class TestSnippetViews(APITestCase):
         self.assertIn('beginner', snippet.tags)
         self.assertIn('tutorial', snippet.tags)
 
+    # ── is_favorite / usage_count ────────────────────────────────────────────
+
+    def test_create_snippet_with_is_favorite(self):
+        data = {
+            'title': 'Favorite one', 'code': 'x = 1', 'language': 'python',
+            'is_favorite': True,
+        }
+        response = self.client.post(BASE_URL, data, format='json', **self.slug)
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        body = response.json()
+        self.assertTrue(body['is_favorite'])
+        self.assertEqual(body['usage_count'], 0)
+        snippet = CodeSnippet.objects.get(tenant=self.tenant, title='Favorite one')
+        self.assertTrue(snippet.is_favorite)
+
+    def test_update_snippet_toggles_is_favorite(self):
+        snippet = CodeSnippet.objects.create(
+            tenant=self.tenant, user=self.user, title='X', code='x = 1',
+            language='python', is_favorite=False,
+        )
+        url = f'{BASE_URL}{snippet.pk}/'
+        response = self.client.patch(url, {'is_favorite': True}, format='json', **self.slug)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(response.json()['is_favorite'])
+        snippet.refresh_from_db()
+        self.assertTrue(snippet.is_favorite)
+
+    def test_usage_count_is_read_only_on_create(self):
+        data = {
+            'title': 'Y', 'code': 'x = 1', 'language': 'python', 'usage_count': 999,
+        }
+        response = self.client.post(BASE_URL, data, format='json', **self.slug)
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.json()['usage_count'], 0)
+
+    def test_favorite_snippets_ordered_first(self):
+        CodeSnippet.objects.create(
+            tenant=self.tenant, user=self.user, title='Old normal', code='x = 1',
+            language='python', is_favorite=False,
+        )
+        CodeSnippet.objects.create(
+            tenant=self.tenant, user=self.user, title='Old favorite', code='x = 1',
+            language='python', is_favorite=True,
+        )
+        response = self.client.get(BASE_URL, **self.slug)
+        snippets = response.json()['snippets']
+        self.assertEqual(snippets[0]['title'], 'Old favorite')
+
     # ── Plan limit ────────────────────────────────────────────────────────────
 
     def test_create_snippet_exceeds_plan_limit(self):
@@ -135,3 +183,53 @@ class TestSnippetViews(APITestCase):
         url = f'{BASE_URL}{snippet.pk}/'
         response = self.client.get(url, **self.slug)
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    # ── Filter by tag ─────────────────────────────────────────────────────────
+
+    def test_filter_snippets_by_tag(self):
+        CodeSnippet.objects.create(
+            tenant=self.tenant, user=self.user, title='A', code='x = 1',
+            language='python', tags=['urgente'],
+        )
+        CodeSnippet.objects.create(
+            tenant=self.tenant, user=self.user, title='B', code='y = 2',
+            language='python', tags=['personal'],
+        )
+        response = self.client.get(f'{BASE_URL}?tag=urgente', **self.slug)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        snippets = response.json()['snippets']
+        self.assertEqual(len(snippets), 1)
+        self.assertEqual(snippets[0]['title'], 'A')
+
+    # ── Tags: suggestions ────────────────────────────────────────────────────
+
+    def test_snippet_tags_endpoint_returns_distinct_sorted(self):
+        CodeSnippet.objects.create(
+            tenant=self.tenant, user=self.user, title='A', code='x = 1',
+            language='python', tags=['zebra', 'apple'],
+        )
+        CodeSnippet.objects.create(
+            tenant=self.tenant, user=self.user, title='B', code='y = 2',
+            language='python', tags=['apple', 'mango'],
+        )
+        response = self.client.get(f'{BASE_URL}tags/', **self.slug)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.json()['tags'], ['apple', 'mango', 'zebra'])
+
+    def test_snippet_tags_endpoint_scoped_to_user(self):
+        CodeSnippet.objects.create(
+            tenant=self.tenant, user=self.user, title='Mine', code='x = 1',
+            language='python', tags=['mine'],
+        )
+        other_user = _create_superuser(self.tenant, 'other-user@sn.com')
+        CodeSnippet.objects.create(
+            tenant=self.tenant, user=other_user, title='Theirs', code='y = 2',
+            language='python', tags=['theirs'],
+        )
+        response = self.client.get(f'{BASE_URL}tags/', **self.slug)
+        self.assertEqual(response.json()['tags'], ['mine'])
+
+    def test_snippet_tags_endpoint_empty_state(self):
+        response = self.client.get(f'{BASE_URL}tags/', **self.slug)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.json()['tags'], [])

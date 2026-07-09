@@ -6,6 +6,7 @@ URL namespace: /api/v1/app/bookmarks/
 Endpoints:
   GET    /app/bookmarks/                      → list bookmarks (supports ?collection= ?search= ?tag=)
   POST   /app/bookmarks/                      → create bookmark
+  GET    /app/bookmarks/tags/                 → list distinct tags used by the current user
   GET    /app/bookmarks/<pk>/                 → bookmark detail
   PATCH  /app/bookmarks/<pk>/                 → update bookmark
   DELETE /app/bookmarks/<pk>/                 → delete bookmark
@@ -101,6 +102,20 @@ class BookmarkListCreateView(APIView):
             **data,
         )
         return Response(BookmarkSerializer(bookmark).data, status=status.HTTP_201_CREATED)
+
+
+class BookmarkTagsView(APIView):
+    """Distinct tags the current user has used across their own bookmarks."""
+
+    permission_classes = [HasPermission('bookmarks.read')]
+
+    @extend_schema(tags=['app-bookmarks'], summary='List distinct tags used by the current user')
+    def get(self, request):
+        bookmarks = Bookmark.objects.filter(tenant=request.tenant, user=request.user).only('tags')
+        all_tags: set[str] = set()
+        for bookmark in bookmarks:
+            all_tags.update(bookmark.tags)
+        return Response({'tags': sorted(all_tags)})
 
 
 class BookmarkImportView(AuditMixin, APIView):
