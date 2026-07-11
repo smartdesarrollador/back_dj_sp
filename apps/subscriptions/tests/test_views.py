@@ -5,11 +5,12 @@ import uuid
 from unittest.mock import MagicMock, patch
 
 import stripe as stripe_lib
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
 from rest_framework import status
 from rest_framework.test import APIClient, APITestCase
 
-from apps.subscriptions.models import Invoice, PaymentMethod, Subscription
+from apps.subscriptions.models import Invoice, PaymentMethod, Subscription, YapePaymentProof
 from apps.tenants.models import Tenant
 
 _FAST_HASHERS = ['django.contrib.auth.hashers.MD5PasswordHasher']
@@ -64,7 +65,7 @@ class TestCurrentSubscriptionView(APITestCase):
     def test_current_subscription_requires_auth(self):
         client = APIClient()
         resp = client.get(
-            '/api/v1/admin/subscriptions/current',
+            '/api/v1/admin/subscriptions/current/',
             **slug_header(self.tenant.slug),
         )
         self.assertEqual(resp.status_code, status.HTTP_401_UNAUTHORIZED)
@@ -74,7 +75,7 @@ class TestCurrentSubscriptionView(APITestCase):
         Subscription.objects.filter(tenant=self.tenant).delete()
 
         resp = self.client.get(
-            '/api/v1/admin/subscriptions/current',
+            '/api/v1/admin/subscriptions/current/',
             **slug_header(self.tenant.slug),
         )
 
@@ -96,7 +97,7 @@ class TestCurrentSubscriptionView(APITestCase):
             sub.save()
 
         resp = self.client.get(
-            '/api/v1/admin/subscriptions/current',
+            '/api/v1/admin/subscriptions/current/',
             **slug_header(self.tenant.slug),
         )
 
@@ -114,7 +115,7 @@ class TestCurrentSubscriptionView(APITestCase):
         sub.save()
 
         resp = self.client.get(
-            '/api/v1/admin/subscriptions/current',
+            '/api/v1/admin/subscriptions/current/',
             **slug_header(self.tenant.slug),
         )
 
@@ -123,7 +124,7 @@ class TestCurrentSubscriptionView(APITestCase):
 
     def test_current_subscription_includes_usage(self):
         resp = self.client.get(
-            '/api/v1/admin/subscriptions/current',
+            '/api/v1/admin/subscriptions/current/',
             **slug_header(self.tenant.slug),
         )
 
@@ -149,7 +150,7 @@ class TestUpgradeSubscriptionView(APITestCase):
     def test_upgrade_requires_auth(self):
         client = APIClient()
         resp = client.post(
-            '/api/v1/admin/subscriptions/upgrade',
+            '/api/v1/admin/subscriptions/upgrade/',
             {'new_plan': 'starter', 'billing_cycle': 'monthly'},
             format='json',
             **slug_header(self.tenant.slug),
@@ -162,7 +163,7 @@ class TestUpgradeSubscriptionView(APITestCase):
         self.client.force_authenticate(user=user_no_perm)
 
         resp = self.client.post(
-            '/api/v1/admin/subscriptions/upgrade',
+            '/api/v1/admin/subscriptions/upgrade/',
             {'new_plan': 'starter', 'billing_cycle': 'monthly'},
             format='json',
             **slug_header(self.tenant.slug),
@@ -176,7 +177,7 @@ class TestUpgradeSubscriptionView(APITestCase):
         mock_sub_create.return_value = {'id': 'sub_test_upgrade', 'status': 'active'}
 
         resp = self.client.post(
-            '/api/v1/admin/subscriptions/upgrade',
+            '/api/v1/admin/subscriptions/upgrade/',
             {'new_plan': 'starter', 'billing_cycle': 'monthly'},
             format='json',
             **slug_header(self.tenant.slug),
@@ -193,7 +194,7 @@ class TestUpgradeSubscriptionView(APITestCase):
         self.tenant.save()
 
         resp = self.client.post(
-            '/api/v1/admin/subscriptions/upgrade',
+            '/api/v1/admin/subscriptions/upgrade/',
             {'new_plan': 'starter', 'billing_cycle': 'monthly'},
             format='json',
             **slug_header(self.tenant.slug),
@@ -202,7 +203,7 @@ class TestUpgradeSubscriptionView(APITestCase):
 
     def test_upgrade_invalid_plan_rejected(self):
         resp = self.client.post(
-            '/api/v1/admin/subscriptions/upgrade',
+            '/api/v1/admin/subscriptions/upgrade/',
             {'new_plan': 'invalid_plan', 'billing_cycle': 'monthly'},
             format='json',
             **slug_header(self.tenant.slug),
@@ -230,7 +231,7 @@ class TestCancelSubscriptionView(APITestCase):
         mock_modify.return_value = MagicMock(id='sub_cancel_test', cancel_at_period_end=True)
 
         resp = self.client.post(
-            '/api/v1/admin/subscriptions/cancel',
+            '/api/v1/admin/subscriptions/cancel/',
             format='json',
             **slug_header(self.tenant.slug),
         )
@@ -242,7 +243,7 @@ class TestCancelSubscriptionView(APITestCase):
     def test_cancel_requires_auth(self):
         client = APIClient()
         resp = client.post(
-            '/api/v1/admin/subscriptions/cancel',
+            '/api/v1/admin/subscriptions/cancel/',
             format='json',
             **slug_header(self.tenant.slug),
         )
@@ -253,7 +254,7 @@ class TestCancelSubscriptionView(APITestCase):
         self.client.force_authenticate(user=user_no_perm)
 
         resp = self.client.post(
-            '/api/v1/admin/subscriptions/cancel',
+            '/api/v1/admin/subscriptions/cancel/',
             format='json',
             **slug_header(self.tenant.slug),
         )
@@ -265,7 +266,7 @@ class TestCancelSubscriptionView(APITestCase):
         self.sub.save()
 
         resp = self.client.post(
-            '/api/v1/admin/subscriptions/cancel',
+            '/api/v1/admin/subscriptions/cancel/',
             format='json',
             **slug_header(self.tenant.slug),
         )
@@ -273,6 +274,94 @@ class TestCancelSubscriptionView(APITestCase):
         self.assertEqual(resp.status_code, status.HTTP_200_OK)
         self.sub.refresh_from_db()
         self.assertTrue(self.sub.cancel_at_period_end)
+
+
+# ─── YapeUpgradeView ──────────────────────────────────────────────────────────
+
+@override_settings(PASSWORD_HASHERS=_FAST_HASHERS)
+class TestYapeUpgradeView(APITestCase):
+    def setUp(self):
+        self.tenant = make_tenant(plan='free')
+        self.user = make_user(self.tenant, is_superuser=True)
+        self.client.force_authenticate(user=self.user)
+
+    def _screenshot(self):
+        return SimpleUploadedFile('proof.png', b'\x89PNG fake', content_type='image/png')
+
+    def test_yape_upgrade_success(self):
+        resp = self.client.post(
+            '/api/v1/admin/subscriptions/yape-upgrade/',
+            {'plan': 'professional', 'screenshot': self._screenshot(), 'amount': '79'},
+            format='multipart',
+            **slug_header(self.tenant.slug),
+        )
+
+        self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
+        self.assertIn('proof_id', resp.data)
+        proof = YapePaymentProof.objects.get(id=resp.data['proof_id'])
+        self.assertEqual(proof.plan, 'professional')
+        self.assertEqual(proof.subscription.tenant, self.tenant)
+
+    def test_yape_upgrade_requires_auth(self):
+        client = APIClient()
+        resp = client.post(
+            '/api/v1/admin/subscriptions/yape-upgrade/',
+            {'plan': 'professional', 'screenshot': self._screenshot(), 'amount': '79'},
+            format='multipart',
+            **slug_header(self.tenant.slug),
+        )
+        self.assertEqual(resp.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_yape_upgrade_same_or_lower_plan_rejected(self):
+        resp = self.client.post(
+            '/api/v1/admin/subscriptions/yape-upgrade/',
+            {'plan': 'free', 'screenshot': self._screenshot(), 'amount': '0'},
+            format='multipart',
+            **slug_header(self.tenant.slug),
+        )
+        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+
+
+# ─── StartTrialView ───────────────────────────────────────────────────────────
+
+@override_settings(PASSWORD_HASHERS=_FAST_HASHERS)
+class TestStartTrialView(APITestCase):
+    def setUp(self):
+        self.tenant = make_tenant(plan='free')
+        self.user = make_user(self.tenant, is_superuser=True)
+        self.client.force_authenticate(user=self.user)
+
+    def test_start_trial_success(self):
+        resp = self.client.post(
+            '/api/v1/admin/subscriptions/trial/',
+            format='json',
+            **slug_header(self.tenant.slug),
+        )
+
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.tenant.refresh_from_db()
+        self.assertEqual(self.tenant.plan, 'professional')
+        self.assertTrue(self.tenant.professional_trial_used)
+
+    def test_start_trial_requires_auth(self):
+        client = APIClient()
+        resp = client.post(
+            '/api/v1/admin/subscriptions/trial/',
+            format='json',
+            **slug_header(self.tenant.slug),
+        )
+        self.assertEqual(resp.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_start_trial_already_used_rejected(self):
+        self.tenant.professional_trial_used = True
+        self.tenant.save(update_fields=['professional_trial_used'])
+
+        resp = self.client.post(
+            '/api/v1/admin/subscriptions/trial/',
+            format='json',
+            **slug_header(self.tenant.slug),
+        )
+        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
 
 
 # ─── InvoiceListView ──────────────────────────────────────────────────────────

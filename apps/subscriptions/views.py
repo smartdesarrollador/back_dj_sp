@@ -1,9 +1,9 @@
 """
 Subscription billing views.
 
-CurrentSubscriptionView    — GET  /api/v1/admin/subscriptions/current
-UpgradeSubscriptionView    — POST /api/v1/admin/subscriptions/upgrade
-CancelSubscriptionView     — POST /api/v1/admin/subscriptions/cancel
+CurrentSubscriptionView    — GET  /api/v1/admin/subscriptions/current/
+UpgradeSubscriptionView    — POST /api/v1/admin/subscriptions/upgrade/
+CancelSubscriptionView     — POST /api/v1/admin/subscriptions/cancel/
 InvoiceListView            — GET  /api/v1/admin/billing/invoices
 WebhookView                — POST /api/v1/admin/billing/webhooks
 PaymentMethodListView      — GET+POST /api/v1/admin/billing/payment-methods
@@ -397,7 +397,7 @@ class AdminPlanDetailView(APIView):
 
 class StartTrialView(APIView):
     """
-    POST /api/v1/admin/subscriptions/trial
+    POST /api/v1/admin/subscriptions/trial/
     Activates a 30-day Professional trial for the current tenant.
     Only available to Free-plan tenants that haven't used their trial.
     """

@@ -1,7 +1,7 @@
 """
 YapeUpgradeView — authenticated Yape payment proof for plan upgrades.
 
-POST /api/v1/admin/subscriptions/yape-upgrade
+POST /api/v1/admin/subscriptions/yape-upgrade/
 
 Used when a logged-in tenant wants to upgrade their plan by submitting a Yape
 payment screenshot. Unlike YapePaymentProofView (which uses a Redis token for
