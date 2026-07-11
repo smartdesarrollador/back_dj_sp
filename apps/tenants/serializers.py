@@ -6,6 +6,7 @@ from rest_framework import serializers
 from apps.tenants.models import Tenant
 from utils.media import build_media_url
 from utils.plans import PLAN_FEATURES
+from utils.storage import get_tenant_storage_bytes
 
 PLAN_NAME_MAP = {
     'free': 'Free',
@@ -121,7 +122,7 @@ class ClientListSerializer(serializers.ModelSerializer):
                 'limit': plan_cfg['max_users'],
             },
             'storage': {
-                'current_gb': 0,
+                'current_gb': round(get_tenant_storage_bytes(obj) / 1024 ** 3, 3),
                 'limit_gb': plan_cfg['storage_gb'],
             },
             'api_calls': {

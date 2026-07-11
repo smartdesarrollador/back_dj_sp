@@ -1,19 +1,22 @@
 """
 Tests for the Chat module — message attachments (Phase 3).
 """
+from unittest.mock import patch
+
 from django.core.cache import cache
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import override_settings
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from apps.chat.models import Conversation, ConversationMember, MessageAttachment
+from apps.chat.models import Conversation, ConversationMember, Message, MessageAttachment
 from apps.chat.tests.conftest_helpers import (
     FAST_HASHERS,
     LOCMEM_CACHE,
     create_tenant,
     create_user,
 )
+from core.exceptions import PlanLimitExceeded
 
 BASE = '/api/v1/app/chat/'
 
@@ -72,3 +75,16 @@ class TestAttachments(APITestCase):
             format='multipart', **self.headers,
         )
         self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+
+    @patch('apps.chat.views.check_storage_limit')
+    def test_attachment_over_storage_limit_rejected(self, mock_limit):
+        mock_limit.side_effect = PlanLimitExceeded()
+        upload = SimpleUploadedFile('photo.png', b'\x89PNG\r\n\x1a\n fake', content_type='image/png')
+        res = self.client.post(
+            f'{BASE}messages/',
+            {'conversation': str(self.conv.id), 'file': upload},
+            format='multipart', **self.headers,
+        )
+        self.assertEqual(res.status_code, status.HTTP_402_PAYMENT_REQUIRED)
+        self.assertEqual(MessageAttachment.objects.count(), 0)
+        self.assertEqual(Message.objects.count(), 0)

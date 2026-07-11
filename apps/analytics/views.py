@@ -33,6 +33,7 @@ def _compute_summary(tenant, period_days: int) -> dict:
     from apps.projects.models import Project
     from apps.snippets.models import CodeSnippet
     from apps.tasks.models import Task
+    from utils.storage import get_tenant_storage_bytes
 
     start = timezone.now() - timedelta(days=period_days)
     today_start = timezone.now().replace(hour=0, minute=0, second=0, microsecond=0)
@@ -62,7 +63,7 @@ def _compute_summary(tenant, period_days: int) -> dict:
         'completed_tasks': completed_tasks,
         'overdue_tasks': overdue_tasks,
         'total_projects': total_projects,
-        'storage_used_gb': 0,
+        'storage_used_gb': round(get_tenant_storage_bytes(tenant) / 1024 ** 3, 3),
         # DashboardPage fields
         'total_notes': total_notes,
         'events_today': events_today,

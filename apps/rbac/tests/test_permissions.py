@@ -18,6 +18,7 @@ from apps.rbac.permissions import (
     HasPermission,
     _user_has_permission,
     check_plan_limit,
+    check_storage_limit,
 )
 from core.exceptions import FeatureNotAvailable, PlanLimitExceeded
 
@@ -261,6 +262,88 @@ class CheckPlanLimitTest(TestCase):
             check_plan_limit(user, 'projects', current_count=9999)
         except PlanLimitExceeded:
             self.fail('check_plan_limit raised PlanLimitExceeded when user has no tenant')
+
+
+# ─── CheckStorageLimit / get_tenant_storage_bytes Tests ───────────────────────
+
+def _make_attachment(tenant, sender, size: int):
+    from django.core.files.uploadedfile import SimpleUploadedFile
+
+    from apps.chat.models import Conversation, Message, MessageAttachment
+
+    conv = Conversation.objects.create(tenant=tenant, type='direct', created_by=sender)
+    message = Message.objects.create(conversation=conv, sender=sender, content='x')
+    return MessageAttachment.objects.create(
+        message=message,
+        file=SimpleUploadedFile('f.txt', b'x'),
+        kind='file',
+        original_name='f.txt',
+        size=size,
+    )
+
+
+@override_settings(PASSWORD_HASHERS=_FAST_HASHERS)
+class GetTenantStorageBytesTest(TestCase):
+    def test_sums_chat_attachments_for_tenant(self):
+        from utils.storage import get_tenant_storage_bytes
+
+        tenant = make_tenant('professional')
+        user = make_user(tenant)
+        _make_attachment(tenant, user, size=1000)
+        _make_attachment(tenant, user, size=2000)
+
+        self.assertEqual(get_tenant_storage_bytes(tenant), 3000)
+
+    def test_excludes_other_tenants(self):
+        from utils.storage import get_tenant_storage_bytes
+
+        tenant = make_tenant('professional')
+        other_tenant = make_tenant('professional')
+        other_user = make_user(other_tenant)
+        _make_attachment(other_tenant, other_user, size=5000)
+
+        self.assertEqual(get_tenant_storage_bytes(tenant), 0)
+
+    def test_includes_logo_and_favicon(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        from utils.storage import get_tenant_storage_bytes
+
+        tenant = make_tenant('professional')
+        tenant.logo = SimpleUploadedFile('logo.png', b'x' * 100)
+        tenant.favicon = SimpleUploadedFile('favicon.png', b'x' * 50)
+        tenant.save(update_fields=['logo', 'favicon'])
+
+        self.assertEqual(get_tenant_storage_bytes(tenant), 150)
+
+
+@override_settings(PASSWORD_HASHERS=_FAST_HASHERS)
+class CheckStorageLimitTest(TestCase):
+    def test_free_under_limit_passes(self):
+        tenant = make_tenant('free')  # storage_gb = 1
+        try:
+            check_storage_limit(tenant, additional_bytes=1024)
+        except PlanLimitExceeded:
+            self.fail('check_storage_limit raised PlanLimitExceeded unexpectedly')
+
+    def test_free_over_limit_raises(self):
+        tenant = make_tenant('free')  # storage_gb = 1 → 1024**3 bytes
+        with self.assertRaises(PlanLimitExceeded):
+            check_storage_limit(tenant, additional_bytes=2 * 1024 ** 3)
+
+    def test_existing_usage_plus_new_file_over_limit_raises(self):
+        tenant = make_tenant('free')  # storage_gb = 1
+        user = make_user(tenant)
+        _make_attachment(tenant, user, size=int(0.9 * 1024 ** 3))
+        with self.assertRaises(PlanLimitExceeded):
+            check_storage_limit(tenant, additional_bytes=int(0.2 * 1024 ** 3))
+
+    def test_enterprise_unlimited_never_raises(self):
+        tenant = make_tenant('enterprise')  # storage_gb = None
+        try:
+            check_storage_limit(tenant, additional_bytes=999 * 1024 ** 3)
+        except PlanLimitExceeded:
+            self.fail('check_storage_limit raised PlanLimitExceeded for enterprise')
 
 
 # ─── FeaturesView Tests ────────────────────────────────────────────────────────

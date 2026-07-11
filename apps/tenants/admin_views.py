@@ -15,7 +15,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework import status
 
-from apps.rbac.permissions import HasPermission
+from apps.rbac.permissions import HasPermission, check_storage_limit
 from apps.tenants.models import Tenant
 from apps.tenants.serializers import ClientListSerializer, OrganizationSerializer
 
@@ -71,6 +71,11 @@ class OrganizationView(APIView):
     def patch(self, request):
         tenant = request.tenant
         update_fields = []
+        incoming_bytes = sum(
+            request.FILES[key].size for key in ('logo', 'favicon') if key in request.FILES
+        )
+        if incoming_bytes:
+            check_storage_limit(tenant, incoming_bytes)
         if 'name' in request.data:
             tenant.name = request.data['name']
             update_fields.append('name')

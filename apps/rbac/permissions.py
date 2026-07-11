@@ -185,3 +185,36 @@ def check_plan_limit(user, resource: str, current_count: int) -> None:
                 'Actualiza tu plan para continuar.'
             )
         )
+
+
+def check_storage_limit(tenant, additional_bytes: int) -> None:
+    """
+    Verifica que sumar `additional_bytes` al almacenamiento ya consumido no supere
+    el storage_gb del plan del tenant.
+
+    A diferencia de check_plan_limit (conteo de unidades vía max_{resource}), storage_gb
+    no sigue esa convención de nombre en PLAN_FEATURES — se lee directo.
+
+    Args:
+        tenant: instancia de Tenant
+        additional_bytes: tamaño del archivo que se está por subir
+
+    Raises:
+        PlanLimitExceeded: HTTP 402 si (uso actual + additional_bytes) > límite del plan
+    """
+    from utils.plans import PLAN_FEATURES
+    from utils.storage import get_tenant_storage_bytes
+
+    limit_gb = PLAN_FEATURES.get(tenant.plan, PLAN_FEATURES['free']).get('storage_gb')
+    if limit_gb is None:
+        return  # Ilimitado (Enterprise)
+
+    limit_bytes = limit_gb * 1024 ** 3
+    current_bytes = get_tenant_storage_bytes(tenant)
+    if current_bytes + additional_bytes > limit_bytes:
+        raise PlanLimitExceeded(
+            detail=(
+                f'Has alcanzado el límite de almacenamiento de {limit_gb} GB para el plan '
+                f'{tenant.plan}. Actualiza tu plan para continuar.'
+            )
+        )

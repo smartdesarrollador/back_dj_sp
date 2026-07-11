@@ -42,14 +42,16 @@ _NOT_FOUND = Response(
 
 
 def _is_agent(user) -> bool:
-    """Return True if the user has agent-level access (superuser or support.assign perm)."""
-    return user.is_superuser or _user_has_permission(user, 'support.assign')
+    """Return True if the user has agent-level access (platform staff, superuser or support.assign perm)."""
+    return user.is_staff or user.is_superuser or _user_has_permission(user, 'support.assign')
 
 
 def _get_ticket(pk, tenant, user):
-    """Return SupportTicket scoped by tenant. Agents see all; clients see only their own."""
+    """Return SupportTicket scoped by tenant. Platform staff see tickets from every
+    tenant; agents see all of their own tenant's tickets; clients see only their own."""
     try:
-        qs = SupportTicket.objects.filter(pk=pk, tenant=tenant)
+        qs = SupportTicket.objects.all() if user.is_staff else SupportTicket.objects.filter(tenant=tenant)
+        qs = qs.filter(pk=pk)
         if not _is_agent(user):
             qs = qs.filter(client=user)
         return qs.get()
@@ -71,7 +73,8 @@ class TicketListCreateView(AuditMixin, APIView):
         ],
     )
     def get(self, request):
-        qs = SupportTicket.objects.filter(tenant=request.tenant)
+        base_qs = SupportTicket.objects.all() if request.user.is_staff else SupportTicket.objects.filter(tenant=request.tenant)
+        qs = base_qs
         if not _is_agent(request.user):
             qs = qs.filter(client=request.user)
 
@@ -89,9 +92,7 @@ class TicketListCreateView(AuditMixin, APIView):
         if search:
             qs = (
                 qs.filter(subject__icontains=search)
-                | SupportTicket.objects.filter(
-                    tenant=request.tenant, client_email__icontains=search
-                )
+                | base_qs.filter(client_email__icontains=search)
             ).distinct()
             if not _is_agent(request.user):
                 qs = qs.filter(client=request.user)
@@ -230,7 +231,8 @@ class TicketExportView(APIView):
 
     @extend_schema(tags=['support'], summary='Export tickets as CSV')
     def get(self, request):
-        qs = SupportTicket.objects.filter(tenant=request.tenant).order_by('-created_at')
+        qs = SupportTicket.objects.all() if request.user.is_staff else SupportTicket.objects.filter(tenant=request.tenant)
+        qs = qs.order_by('-created_at')
         output = io.StringIO()
         writer = csv.writer(output)
         writer.writerow([

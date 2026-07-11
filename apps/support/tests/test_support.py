@@ -11,6 +11,7 @@ from django.test import override_settings
 from rest_framework import status
 from rest_framework.test import APITestCase
 
+from apps.rbac.models import Permission, Role, RolePermission, UserRole
 from apps.support.models import SupportTicket, TicketComment
 from apps.tenants.models import Tenant
 
@@ -39,6 +40,24 @@ def _create_regular_user(tenant, email, name='Regular User'):
     return User.objects.create_user(
         email=email, name=name, password='x', tenant=tenant
     )
+
+
+def _create_staff_user(tenant, email, name='Staff User'):
+    """Platform staff (is_staff=True, not superuser) with support.read/support.assign
+    granted via a role on their own tenant — mirrors how a real Admin Panel operator
+    is set up (unlike superusers, is_staff alone doesn't bypass RBAC permission checks)."""
+    user = User.objects.create_user(
+        email=email, name=name, password='x', tenant=tenant, is_staff=True,
+    )
+    role = Role.objects.create(tenant=tenant, name=f'support-agent-{email}')
+    for codename in ('support.read', 'support.assign'):
+        perm, _ = Permission.objects.get_or_create(
+            codename=codename,
+            defaults={'name': codename, 'resource': 'support', 'action': codename.split('.')[1]},
+        )
+        RolePermission.objects.create(role=role, permission=perm, scope='all')
+    UserRole.objects.create(user=user, role=role)
+    return user
 
 
 @override_settings(PASSWORD_HASHERS=_FAST_HASHERS, CACHES=_LOCMEM_CACHE)
@@ -113,6 +132,33 @@ class TestSupportTicketCRUD(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         tickets = response.json()['tickets']
         self.assertEqual(len(tickets), 2)
+
+    # ── 3b. Platform staff sees tickets from every tenant ─────────────────────
+
+    def test_platform_staff_sees_tickets_across_all_tenants(self):
+        other_tenant = _create_tenant('client-corp')
+        other_client = _create_regular_user(other_tenant, 'client@client-corp.com')
+        SupportTicket.objects.create(
+            tenant=other_tenant, client=other_client,
+            subject='Client-corp issue', description='desc', category='technical',
+        )
+        SupportTicket.objects.create(
+            tenant=self.tenant, client=self.user,
+            subject='Own tenant issue', description='desc', category='billing',
+        )
+
+        staff = _create_staff_user(self.tenant, 'staff@support-corp.com')
+        self.client.force_authenticate(user=staff)
+        # Staff's own tenant slug in the header — cross-tenant visibility must not
+        # depend on which tenant slug the Admin Panel happens to send.
+        response = self.client.get(BASE_URL, **self.slug)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        tickets = response.json()['tickets']
+        self.assertEqual(len(tickets), 2)
+
+        ticket_id = next(t['id'] for t in tickets if t['subject'] == 'Client-corp issue')
+        detail = self.client.get(f'{BASE_URL}{ticket_id}/', **self.slug)
+        self.assertEqual(detail.status_code, status.HTTP_200_OK)
 
     # ── 4. Close ticket ───────────────────────────────────────────────────────
 

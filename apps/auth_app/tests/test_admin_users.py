@@ -126,6 +126,18 @@ class TestAdminUserViews(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         mock_mail.assert_called_once()
 
+    @patch('apps.auth_app.admin_views.check_plan_limit')
+    def test_invite_exceeds_plan_limit(self, mock_limit):
+        mock_limit.side_effect = PlanLimitExceeded()
+        response = self.client.post(
+            USERS_URL + 'invite/',
+            {'email': 'over@corp.com'},
+            format='json',
+            HTTP_X_TENANT_SLUG='corp',
+        )
+        self.assertEqual(response.status_code, status.HTTP_402_PAYMENT_REQUIRED)
+        self.assertFalse(User.objects.filter(email='over@corp.com').exists())
+
     # ── assign / remove roles ─────────────────────────────────────────────────
 
     def test_assign_role_success(self):

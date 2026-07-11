@@ -103,12 +103,23 @@ class TeamDirectoryView(APIView):
 class UserInviteView(APIView):
     permission_classes = [HasPermission('users.invite')]
 
-    @extend_schema(tags=['admin-users'], summary='Invite user via email')
+    @extend_schema(
+        tags=['admin-users'],
+        summary='Invite user via email',
+        responses={
+            201: OpenApiResponse(description='Invitation sent'),
+            400: OpenApiResponse(description='Validation error'),
+            402: OpenApiResponse(description='Plan user limit exceeded'),
+        },
+    )
     def post(self, request):
         serializer = InviteUserSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         email = serializer.validated_data['email']
         role_id = serializer.validated_data.get('role_id')
+
+        current_count = User.objects.filter(tenant=request.tenant).count()
+        check_plan_limit(request.user, 'users', current_count)
 
         user = User.objects.create_user(
             email=email,

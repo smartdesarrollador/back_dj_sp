@@ -38,7 +38,7 @@ from apps.chat.serializers import (
     MessageSerializer,
 )
 from apps.chat.realtime import broadcast_membership_changed, broadcast_message
-from apps.rbac.permissions import _user_has_permission, check_plan_limit
+from apps.rbac.permissions import _user_has_permission, check_plan_limit, check_storage_limit
 from core.mixins import AuditMixin
 
 User = ConversationMember._meta.get_field('user').related_model
@@ -365,6 +365,8 @@ class MessageListCreateView(AuditMixin, APIView):
             raise ValidationError({'content': 'El mensaje no puede estar vacío.'})
         if upload and upload.size > _MAX_ATTACHMENT_BYTES:
             raise ValidationError({'file': 'El archivo supera el límite de 10 MB.'})
+        if upload:
+            check_storage_limit(request.tenant, upload.size)
 
         reply_to = None
         reply_to_id = request.data.get('reply_to')

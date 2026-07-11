@@ -4,6 +4,7 @@ from rest_framework import serializers
 from apps.services.models import TenantService
 from apps.subscriptions.models import Invoice, PaymentMethod, Plan, Subscription
 from utils.plans import PLAN_FEATURES
+from utils.storage import get_tenant_storage_bytes
 
 
 class SubscriptionSerializer(serializers.ModelSerializer):
@@ -208,7 +209,7 @@ class CurrentSubscriptionSerializer(serializers.ModelSerializer):
                 'limit': plan_config.get('max_users'),
             },
             'storage': {
-                'current_gb': 0,
+                'current_gb': round(get_tenant_storage_bytes(tenant) / 1024 ** 3, 3),
                 'limit_gb': plan_config.get('storage_gb'),
             },
             'services': {
