@@ -236,10 +236,18 @@ class Plan(models.Model):
     price_annual  = models.IntegerField(default=0)
     popular       = models.BooleanField(default=False)
     highlights    = models.JSONField(default=list)   # [{ "label": str, "included": bool }]
+    # Overrides de utils.plans.PLAN_FEATURES (max_users, storage_gb, ...). {} = usar defaults de
+    # código. Ver utils.plans.get_effective_plan_limits().
+    limits        = models.JSONField(default=dict, blank=True)
     updated_at    = models.DateTimeField(auto_now=True)
 
     class Meta:
         ordering = ['price_monthly']
+
+    def save(self, *args, **kwargs) -> None:
+        super().save(*args, **kwargs)
+        from django.core.cache import cache
+        cache.delete(f'plan:limits:{self.id}')
 
     def __str__(self) -> str:
         return f'{self.display_name} (${self.price_monthly}/mo)'

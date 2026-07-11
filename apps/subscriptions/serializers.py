@@ -3,7 +3,7 @@ from rest_framework import serializers
 
 from apps.services.models import TenantService
 from apps.subscriptions.models import Invoice, PaymentMethod, Plan, Subscription
-from utils.plans import PLAN_FEATURES
+from utils.plans import get_effective_plan_limits
 from utils.storage import get_tenant_storage_bytes
 
 
@@ -108,14 +108,30 @@ class PaymentMethodUpdateSerializer(serializers.Serializer):
     external_account_id = serializers.CharField(required=False, allow_blank=True)
 
 
+class PlanLimitsSerializer(serializers.Serializer):
+    """Subset comercial de límites técnicos editable desde el Admin (ver Plan.limits)."""
+    max_users            = serializers.IntegerField(min_value=0, required=False, allow_null=True)
+    storage_gb           = serializers.IntegerField(min_value=0, required=False, allow_null=True)
+    max_projects         = serializers.IntegerField(min_value=0, required=False, allow_null=True)
+    max_custom_roles     = serializers.IntegerField(min_value=0, required=False, allow_null=True)
+    api_calls_per_month  = serializers.IntegerField(min_value=0, required=False, allow_null=True)
+
+
 class PlanSerializer(serializers.ModelSerializer):
+    limits = serializers.SerializerMethodField()
+
     class Meta:
         model = Plan
         fields = [
             'id', 'display_name', 'description', 'price_monthly',
-            'price_annual', 'popular', 'highlights', 'updated_at',
+            'price_annual', 'popular', 'highlights', 'limits', 'updated_at',
         ]
         read_only_fields = ['id', 'updated_at']
+
+    def get_limits(self, obj) -> dict:
+        # Valor efectivo (override de BD + defaults de código), no el campo crudo —
+        # así el form del Admin siempre se precarga con lo realmente vigente.
+        return get_effective_plan_limits(obj.id)
 
 
 class PlanUpdateSerializer(serializers.Serializer):
@@ -127,6 +143,7 @@ class PlanUpdateSerializer(serializers.Serializer):
     highlights    = serializers.ListField(
         child=serializers.DictField(), required=False, min_length=1, max_length=10
     )
+    limits        = PlanLimitsSerializer(required=False)
 
 
 class UpgradeSerializer(serializers.Serializer):
@@ -156,6 +173,7 @@ PLAN_DISPLAY_NAMES: dict[str, str] = {
 
 class CurrentSubscriptionSerializer(serializers.ModelSerializer):
     usage = serializers.SerializerMethodField()
+    plan = serializers.SerializerMethodField()
     plan_display = serializers.SerializerMethodField()
     mrr = serializers.SerializerMethodField()
     professional_trial_used = serializers.SerializerMethodField()
@@ -180,8 +198,15 @@ class CurrentSubscriptionSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = fields
 
+    def get_plan(self, obj) -> str:
+        # Tenant.plan es la fuente de verdad real (la que usa check_plan_limit y el topbar);
+        # Subscription.plan es bookkeeping de billing y puede desincronizarse. Ver LL-049/plan
+        # de fix "plan del tenant desincronizado en el Hub".
+        return obj.tenant.plan
+
     def get_plan_display(self, obj) -> str:
-        return PLAN_DISPLAY_NAMES.get(obj.plan, obj.plan.capitalize())
+        plan = obj.tenant.plan
+        return PLAN_DISPLAY_NAMES.get(plan, plan.capitalize())
 
     def get_professional_trial_used(self, obj) -> bool:
         return obj.tenant.professional_trial_used
@@ -197,8 +222,7 @@ class CurrentSubscriptionSerializer(serializers.ModelSerializer):
 
     def get_usage(self, obj) -> dict:
         tenant = obj.tenant
-        plan = obj.plan
-        plan_config = PLAN_FEATURES.get(plan, PLAN_FEATURES['free'])
+        plan_config = get_effective_plan_limits(tenant.plan)
 
         user_count = tenant.users.count()
         service_count = TenantService.objects.filter(tenant=tenant, status='active').count()

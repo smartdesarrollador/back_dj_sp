@@ -5,7 +5,7 @@ from rest_framework import serializers
 
 from apps.tenants.models import Tenant
 from utils.media import build_media_url
-from utils.plans import PLAN_FEATURES
+from utils.plans import get_effective_plan_limits
 from utils.storage import get_tenant_storage_bytes
 
 PLAN_NAME_MAP = {
@@ -41,7 +41,7 @@ class ClientUserSerializer(serializers.Serializer):
 
 class ClientSubscriptionSerializer(serializers.Serializer):
     status = serializers.SerializerMethodField()
-    plan = serializers.CharField()
+    plan = serializers.SerializerMethodField()
     plan_name = serializers.SerializerMethodField()
     mrr = serializers.SerializerMethodField()
     trial_ends_at = serializers.SerializerMethodField()
@@ -50,13 +50,19 @@ class ClientSubscriptionSerializer(serializers.Serializer):
         raw = obj.status
         return STATUS_MAP.get(raw, raw)
 
+    def get_plan(self, obj) -> str:
+        # Tenant.plan es la fuente de verdad real; Subscription.plan es bookkeeping de
+        # billing y puede desincronizarse (ver LL-049/fix "plan del tenant desincronizado").
+        return obj.tenant.plan
+
     def get_plan_name(self, obj) -> str:
-        return PLAN_NAME_MAP.get(obj.plan, obj.plan.title())
+        plan = obj.tenant.plan
+        return PLAN_NAME_MAP.get(plan, plan.title())
 
     def get_mrr(self, obj) -> int:
         if obj.status == 'trialing':
             return 0
-        return PLAN_MRR_MAP.get(obj.plan, 0)
+        return PLAN_MRR_MAP.get(obj.tenant.plan, 0)
 
     def get_trial_ends_at(self, obj):
         if obj.status == 'trialing' and obj.trial_end:
@@ -114,8 +120,7 @@ class ClientListSerializer(serializers.ModelSerializer):
             }
 
     def get_usage(self, obj) -> dict:
-        plan = obj.plan
-        plan_cfg = PLAN_FEATURES.get(plan, PLAN_FEATURES['free'])
+        plan_cfg = get_effective_plan_limits(obj.plan)
         return {
             'users': {
                 'current': obj.users.count(),

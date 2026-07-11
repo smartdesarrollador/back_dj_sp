@@ -296,6 +296,36 @@ PLAN_FEATURES: dict[str, dict[str, Any]] = {
 }
 
 
+PLAN_LIMITS_CACHE_TTL = 300  # 5 min — mismo TTL que TENANT_CACHE_TTL (apps/tenants/middleware.py)
+
+
+def get_effective_plan_limits(plan: str) -> dict[str, Any]:
+    """
+    Límites técnicos reales de un plan: los overrides editables desde el Admin
+    (Plan.limits en BD, subset comercial: max_users, storage_gb, max_projects,
+    max_custom_roles, api_calls_per_month) tienen prioridad sobre los defaults
+    hardcodeados de PLAN_FEATURES. Cacheado — se invalida en Plan.save().
+    """
+    from django.core.cache import cache
+
+    cache_key = f'plan:limits:{plan}'
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return cached
+
+    from apps.subscriptions.models import Plan  # import diferido: orden de carga de apps
+
+    defaults = PLAN_FEATURES.get(plan, PLAN_FEATURES['free'])
+    try:
+        overrides = Plan.objects.get(id=plan).limits or {}
+    except Plan.DoesNotExist:
+        overrides = {}
+
+    merged = {**defaults, **overrides}
+    cache.set(cache_key, merged, timeout=PLAN_LIMITS_CACHE_TTL)
+    return merged
+
+
 def get_plan_limit(plan: str, resource: str) -> int | None:
     """
     Retorna el límite numérico para un recurso en un plan.
@@ -305,8 +335,7 @@ def get_plan_limit(plan: str, resource: str) -> int | None:
         plan: 'free' | 'starter' | 'professional' | 'enterprise'
         resource: nombre del recurso sin prefijo 'max_' (ej. 'projects', 'users')
     """
-    plan_config = PLAN_FEATURES.get(plan, PLAN_FEATURES['free'])
-    return plan_config.get(f'max_{resource}')
+    return get_effective_plan_limits(plan).get(f'max_{resource}')
 
 
 def plan_has_feature(plan: str, feature: str) -> bool:

@@ -89,7 +89,7 @@ class YapeUpgradeView(APIView):
 
         subscription, _ = Subscription.objects.get_or_create(
             tenant=tenant,
-            defaults={'plan': 'free', 'status': 'trialing'},
+            defaults={'plan': tenant.plan, 'status': 'trialing'},
         )
 
         admin_token = secrets.token_urlsafe(48)

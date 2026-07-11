@@ -83,6 +83,8 @@ class TestCurrentSubscriptionView(APITestCase):
         self.assertTrue(Subscription.objects.filter(tenant=self.tenant).exists())
 
     def test_current_subscription_returns_existing(self):
+        self.tenant.plan = 'starter'
+        self.tenant.save(update_fields=['plan'])
         sub = Subscription.objects.filter(tenant=self.tenant).first()
         if not sub:
             sub = Subscription.objects.create(
@@ -100,6 +102,24 @@ class TestCurrentSubscriptionView(APITestCase):
 
         self.assertEqual(resp.status_code, status.HTTP_200_OK)
         self.assertEqual(resp.data['subscription']['plan'], 'starter')
+
+    def test_current_subscription_reflects_tenant_plan_when_desynced(self):
+        # Bug real reportado: Subscription.plan puede quedar desincronizado de Tenant.plan
+        # (p. ej. sembrado por el signal antes de este fix, o editado directo). La respuesta
+        # debe reflejar siempre Tenant.plan — la misma fuente que usa el topbar del Hub.
+        self.tenant.plan = 'professional'
+        self.tenant.save(update_fields=['plan'])
+        sub, _ = Subscription.objects.get_or_create(tenant=self.tenant)
+        sub.plan = 'free'
+        sub.save()
+
+        resp = self.client.get(
+            '/api/v1/admin/subscriptions/current',
+            **slug_header(self.tenant.slug),
+        )
+
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.assertEqual(resp.data['subscription']['plan'], 'professional')
 
     def test_current_subscription_includes_usage(self):
         resp = self.client.get(

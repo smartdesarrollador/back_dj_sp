@@ -26,7 +26,7 @@ from apps.rbac.serializers import (
     RoleCreateUpdateSerializer,
     RoleSerializer,
 )
-from utils.plans import PLAN_FEATURES
+from utils.plans import PLAN_FEATURES, get_effective_plan_limits
 
 # Claves que son límites operacionales (no feature flags booleanos)
 _OPERATIONAL_LIMITS = {'audit_log_days', 'storage_gb', 'api_calls_per_month'}
@@ -66,12 +66,16 @@ class FeaturesView(APIView):
             if not k.startswith('max_') and k not in _OPERATIONAL_LIMITS
         }
 
+        # Límites: valor efectivo (override editable desde el Admin + defaults de código),
+        # no el dict de código crudo — para que este endpoint no quede desincronizado de
+        # check_plan_limit/check_storage_limit cuando un admin edita Plan.limits.
+        effective = get_effective_plan_limits(plan)
         limits = {
-            'users': plan_config.get('max_users'),
-            'projects': plan_config.get('max_projects'),
-            'storage_gb': plan_config.get('storage_gb'),
-            'api_calls_per_month': plan_config.get('api_calls_per_month'),
-            'vault_items': plan_config.get('max_vault_items'),
+            'users': effective.get('max_users'),
+            'projects': effective.get('max_projects'),
+            'storage_gb': effective.get('storage_gb'),
+            'api_calls_per_month': effective.get('api_calls_per_month'),
+            'vault_items': effective.get('max_vault_items'),
         }
 
         return Response({'plan': plan, 'features': feature_flags, 'limits': limits})

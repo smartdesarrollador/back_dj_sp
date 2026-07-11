@@ -6,6 +6,7 @@ import uuid
 from datetime import timedelta
 from unittest.mock import MagicMock, patch
 
+from django.core.cache import cache
 from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
@@ -24,6 +25,7 @@ from core.exceptions import FeatureNotAvailable, PlanLimitExceeded
 
 
 _FAST_HASHERS = ['django.contrib.auth.hashers.MD5PasswordHasher']
+_LOCMEM_CACHE = {'default': {'BACKEND': 'django.core.cache.backends.locmem.LocMemCache'}}
 
 
 # ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -317,8 +319,11 @@ class GetTenantStorageBytesTest(TestCase):
         self.assertEqual(get_tenant_storage_bytes(tenant), 150)
 
 
-@override_settings(PASSWORD_HASHERS=_FAST_HASHERS)
+@override_settings(PASSWORD_HASHERS=_FAST_HASHERS, CACHES=_LOCMEM_CACHE)
 class CheckStorageLimitTest(TestCase):
+    def setUp(self):
+        cache.clear()  # get_effective_plan_limits cachea por plan id — evitar fugas entre tests
+
     def test_free_under_limit_passes(self):
         tenant = make_tenant('free')  # storage_gb = 1
         try:
@@ -344,6 +349,15 @@ class CheckStorageLimitTest(TestCase):
             check_storage_limit(tenant, additional_bytes=999 * 1024 ** 3)
         except PlanLimitExceeded:
             self.fail('check_storage_limit raised PlanLimitExceeded for enterprise')
+
+    def test_admin_override_in_plan_model_takes_priority(self):
+        from apps.subscriptions.models import Plan
+
+        # Free por código permite 1GB; un admin lo baja a un override de ~0 bytes en BD.
+        Plan.objects.create(id='free', display_name='Free', limits={'storage_gb': 0})
+        tenant = make_tenant('free')
+        with self.assertRaises(PlanLimitExceeded):
+            check_storage_limit(tenant, additional_bytes=1)
 
 
 # ─── FeaturesView Tests ────────────────────────────────────────────────────────

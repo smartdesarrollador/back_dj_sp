@@ -16,7 +16,7 @@ def auto_create_subscription(sender, instance, created, **kwargs):
         Subscription.objects.get_or_create(
             tenant=instance,
             defaults={
-                'plan': 'free',
+                'plan': instance.plan,
                 'status': 'trialing',
                 'trial_start': timezone.now(),
                 'trial_end': timezone.now() + timedelta(days=14),

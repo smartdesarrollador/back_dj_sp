@@ -71,7 +71,7 @@ class CurrentSubscriptionView(APIView):
         subscription, _ = Subscription.objects.get_or_create(
             tenant=tenant,
             defaults={
-                'plan': 'free',
+                'plan': tenant.plan,
                 'status': 'trialing',
                 'trial_start': timezone.now(),
                 'trial_end': timezone.now() + timedelta(days=14),
@@ -113,7 +113,7 @@ class UpgradeSubscriptionView(APIView):
 
         subscription, _ = Subscription.objects.get_or_create(
             tenant=tenant,
-            defaults={'plan': 'free', 'status': 'trialing'},
+            defaults={'plan': tenant.plan, 'status': 'trialing'},
         )
 
         stripe_client = StripeClient()
@@ -500,7 +500,7 @@ class PaymentMethodListView(APIView):
 
         subscription, _ = Subscription.objects.get_or_create(
             tenant=tenant,
-            defaults={'plan': 'free', 'status': 'trialing'},
+            defaults={'plan': tenant.plan, 'status': 'trialing'},
         )
         stripe_client = StripeClient()
         try:

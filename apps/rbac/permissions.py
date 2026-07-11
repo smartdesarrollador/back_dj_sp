@@ -193,7 +193,8 @@ def check_storage_limit(tenant, additional_bytes: int) -> None:
     el storage_gb del plan del tenant.
 
     A diferencia de check_plan_limit (conteo de unidades vía max_{resource}), storage_gb
-    no sigue esa convención de nombre en PLAN_FEATURES — se lee directo.
+    no sigue esa convención de nombre en PLAN_FEATURES — se lee vía get_effective_plan_limits,
+    que también aplica el override editable desde el Admin si existe (Plan.limits).
 
     Args:
         tenant: instancia de Tenant
@@ -202,10 +203,10 @@ def check_storage_limit(tenant, additional_bytes: int) -> None:
     Raises:
         PlanLimitExceeded: HTTP 402 si (uso actual + additional_bytes) > límite del plan
     """
-    from utils.plans import PLAN_FEATURES
+    from utils.plans import get_effective_plan_limits
     from utils.storage import get_tenant_storage_bytes
 
-    limit_gb = PLAN_FEATURES.get(tenant.plan, PLAN_FEATURES['free']).get('storage_gb')
+    limit_gb = get_effective_plan_limits(tenant.plan).get('storage_gb')
     if limit_gb is None:
         return  # Ilimitado (Enterprise)
 
