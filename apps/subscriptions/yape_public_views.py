@@ -16,6 +16,8 @@ from django.utils import timezone
 from rest_framework.permissions import AllowAny
 from rest_framework.views import APIView
 
+from .services import activate_yape_proof
+
 logger = logging.getLogger(__name__)
 
 User = get_user_model()
@@ -148,26 +150,9 @@ class YapeActivateView(APIView):
         if done := _already_processed(proof):
             return done
 
-        tenant       = proof.subscription.tenant
-        subscription = proof.subscription
+        tenant = proof.subscription.tenant
 
-        with transaction.atomic():
-            subscription.plan                 = proof.plan
-            subscription.status               = 'active'
-            subscription.current_period_start = timezone.now()
-            subscription.trial_start          = None
-            subscription.trial_end            = None
-            subscription.save(update_fields=[
-                'plan', 'status', 'current_period_start',
-                'trial_start', 'trial_end', 'updated_at',
-            ])
-            tenant.plan      = proof.plan
-            tenant.is_active = True
-            tenant.save(update_fields=['plan', 'is_active', 'updated_at'])
-            User.objects.filter(tenant=tenant).update(is_active=True)
-            proof.status      = 'approved'
-            proof.reviewed_at = timezone.now()
-            proof.save(update_fields=['status', 'reviewed_at', 'updated_at'])
+        activate_yape_proof(proof)
 
         owner = tenant.users.order_by('created_at').first()
         if owner:

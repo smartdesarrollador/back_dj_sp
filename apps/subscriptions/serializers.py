@@ -29,13 +29,17 @@ class SubscriptionSerializer(serializers.ModelSerializer):
 
 class InvoiceSerializer(serializers.ModelSerializer):
     amount_display = serializers.SerializerMethodField()
+    number = serializers.SerializerMethodField()
+    amount = serializers.SerializerMethodField()
 
     class Meta:
         model = Invoice
         fields = [
             'id',
+            'number',
             'stripe_invoice_id',
             'amount_cents',
+            'amount',
             'amount_display',
             'currency',
             'status',
@@ -51,6 +55,13 @@ class InvoiceSerializer(serializers.ModelSerializer):
 
     def get_amount_display(self, obj) -> str:
         return obj.amount_display
+
+    def get_number(self, obj) -> str:
+        date = obj.invoice_date or obj.created_at
+        return f"INV-{date.strftime('%Y%m')}-{str(obj.id)[:8].upper()}"
+
+    def get_amount(self, obj) -> float:
+        return obj.amount_cents / 100
 
 
 class PaymentMethodSerializer(serializers.ModelSerializer):

@@ -15,6 +15,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from .models import YapeConfig, YapePaymentProof
+from .services import activate_yape_proof
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
@@ -185,23 +186,7 @@ class YapeProofReviewView(APIView):
         hub_url      = getattr(settings, 'FRONTEND_HUB_URL', '').rstrip('/')
 
         if new_status == 'approved':
-            with transaction.atomic():
-                subscription.plan                 = proof.plan
-                subscription.status               = 'active'
-                subscription.current_period_start = timezone.now()
-                subscription.trial_start          = None
-                subscription.trial_end            = None
-                subscription.save(update_fields=[
-                    'plan', 'status', 'current_period_start',
-                    'trial_start', 'trial_end', 'updated_at',
-                ])
-                tenant.plan      = proof.plan
-                tenant.is_active = True
-                tenant.save(update_fields=['plan', 'is_active', 'updated_at'])
-                User.objects.filter(tenant=tenant).update(is_active=True)
-                proof.status      = 'approved'
-                proof.reviewed_at = timezone.now()
-                proof.save(update_fields=['status', 'reviewed_at', 'updated_at'])
+            activate_yape_proof(proof)
 
             owner = tenant.users.order_by('created_at').first()
             if owner:

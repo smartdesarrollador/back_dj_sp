@@ -389,7 +389,7 @@ class TestInvoiceListView(APITestCase):
         )
 
         resp = self.client.get(
-            '/api/v1/admin/billing/invoices',
+            '/api/v1/admin/billing/invoices/',
             **slug_header(self.tenant.slug),
         )
 
@@ -400,14 +400,14 @@ class TestInvoiceListView(APITestCase):
     def test_invoice_list_requires_auth(self):
         client = APIClient()
         resp = client.get(
-            '/api/v1/admin/billing/invoices',
+            '/api/v1/admin/billing/invoices/',
             **slug_header(self.tenant.slug),
         )
         self.assertEqual(resp.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_invoice_list_empty(self):
         resp = self.client.get(
-            '/api/v1/admin/billing/invoices',
+            '/api/v1/admin/billing/invoices/',
             **slug_header(self.tenant.slug),
         )
         self.assertEqual(resp.status_code, status.HTTP_200_OK)
@@ -429,7 +429,7 @@ class TestWebhookView(APITestCase):
 
     def _post_webhook(self, event_dict, sig='t=123,v1=abc'):
         return self.client.post(
-            '/api/v1/admin/billing/webhooks',
+            '/api/v1/admin/billing/webhooks/',
             data=json.dumps(event_dict),
             content_type='application/json',
             HTTP_STRIPE_SIGNATURE=sig,
@@ -529,6 +529,7 @@ class TestWebhookView(APITestCase):
 # ─── PaymentMethodListView / PaymentMethodDetailView ──────────────────────────
 
 _PM_URL = '/api/v1/admin/billing/payment-methods'
+_PM_LIST_URL = f'{_PM_URL}/'
 
 
 @override_settings(
@@ -564,18 +565,18 @@ class TestPaymentMethodCRUD(APITestCase):
 
     def test_list_returns_payment_methods(self):
         self._make_latam_pm()
-        resp = self.client.get(_PM_URL, **slug_header(self.tenant.slug))
+        resp = self.client.get(_PM_LIST_URL, **slug_header(self.tenant.slug))
         self.assertEqual(resp.status_code, status.HTTP_200_OK)
         self.assertEqual(len(resp.data['payment_methods']), 1)
 
     def test_list_requires_auth(self):
         client = APIClient()
-        resp = client.get(_PM_URL, **slug_header(self.tenant.slug))
+        resp = client.get(_PM_LIST_URL, **slug_header(self.tenant.slug))
         self.assertEqual(resp.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_list_tenant_isolation(self):
         self._make_latam_pm(tenant=self.other_tenant)
-        resp = self.client.get(_PM_URL, **slug_header(self.tenant.slug))
+        resp = self.client.get(_PM_LIST_URL, **slug_header(self.tenant.slug))
         self.assertEqual(resp.status_code, status.HTTP_200_OK)
         self.assertEqual(resp.data['payment_methods'], [])
 
@@ -583,7 +584,7 @@ class TestPaymentMethodCRUD(APITestCase):
 
     def test_create_latam_paypal(self):
         resp = self.client.post(
-            _PM_URL,
+            _PM_LIST_URL,
             {'external_type': 'paypal', 'external_email': 'user@paypal.com', 'is_default': True},
             format='json',
             **slug_header(self.tenant.slug),
@@ -596,7 +597,7 @@ class TestPaymentMethodCRUD(APITestCase):
 
     def test_create_latam_yape(self):
         resp = self.client.post(
-            _PM_URL,
+            _PM_LIST_URL,
             {'external_type': 'yape', 'external_phone': '+51999888777', 'is_default': False},
             format='json',
             **slug_header(self.tenant.slug),
@@ -607,7 +608,7 @@ class TestPaymentMethodCRUD(APITestCase):
 
     def test_create_encrypts_account_id(self):
         resp = self.client.post(
-            _PM_URL,
+            _PM_LIST_URL,
             {
                 'external_type': 'mercadopago',
                 'external_email': 'vendor@mp.com',
@@ -627,7 +628,7 @@ class TestPaymentMethodCRUD(APITestCase):
 
     def test_create_missing_method_returns_400(self):
         resp = self.client.post(
-            _PM_URL,
+            _PM_LIST_URL,
             {'is_default': True},
             format='json',
             **slug_header(self.tenant.slug),
@@ -636,7 +637,7 @@ class TestPaymentMethodCRUD(APITestCase):
 
     def test_create_both_methods_rejected(self):
         resp = self.client.post(
-            _PM_URL,
+            _PM_LIST_URL,
             {
                 'stripe_payment_method_id': 'pm_fake',
                 'external_type': 'paypal',
@@ -665,7 +666,7 @@ class TestPaymentMethodCRUD(APITestCase):
         }
 
         resp = self.client.post(
-            _PM_URL,
+            _PM_LIST_URL,
             {'stripe_payment_method_id': 'pm_card_test', 'set_default': True},
             format='json',
             **slug_header(self.tenant.slug),
