@@ -85,6 +85,30 @@ def _compute_summary(tenant, period_days: int) -> dict:
     }
 
 
+def _compute_role_distribution(tenant) -> list[dict]:
+    """Current (non-expired) role assignments for the tenant's users, grouped by role."""
+    from django.db.models import Count, Q
+
+    from apps.rbac.models import UserRole
+
+    counts = list(
+        UserRole.objects.filter(user__tenant=tenant)
+        .filter(Q(expires_at__isnull=True) | Q(expires_at__gt=timezone.now()))
+        .values('role__name')
+        .annotate(count=Count('id'))
+        .order_by('-count')
+    )
+    total = sum(row['count'] for row in counts)
+    return [
+        {
+            'role': row['role__name'],
+            'count': row['count'],
+            'percentage': round(row['count'] / total * 100, 1) if total else 0,
+        }
+        for row in counts
+    ]
+
+
 def _compute_usage(tenant) -> dict:
     from apps.tasks.models import Task
     from django.db.models import Count
@@ -108,6 +132,7 @@ def _compute_usage(tenant) -> dict:
         'tasks_by_status': by_status,
         'tasks_by_priority': by_priority,
         'overdue': overdue,
+        'role_distribution': _compute_role_distribution(tenant),
     }
 
 

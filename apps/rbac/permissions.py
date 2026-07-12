@@ -118,6 +118,35 @@ def HasPermission(codename: str) -> type[BasePermission]:
     return _Permission
 
 
+class IsStaffUser(BasePermission):
+    """
+    Restricts an endpoint to platform staff (user.is_staff), regardless of any
+    RBAC permission the requesting user's role happens to carry.
+
+    Needed because RBAC permission codenames like 'customers.read' are also
+    granted to the tenant-scoped system 'Owner' role (so Owner can manage
+    their *own* tenant's users/billing/roles through the same /admin/ API
+    namespace). Views that return or mutate data belonging to OTHER tenants
+    (e.g. the client/tenant list) must never rely on HasPermission alone —
+    compose both: permission_classes = [IsStaffUser, HasPermission(...)].
+    Superusers are always staff-equivalent (they already bypass RBAC checks).
+    """
+    message = {
+        'error': {
+            'code': 'staff_required',
+            'message': 'This endpoint is restricted to platform staff.',
+        }
+    }
+
+    def has_permission(self, request, view) -> bool:
+        user = request.user
+        return bool(
+            user
+            and user.is_authenticated
+            and (user.is_staff or user.is_superuser)
+        )
+
+
 def HasFeature(feature: str) -> type[BasePermission]:
     """
     Factory que retorna una clase DRF Permission que verifica un feature flag de plan.

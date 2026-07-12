@@ -15,13 +15,16 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework import status
 
-from apps.rbac.permissions import HasPermission, check_storage_limit
+from apps.rbac.permissions import HasPermission, IsStaffUser, check_storage_limit
 from apps.tenants.models import Tenant
 from apps.tenants.serializers import ClientListSerializer, OrganizationSerializer
 
 
 class ClientListView(APIView):
-    permission_classes = [HasPermission('customers.read')]
+    # IsStaffUser is required in addition to the RBAC permission: 'customers.read'
+    # is also granted to the tenant-scoped system 'Owner' role, but this view
+    # returns every OTHER tenant in the system — never gate it on RBAC alone.
+    permission_classes = [IsStaffUser, HasPermission('customers.read')]
 
     @extend_schema(tags=['admin-clients'], summary='List all tenant clients')
     def get(self, request):
@@ -35,7 +38,8 @@ class ClientListView(APIView):
 
 
 class SuspendClientView(APIView):
-    permission_classes = [HasPermission('customers.suspend')]
+    # Same reasoning as ClientListView — this mutates another tenant's status.
+    permission_classes = [IsStaffUser, HasPermission('customers.suspend')]
 
     @extend_schema(tags=['admin-clients'], summary='Toggle tenant active/suspended status')
     def post(self, request, pk):

@@ -42,6 +42,7 @@ urlpatterns = [
         path('audit-logs/', include('apps.audit.urls')),
         path('notifications/', include('apps.notifications.admin_urls')),
         path('clients/', include('apps.tenants.admin_urls')),
+        path('reports/', include('apps.analytics.admin_urls')),
         path('releases/', include('apps.releases.admin_urls')),
         path('licenses/', include('apps.licenses.admin_urls')),
         path('organization/', include('apps.tenants.organization_urls')),

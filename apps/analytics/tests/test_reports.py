@@ -79,6 +79,37 @@ class TestReportViews(APITestCase):
         self.assertIsInstance(body['tasks_by_status'], list)
         self.assertIsInstance(body['overdue'], list)
 
+    # ── Usage returns role distribution ────────────────────────────────────────
+
+    def test_usage_returns_role_distribution(self):
+        from django.utils import timezone
+
+        from apps.rbac.models import Role, UserRole
+
+        owner_role = Role.objects.create(tenant=self.tenant, name='Owner')
+        viewer_role = Role.objects.create(tenant=self.tenant, name='Viewer')
+        viewer = User.objects.create_user(
+            email='viewer@analytics.com', name='Viewer', password='x', tenant=self.tenant
+        )
+        expired_viewer = User.objects.create_user(
+            email='expired@analytics.com', name='Expired', password='x', tenant=self.tenant
+        )
+        UserRole.objects.create(user=self.user, role=owner_role)
+        UserRole.objects.create(user=viewer, role=viewer_role)
+        # Expired assignment must not be counted
+        UserRole.objects.create(
+            user=expired_viewer, role=viewer_role,
+            expires_at=timezone.now() - timezone.timedelta(days=1),
+        )
+
+        response = self.client.get(USAGE_URL, **self.slug)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        distribution = response.json()['role_distribution']
+        by_role = {row['role']: row for row in distribution}
+        self.assertEqual(by_role['Owner']['count'], 1)
+        self.assertEqual(by_role['Viewer']['count'], 1)
+        self.assertEqual(by_role['Owner']['percentage'], 50.0)
+
     # ── Trends requires analytics_trends feature ──────────────────────────────
 
     def test_trends_requires_analytics_trends_feature(self):
