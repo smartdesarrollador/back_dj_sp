@@ -10,7 +10,7 @@ from django.test import override_settings
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from apps.bookmarks.models import Bookmark
+from apps.bookmarks.models import Bookmark, BookmarkCollection
 from apps.tenants.models import Tenant
 
 User = get_user_model()
@@ -65,6 +65,27 @@ class TestBookmarkViews(APITestCase):
         self.assertEqual(sorted(body['tags']), ['python', 'tools'])
         bm = Bookmark.objects.get(tenant=self.tenant, title='Example')
         self.assertIn('python', bm.tags)
+
+    def test_create_bookmark_with_collection_returns_nested_object(self):
+        """The bookmark's `collection` field must serialize as a nested object
+        (id/name/color), not a bare UUID string, so the frontend can read
+        `bookmark.collection.name` directly."""
+        collection = BookmarkCollection.objects.create(
+            tenant=self.tenant, user=self.user, name='Buscadores', color='#2563eb'
+        )
+        data = {'url': 'https://bing.com', 'title': 'Bing', 'collection': str(collection.pk)}
+        response = self.client.post(BASE_URL, data, format='json', **self.slug)
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        body = response.json()
+        self.assertEqual(body['collection'], {
+            'id': str(collection.pk), 'name': 'Buscadores', 'color': '#2563eb', 'bookmarks_count': 0,
+        })
+        bm = Bookmark.objects.get(tenant=self.tenant, title='Bing')
+        self.assertEqual(bm.collection_id, collection.pk)
+
+        list_response = self.client.get(BASE_URL, **self.slug)
+        listed = next(b for b in list_response.json()['bookmarks'] if b['title'] == 'Bing')
+        self.assertEqual(listed['collection']['name'], 'Buscadores')
 
     # ── Filter by tag ─────────────────────────────────────────────────────────
 
@@ -174,6 +195,58 @@ class TestBookmarkViews(APITestCase):
             BASE_URL + 'collections/', HTTP_X_TENANT_SLUG='free-bm'
         )
         self.assertEqual(response.status_code, status.HTTP_402_PAYMENT_REQUIRED)
+
+    def test_create_bookmark_collection_requires_feature(self):
+        free_tenant = _create_tenant('free-collections', plan='free')
+        free_user = _create_superuser(free_tenant, 'free@collections.com')
+        self.client.force_authenticate(user=free_user)
+        response = self.client.post(
+            BASE_URL + 'collections/', {'name': 'Reading'}, HTTP_X_TENANT_SLUG='free-collections'
+        )
+        self.assertEqual(response.status_code, status.HTTP_402_PAYMENT_REQUIRED)
+
+    def test_create_bookmark_collection_success(self):
+        data = {'name': 'Reading', 'color': '#2563eb'}
+        response = self.client.post(BASE_URL + 'collections/', data, **self.slug)
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        body = response.json()
+        self.assertEqual(body['name'], 'Reading')
+        self.assertEqual(body['color'], '#2563eb')
+        self.assertEqual(body['bookmarks_count'], 0)
+        self.assertTrue(
+            BookmarkCollection.objects.filter(tenant=self.tenant, name='Reading').exists()
+        )
+
+    def test_list_bookmark_collections_returns_collections(self):
+        c1 = BookmarkCollection.objects.create(tenant=self.tenant, user=self.user, name='Reading', color='#2563eb')
+        BookmarkCollection.objects.create(tenant=self.tenant, user=self.user, name='Research', color='#16a34a')
+        Bookmark.objects.create(
+            tenant=self.tenant, user=self.user, url='https://a.com', title='A', collection=c1
+        )
+        response = self.client.get(BASE_URL + 'collections/', **self.slug)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        collections = response.json()['collections']
+        self.assertEqual(len(collections), 2)
+        reading = next(c for c in collections if c['name'] == 'Reading')
+        self.assertEqual(reading['bookmarks_count'], 1)
+
+    def test_delete_bookmark_collection_success(self):
+        collection = BookmarkCollection.objects.create(tenant=self.tenant, user=self.user, name='Reading')
+        url = f'{BASE_URL}collections/{collection.pk}/'
+        response = self.client.delete(url, **self.slug)
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertFalse(BookmarkCollection.objects.filter(pk=collection.pk).exists())
+
+    def test_deleting_collection_nulls_bookmark_collection(self):
+        collection = BookmarkCollection.objects.create(tenant=self.tenant, user=self.user, name='Reading')
+        bookmark = Bookmark.objects.create(
+            tenant=self.tenant, user=self.user, url='https://a.com', title='A', collection=collection
+        )
+        url = f'{BASE_URL}collections/{collection.pk}/'
+        response = self.client.delete(url, **self.slug)
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        bookmark.refresh_from_db()
+        self.assertIsNone(bookmark.collection)
 
     # ── Cross-tenant isolation ────────────────────────────────────────────────
 

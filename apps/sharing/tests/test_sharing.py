@@ -364,7 +364,7 @@ class TestSharingNewResourceTypes(APITestCase):
         )
         self.note = Note.objects.create(
             tenant=self.tenant, user=self.owner,
-            title='My Note', content='content', category='work',
+            title='My Note', content='content',
         )
         self.contact = Contact.objects.create(
             tenant=self.tenant, user=self.owner,
@@ -417,7 +417,7 @@ class TestSharingNewResourceTypes(APITestCase):
         alien = Note.objects.create(
             tenant=other_tenant,
             user=_create_superuser(other_tenant, 'x4@other4.com'),
-            title='Alien Note', content='', category='work',
+            title='Alien Note', content='',
         )
         resp = self._share('note', alien.pk)
         self.assertEqual(resp.status_code, status.HTTP_404_NOT_FOUND)

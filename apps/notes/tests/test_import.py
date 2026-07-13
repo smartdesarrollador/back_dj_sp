@@ -39,7 +39,7 @@ class TestNoteImport(APITestCase):
 
     def test_import_creates_notes(self):
         items = [
-            {'title': 'N1', 'content': 'hello', 'category': 'work', 'tags': ['a']},
+            {'title': 'N1', 'content': 'hello', 'tags': ['a']},
             {'title': 'N2'},
         ]
         r = self.client.post(IMPORT_URL, {'items': items}, format='json', **self.slug)

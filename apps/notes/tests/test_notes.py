@@ -10,7 +10,7 @@ from django.test import override_settings
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from apps.notes.models import Note
+from apps.notes.models import Note, NoteCategory
 from apps.sharing.models import Share
 from apps.tenants.models import Tenant
 
@@ -54,14 +54,72 @@ class TestNoteViews(APITestCase):
     # ── Create ────────────────────────────────────────────────────────────────
 
     def test_create_note_success(self):
-        data = {'title': 'My Note', 'content': 'Hello world', 'category': 'work'}
+        category = NoteCategory.objects.create(tenant=self.tenant, user=self.user, name='Trabajo')
+        data = {'title': 'My Note', 'content': 'Hello world', 'category': str(category.pk)}
         response = self.client.post(BASE_URL, data, **self.slug)
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         body = response.json()
         self.assertEqual(body['title'], 'My Note')
-        self.assertEqual(body['category'], 'work')
+        self.assertEqual(body['category']['name'], 'Trabajo')
         self.assertFalse(body['is_pinned'])
         self.assertTrue(Note.objects.filter(tenant=self.tenant, title='My Note').exists())
+
+    def test_create_note_without_category(self):
+        response = self.client.post(BASE_URL, {'title': 'No category'}, **self.slug)
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertIsNone(response.json()['category'])
+
+    # ── Categories ────────────────────────────────────────────────────────────
+
+    def test_create_note_category_success(self):
+        data = {'name': 'Ideas', 'color': '#f59e0b'}
+        response = self.client.post(BASE_URL + 'categories/', data, **self.slug)
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        body = response.json()
+        self.assertEqual(body['name'], 'Ideas')
+        self.assertEqual(body['color'], '#f59e0b')
+        self.assertEqual(body['notes_count'], 0)
+        self.assertTrue(
+            NoteCategory.objects.filter(tenant=self.tenant, name='Ideas').exists()
+        )
+
+    def test_list_note_categories_returns_categories(self):
+        c1 = NoteCategory.objects.create(tenant=self.tenant, user=self.user, name='Trabajo', color='#3b82f6')
+        NoteCategory.objects.create(tenant=self.tenant, user=self.user, name='Personal', color='#10b981')
+        Note.objects.create(tenant=self.tenant, user=self.user, title='A', category=c1)
+        response = self.client.get(BASE_URL + 'categories/', **self.slug)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        categories = response.json()['categories']
+        self.assertEqual(len(categories), 2)
+        trabajo = next(c for c in categories if c['name'] == 'Trabajo')
+        self.assertEqual(trabajo['notes_count'], 1)
+
+    def test_delete_note_category_success(self):
+        category = NoteCategory.objects.create(tenant=self.tenant, user=self.user, name='Trabajo')
+        url = f'{BASE_URL}categories/{category.pk}/'
+        response = self.client.delete(url, **self.slug)
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertFalse(NoteCategory.objects.filter(pk=category.pk).exists())
+
+    def test_deleting_category_nulls_note_category(self):
+        category = NoteCategory.objects.create(tenant=self.tenant, user=self.user, name='Trabajo')
+        note = Note.objects.create(tenant=self.tenant, user=self.user, title='A', category=category)
+        url = f'{BASE_URL}categories/{category.pk}/'
+        response = self.client.delete(url, **self.slug)
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        note.refresh_from_db()
+        self.assertIsNone(note.category)
+
+    def test_filter_notes_by_category(self):
+        c1 = NoteCategory.objects.create(tenant=self.tenant, user=self.user, name='Trabajo')
+        c2 = NoteCategory.objects.create(tenant=self.tenant, user=self.user, name='Personal')
+        Note.objects.create(tenant=self.tenant, user=self.user, title='A', category=c1)
+        Note.objects.create(tenant=self.tenant, user=self.user, title='B', category=c2)
+        response = self.client.get(f'{BASE_URL}?category={c1.pk}', **self.slug)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        notes = response.json()['notes']
+        self.assertEqual(len(notes), 1)
+        self.assertEqual(notes[0]['title'], 'A')
 
     # ── Plan limit ────────────────────────────────────────────────────────────
 

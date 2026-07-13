@@ -7,14 +7,20 @@ from apps.bookmarks.models import Bookmark, BookmarkCollection
 
 
 class BookmarkCollectionSerializer(serializers.ModelSerializer):
+    bookmarks_count = serializers.SerializerMethodField()
+
     class Meta:
         model = BookmarkCollection
-        fields = ['id', 'name', 'color', 'created_at', 'updated_at']
-        read_only_fields = ['id', 'created_at', 'updated_at']
+        fields = ['id', 'name', 'color', 'bookmarks_count', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'bookmarks_count', 'created_at', 'updated_at']
+
+    def get_bookmarks_count(self, obj) -> int:
+        return obj.bookmarks.count()
 
 
 class BookmarkSerializer(serializers.ModelSerializer):
     collection_name = serializers.CharField(source='collection.name', read_only=True, default=None)
+    collection = serializers.SerializerMethodField()
 
     class Meta:
         model = Bookmark
@@ -23,6 +29,16 @@ class BookmarkSerializer(serializers.ModelSerializer):
             'is_favorite', 'collection', 'collection_name', 'created_at', 'updated_at',
         ]
         read_only_fields = ['id', 'collection_name', 'created_at', 'updated_at']
+
+    def get_collection(self, obj):
+        if obj.collection:
+            return {
+                'id': str(obj.collection.id),
+                'name': obj.collection.name,
+                'color': obj.collection.color,
+                'bookmarks_count': 0,
+            }
+        return None
 
 
 class BookmarkCreateUpdateSerializer(serializers.Serializer):

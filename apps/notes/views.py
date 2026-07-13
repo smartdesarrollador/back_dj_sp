@@ -4,13 +4,16 @@ Notes views — CRUD for personal notes with category filtering and pinning.
 URL namespace: /api/v1/app/notes/
 
 Endpoints:
-  GET    /app/notes/           → list notes (supports ?category= ?search= ?tag=)
-  POST   /app/notes/           → create note
-  GET    /app/notes/tags/      → list distinct tags used by the current user
-  GET    /app/notes/<pk>/      → note detail
-  PATCH  /app/notes/<pk>/      → update note
-  DELETE /app/notes/<pk>/      → delete note
-  PATCH  /app/notes/<pk>/pin/  → toggle pin
+  GET    /app/notes/                  → list notes (supports ?category= ?search= ?tag=)
+  POST   /app/notes/                  → create note
+  GET    /app/notes/tags/             → list distinct tags used by the current user
+  GET    /app/notes/<pk>/              → note detail
+  PATCH  /app/notes/<pk>/              → update note
+  DELETE /app/notes/<pk>/              → delete note
+  PATCH  /app/notes/<pk>/pin/          → toggle pin
+  GET    /app/notes/categories/        → list categories
+  POST   /app/notes/categories/        → create category
+  DELETE /app/notes/categories/<pk>/   → delete category
 """
 from django.db.models import Q
 from drf_spectacular.utils import OpenApiParameter, extend_schema
@@ -19,8 +22,8 @@ from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.notes.models import Note
-from apps.notes.serializers import NoteCreateUpdateSerializer, NoteSerializer
+from apps.notes.models import Note, NoteCategory
+from apps.notes.serializers import NoteCategorySerializer, NoteCreateUpdateSerializer, NoteSerializer
 from apps.rbac.permissions import HasFeature, HasPermission, check_plan_limit, _user_has_permission
 from apps.sharing.models import Share
 from core.mixins import AuditMixin
@@ -41,6 +44,13 @@ def _get_note(pk, tenant, user):
         return None
 
 
+def _get_category(pk, tenant, user):
+    try:
+        return NoteCategory.objects.get(pk=pk, tenant=tenant, user=user)
+    except NoteCategory.DoesNotExist:
+        return None
+
+
 class NoteListCreateView(APIView):
     permission_classes = [HasPermission('notes.read')]
 
@@ -48,7 +58,7 @@ class NoteListCreateView(APIView):
         tags=['app-notes'],
         summary='List notes',
         parameters=[
-            OpenApiParameter('category', OpenApiTypes.STR, description='Filter by category'),
+            OpenApiParameter('category', OpenApiTypes.UUID, description='Filter by category'),
             OpenApiParameter('search', OpenApiTypes.STR, description='Search in title/content'),
             OpenApiParameter('tag', OpenApiTypes.STR, description='Filter by tag'),
         ],
@@ -66,7 +76,7 @@ class NoteListCreateView(APIView):
         search = request.query_params.get('search')
         tag = request.query_params.get('tag')
         if category:
-            qs = qs.filter(category=category)
+            qs = qs.filter(category__pk=category)
         if search:
             qs = qs.filter(Q(title__icontains=search) | Q(content__icontains=search))
         if tag:
@@ -85,10 +95,15 @@ class NoteListCreateView(APIView):
         check_plan_limit(request.user, 'notes', count)
         serializer = NoteCreateUpdateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        data = dict(serializer.validated_data)
+        data = serializer.validated_data.copy()
+        category_id = data.pop('category', None)
+        category = None
+        if category_id:
+            category = _get_category(category_id, request.tenant, request.user)
         note = Note.objects.create(
             tenant=request.tenant,
             user=request.user,
+            category=category,
             **data,
         )
         return Response(NoteSerializer(note).data, status=status.HTTP_201_CREATED)
@@ -134,7 +149,8 @@ class NotesImportView(AuditMixin, APIView):
             if not serializer.is_valid():
                 errors.append({'index': idx, 'errors': serializer.errors})
                 continue
-            data = dict(serializer.validated_data)
+            data = serializer.validated_data.copy()
+            data.pop('category', None)  # imports ignore category FK
             valid.append(data)
 
         current = Note.objects.filter(tenant=request.tenant, user=request.user).count()
@@ -182,7 +198,11 @@ class NoteDetailView(APIView):
             return _NOT_FOUND
         serializer = NoteCreateUpdateSerializer(data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
-        for field, value in serializer.validated_data.items():
+        data = serializer.validated_data.copy()
+        category_id = data.pop('category', None)
+        if category_id is not None:
+            note.category = _get_category(category_id, request.tenant, request.user)
+        for field, value in data.items():
             setattr(note, field, value)
         note.save()
         return Response(NoteSerializer(note).data)
@@ -210,3 +230,32 @@ class NotePinView(APIView):
         note.is_pinned = not note.is_pinned
         note.save(update_fields=['is_pinned', 'updated_at'])
         return Response(NoteSerializer(note).data)
+
+
+class NoteCategoryListCreateView(APIView):
+    permission_classes = [HasPermission('notes.read')]
+
+    @extend_schema(tags=['app-notes'], summary='List note categories')
+    def get(self, request):
+        categories = NoteCategory.objects.filter(tenant=request.tenant, user=request.user)
+        cats = NoteCategorySerializer(categories, many=True).data
+        return Response({'results': cats, 'count': len(cats), 'categories': cats})
+
+    @extend_schema(tags=['app-notes'], summary='Create note category')
+    def post(self, request):
+        serializer = NoteCategorySerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        category = serializer.save(tenant=request.tenant, user=request.user)
+        return Response(NoteCategorySerializer(category).data, status=status.HTTP_201_CREATED)
+
+
+class NoteCategoryDetailView(APIView):
+    permission_classes = [HasPermission('notes.read')]
+
+    @extend_schema(tags=['app-notes'], summary='Delete note category')
+    def delete(self, request, pk):
+        category = _get_category(pk, request.tenant, request.user)
+        if not category:
+            return _NOT_FOUND
+        category.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
