@@ -262,3 +262,102 @@ class TestBookmarkViews(APITestCase):
         url = f'{BASE_URL}{bm.pk}/'
         response = self.client.get(url, **self.slug)
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    # ── List bookmarks (pagination) ──────────────────────────────────────────
+
+    def _create_bookmarks(self, n, **overrides):
+        bookmarks = []
+        for i in range(n):
+            defaults = {
+                'tenant': self.tenant,
+                'user': self.user,
+                'url': f'https://example.com/{i}',
+                'title': f'Bookmark {i}',
+            }
+            defaults.update(overrides)
+            bookmarks.append(Bookmark.objects.create(**defaults))
+        return bookmarks
+
+    def test_list_bookmarks_without_page_preserves_legacy_shape(self):
+        self._create_bookmarks(5)
+        response = self.client.get(BASE_URL, **self.slug)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        body = response.json()
+        self.assertEqual(body['results'], body['bookmarks'])
+        self.assertEqual(body['count'], len(body['results']))
+        self.assertEqual(len(body['bookmarks']), 5)
+
+    def test_list_bookmarks_first_page_default_per_page(self):
+        self._create_bookmarks(25)
+        response = self.client.get(BASE_URL, {'page': 1}, **self.slug)
+        body = response.json()
+        self.assertEqual(len(body['bookmarks']), 20)
+        self.assertEqual(body['pagination'], {'page': 1, 'per_page': 20, 'total': 25})
+
+    def test_list_bookmarks_second_page(self):
+        self._create_bookmarks(25)
+        response = self.client.get(BASE_URL, {'page': 2}, **self.slug)
+        body = response.json()
+        self.assertEqual(len(body['bookmarks']), 5)
+        self.assertEqual(body['pagination']['page'], 2)
+
+    def test_list_bookmarks_custom_per_page(self):
+        self._create_bookmarks(10)
+        response = self.client.get(BASE_URL, {'page': 1, 'per_page': 5}, **self.slug)
+        body = response.json()
+        self.assertEqual(len(body['bookmarks']), 5)
+        self.assertEqual(body['pagination']['per_page'], 5)
+
+    def test_list_bookmarks_per_page_clamped_to_100(self):
+        self._create_bookmarks(3)
+        response = self.client.get(BASE_URL, {'page': 1, 'per_page': 500}, **self.slug)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.json()['pagination']['per_page'], 100)
+
+    def test_list_bookmarks_page_out_of_range_returns_empty(self):
+        self._create_bookmarks(3)
+        response = self.client.get(BASE_URL, {'page': 999}, **self.slug)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        body = response.json()
+        self.assertEqual(body['bookmarks'], [])
+        self.assertEqual(body['pagination']['total'], 3)
+
+    def test_list_bookmarks_invalid_page_falls_back_to_default(self):
+        self._create_bookmarks(3)
+        response = self.client.get(BASE_URL, {'page': 'abc'}, **self.slug)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.json()['pagination']['page'], 1)
+
+    def test_list_bookmarks_invalid_per_page_falls_back_to_default(self):
+        self._create_bookmarks(3)
+        response = self.client.get(BASE_URL, {'page': 1, 'per_page': 'xyz'}, **self.slug)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.json()['pagination']['per_page'], 20)
+
+    def test_list_bookmarks_negative_page_clamped_to_one(self):
+        self._create_bookmarks(3)
+        response = self.client.get(BASE_URL, {'page': -5}, **self.slug)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.json()['pagination']['page'], 1)
+
+    def test_list_bookmarks_filters_combined_with_pagination(self):
+        collection = BookmarkCollection.objects.create(tenant=self.tenant, user=self.user, name='Reading')
+        self._create_bookmarks(3, collection=collection)
+        self._create_bookmarks(4)
+        response = self.client.get(
+            BASE_URL, {'collection': str(collection.pk), 'page': 1, 'per_page': 2}, **self.slug
+        )
+        body = response.json()
+        self.assertEqual(len(body['bookmarks']), 2)
+        self.assertEqual(body['pagination']['total'], 3)
+        self.assertTrue(all(b['collection']['id'] == str(collection.pk) for b in body['bookmarks']))
+
+    def test_list_bookmarks_cross_tenant_pagination_isolated(self):
+        other_tenant = _create_tenant('other-bookmarks-pagination')
+        other_user = _create_superuser(other_tenant, 'other@bookmarks-pagination.com')
+        Bookmark.objects.create(
+            tenant=other_tenant, user=other_user, url='https://other.com', title='Other tenant'
+        )
+        self._create_bookmarks(2)
+        response = self.client.get(BASE_URL, {'page': 1}, **self.slug)
+        self.assertEqual(response.json()['pagination']['total'], 2)

@@ -252,3 +252,142 @@ class TestNoteViews(APITestCase):
         response = self.client.get(f'{BASE_URL}?tag=inexistente', **self.slug)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.json()['notes'], [])
+
+    # ── List notes (pagination) ──────────────────────────────────────────────
+
+    def _create_notes(self, n, **overrides):
+        notes = []
+        for i in range(n):
+            defaults = {
+                'tenant': self.tenant,
+                'user': self.user,
+                'title': f'Note {i}',
+            }
+            defaults.update(overrides)
+            notes.append(Note.objects.create(**defaults))
+        return notes
+
+    def test_list_notes_without_page_preserves_legacy_shape(self):
+        self._create_notes(2, is_pinned=True)
+        self._create_notes(3, is_pinned=False)
+        response = self.client.get(BASE_URL, **self.slug)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        body = response.json()
+        self.assertEqual(body['results'], body['notes'])
+        self.assertEqual(body['count'], len(body['results']))
+        self.assertEqual(len(body['notes']), 5)
+
+    def test_list_notes_with_page_includes_all_pinned_plus_page_of_unpinned(self):
+        self._create_notes(3, is_pinned=True)
+        self._create_notes(25, is_pinned=False)
+        response = self.client.get(BASE_URL, {'page': 1}, **self.slug)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        body = response.json()
+        self.assertEqual(len(body['notes']), 3 + 20)
+        self.assertEqual(body['pagination'], {'page': 1, 'per_page': 20, 'total': 25})
+        self.assertEqual(sum(1 for n in body['notes'] if n['is_pinned']), 3)
+
+    def test_list_notes_second_page_returns_remaining_unpinned_plus_all_pinned(self):
+        self._create_notes(3, is_pinned=True)
+        self._create_notes(25, is_pinned=False)
+        response = self.client.get(BASE_URL, {'page': 2}, **self.slug)
+        body = response.json()
+        self.assertEqual(len(body['notes']), 3 + 5)
+        self.assertEqual(body['pagination']['page'], 2)
+        self.assertEqual(sum(1 for n in body['notes'] if n['is_pinned']), 3)
+
+    def test_list_notes_more_than_20_pinned_all_returned_without_page(self):
+        self._create_notes(25, is_pinned=True)
+        response = self.client.get(BASE_URL, **self.slug)
+        self.assertEqual(len(response.json()['notes']), 25)
+
+    def test_list_notes_more_than_20_pinned_all_returned_with_page(self):
+        self._create_notes(25, is_pinned=True)
+        response = self.client.get(BASE_URL, {'page': 1}, **self.slug)
+        body = response.json()
+        self.assertEqual(len(body['notes']), 25)
+        self.assertEqual(body['pagination']['total'], 0)
+
+    def test_list_notes_custom_per_page(self):
+        self._create_notes(10, is_pinned=False)
+        response = self.client.get(BASE_URL, {'page': 1, 'per_page': 5}, **self.slug)
+        body = response.json()
+        self.assertEqual(len(body['notes']), 5)
+        self.assertEqual(body['pagination']['per_page'], 5)
+
+    def test_list_notes_per_page_clamped_to_100(self):
+        self._create_notes(3, is_pinned=False)
+        response = self.client.get(BASE_URL, {'page': 1, 'per_page': 500}, **self.slug)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.json()['pagination']['per_page'], 100)
+
+    def test_list_notes_invalid_page_falls_back_to_default(self):
+        self._create_notes(3, is_pinned=False)
+        response = self.client.get(BASE_URL, {'page': 'abc'}, **self.slug)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.json()['pagination']['page'], 1)
+
+    def test_list_notes_invalid_per_page_falls_back_to_default(self):
+        self._create_notes(3, is_pinned=False)
+        response = self.client.get(BASE_URL, {'page': 1, 'per_page': 'xyz'}, **self.slug)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.json()['pagination']['per_page'], 20)
+
+    def test_list_notes_negative_page_clamped_to_one(self):
+        self._create_notes(3, is_pinned=False)
+        response = self.client.get(BASE_URL, {'page': -5}, **self.slug)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.json()['pagination']['page'], 1)
+
+    def test_list_notes_page_out_of_range_returns_only_pinned(self):
+        self._create_notes(2, is_pinned=True)
+        self._create_notes(3, is_pinned=False)
+        response = self.client.get(BASE_URL, {'page': 999}, **self.slug)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        body = response.json()
+        self.assertEqual(len(body['notes']), 2)
+        self.assertTrue(all(n['is_pinned'] for n in body['notes']))
+        self.assertEqual(body['pagination']['total'], 3)
+
+    def test_list_notes_filters_combined_with_pagination(self):
+        category = NoteCategory.objects.create(tenant=self.tenant, user=self.user, name='Trabajo')
+        self._create_notes(1, is_pinned=True, category=category)
+        self._create_notes(1, is_pinned=True)
+        self._create_notes(2, is_pinned=False, category=category)
+        self._create_notes(2, is_pinned=False)
+        response = self.client.get(
+            BASE_URL, {'category': str(category.pk), 'page': 1, 'per_page': 20}, **self.slug
+        )
+        body = response.json()
+        self.assertEqual(len(body['notes']), 1 + 2)
+        self.assertEqual(body['pagination']['total'], 2)
+        self.assertTrue(all(n['category']['id'] == str(category.pk) for n in body['notes']))
+
+    def test_list_notes_cross_tenant_pagination_isolated(self):
+        other_tenant = _create_tenant('other-notes-pagination')
+        other_user = _create_superuser(other_tenant, 'other@notes-pagination.com')
+        Note.objects.create(tenant=other_tenant, user=other_user, title='Other tenant note')
+        self._create_notes(2, is_pinned=True)
+        self._create_notes(2, is_pinned=False)
+        response = self.client.get(BASE_URL, {'page': 1}, **self.slug)
+        body = response.json()
+        self.assertEqual(body['pagination']['total'], 2)
+        self.assertEqual(len(body['notes']), 4)
+
+    def test_list_notes_shared_pinned_note_included_in_pinned_bucket(self):
+        owner = _create_superuser(self.tenant, 'owner-pinned@notes.com')
+        shared_note = Note.objects.create(
+            tenant=self.tenant, user=owner, title='Shared pinned', is_pinned=True
+        )
+        Share.objects.create(
+            tenant=self.tenant,
+            resource_type='note',
+            resource_id=shared_note.id,
+            shared_by=owner,
+            shared_with=self.user,
+            permission_level='viewer',
+        )
+        response = self.client.get(BASE_URL, {'page': 1}, **self.slug)
+        body = response.json()
+        shared_ids = {n['id'] for n in body['notes'] if n['is_pinned']}
+        self.assertIn(str(shared_note.id), shared_ids)

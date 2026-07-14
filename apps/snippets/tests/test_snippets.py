@@ -233,3 +233,102 @@ class TestSnippetViews(APITestCase):
         response = self.client.get(f'{BASE_URL}tags/', **self.slug)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.json()['tags'], [])
+
+    # ── List snippets (pagination) ───────────────────────────────────────────
+
+    def _create_snippets(self, n, **overrides):
+        snippets = []
+        for i in range(n):
+            defaults = {
+                'tenant': self.tenant,
+                'user': self.user,
+                'title': f'Snippet {i}',
+                'code': f'x = {i}',
+                'language': 'python',
+            }
+            defaults.update(overrides)
+            snippets.append(CodeSnippet.objects.create(**defaults))
+        return snippets
+
+    def test_list_snippets_without_page_returns_plain_shape(self):
+        self._create_snippets(5)
+        response = self.client.get(BASE_URL, **self.slug)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        body = response.json()
+        self.assertEqual(len(body['snippets']), 5)
+        self.assertNotIn('pagination', body)
+
+    def test_list_snippets_first_page_default_per_page(self):
+        self._create_snippets(25)
+        response = self.client.get(BASE_URL, {'page': 1}, **self.slug)
+        body = response.json()
+        self.assertEqual(len(body['snippets']), 20)
+        self.assertEqual(body['pagination'], {'page': 1, 'per_page': 20, 'total': 25})
+
+    def test_list_snippets_second_page(self):
+        self._create_snippets(25)
+        response = self.client.get(BASE_URL, {'page': 2}, **self.slug)
+        body = response.json()
+        self.assertEqual(len(body['snippets']), 5)
+        self.assertEqual(body['pagination']['page'], 2)
+
+    def test_list_snippets_custom_per_page(self):
+        self._create_snippets(10)
+        response = self.client.get(BASE_URL, {'page': 1, 'per_page': 5}, **self.slug)
+        body = response.json()
+        self.assertEqual(len(body['snippets']), 5)
+        self.assertEqual(body['pagination']['per_page'], 5)
+
+    def test_list_snippets_per_page_clamped_to_100(self):
+        self._create_snippets(3)
+        response = self.client.get(BASE_URL, {'page': 1, 'per_page': 500}, **self.slug)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.json()['pagination']['per_page'], 100)
+
+    def test_list_snippets_page_out_of_range_returns_empty(self):
+        self._create_snippets(3)
+        response = self.client.get(BASE_URL, {'page': 999}, **self.slug)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        body = response.json()
+        self.assertEqual(body['snippets'], [])
+        self.assertEqual(body['pagination']['total'], 3)
+
+    def test_list_snippets_invalid_page_falls_back_to_default(self):
+        self._create_snippets(3)
+        response = self.client.get(BASE_URL, {'page': 'abc'}, **self.slug)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.json()['pagination']['page'], 1)
+
+    def test_list_snippets_invalid_per_page_falls_back_to_default(self):
+        self._create_snippets(3)
+        response = self.client.get(BASE_URL, {'page': 1, 'per_page': 'xyz'}, **self.slug)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.json()['pagination']['per_page'], 20)
+
+    def test_list_snippets_negative_page_clamped_to_one(self):
+        self._create_snippets(3)
+        response = self.client.get(BASE_URL, {'page': -5}, **self.slug)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.json()['pagination']['page'], 1)
+
+    def test_list_snippets_filters_combined_with_pagination(self):
+        self._create_snippets(3, language='python')
+        self._create_snippets(4, language='javascript')
+        response = self.client.get(
+            BASE_URL, {'language': 'python', 'page': 1, 'per_page': 2}, **self.slug
+        )
+        body = response.json()
+        self.assertEqual(len(body['snippets']), 2)
+        self.assertEqual(body['pagination']['total'], 3)
+        self.assertTrue(all(s['language'] == 'python' for s in body['snippets']))
+
+    def test_list_snippets_cross_tenant_pagination_isolated(self):
+        other_tenant = _create_tenant('other-snippets-pagination')
+        other_user = _create_superuser(other_tenant, 'other@snippets-pagination.com')
+        CodeSnippet.objects.create(
+            tenant=other_tenant, user=other_user, title='Other tenant', code='x = 1',
+            language='python',
+        )
+        self._create_snippets(2)
+        response = self.client.get(BASE_URL, {'page': 1}, **self.slug)
+        self.assertEqual(response.json()['pagination']['total'], 2)

@@ -176,3 +176,100 @@ class TestContactViews(APITestCase):
         response = self.client.get(BASE_URL + 'export/', HTTP_X_TENANT_SLUG='starter-exp')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertIn('text/csv', response.get('Content-Type', ''))
+
+    # ── List contacts (pagination) ───────────────────────────────────────────
+
+    def _create_contacts(self, n, **overrides):
+        contacts = []
+        for i in range(n):
+            defaults = {
+                'tenant': self.tenant,
+                'user': self.user,
+                'first_name': f'Contact{i}',
+                'last_name': f'Last{i}',
+            }
+            defaults.update(overrides)
+            contacts.append(Contact.objects.create(**defaults))
+        return contacts
+
+    def test_list_contacts_without_page_preserves_legacy_shape(self):
+        self._create_contacts(5)
+        response = self.client.get(BASE_URL, **self.slug)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        body = response.json()
+        self.assertEqual(body['results'], body['contacts'])
+        self.assertEqual(body['count'], len(body['results']))
+        self.assertEqual(len(body['contacts']), 5)
+
+    def test_list_contacts_first_page_default_per_page(self):
+        self._create_contacts(25)
+        response = self.client.get(BASE_URL, {'page': 1}, **self.slug)
+        body = response.json()
+        self.assertEqual(len(body['contacts']), 20)
+        self.assertEqual(body['pagination'], {'page': 1, 'per_page': 20, 'total': 25})
+
+    def test_list_contacts_second_page(self):
+        self._create_contacts(25)
+        response = self.client.get(BASE_URL, {'page': 2}, **self.slug)
+        body = response.json()
+        self.assertEqual(len(body['contacts']), 5)
+        self.assertEqual(body['pagination']['page'], 2)
+
+    def test_list_contacts_custom_per_page(self):
+        self._create_contacts(10)
+        response = self.client.get(BASE_URL, {'page': 1, 'per_page': 5}, **self.slug)
+        body = response.json()
+        self.assertEqual(len(body['contacts']), 5)
+        self.assertEqual(body['pagination']['per_page'], 5)
+
+    def test_list_contacts_per_page_clamped_to_100(self):
+        self._create_contacts(3)
+        response = self.client.get(BASE_URL, {'page': 1, 'per_page': 500}, **self.slug)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.json()['pagination']['per_page'], 100)
+
+    def test_list_contacts_page_out_of_range_returns_empty(self):
+        self._create_contacts(3)
+        response = self.client.get(BASE_URL, {'page': 999}, **self.slug)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        body = response.json()
+        self.assertEqual(body['contacts'], [])
+        self.assertEqual(body['pagination']['total'], 3)
+
+    def test_list_contacts_invalid_page_falls_back_to_default(self):
+        self._create_contacts(3)
+        response = self.client.get(BASE_URL, {'page': 'abc'}, **self.slug)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.json()['pagination']['page'], 1)
+
+    def test_list_contacts_invalid_per_page_falls_back_to_default(self):
+        self._create_contacts(3)
+        response = self.client.get(BASE_URL, {'page': 1, 'per_page': 'xyz'}, **self.slug)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.json()['pagination']['per_page'], 20)
+
+    def test_list_contacts_negative_page_clamped_to_one(self):
+        self._create_contacts(3)
+        response = self.client.get(BASE_URL, {'page': -5}, **self.slug)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.json()['pagination']['page'], 1)
+
+    def test_list_contacts_filters_combined_with_pagination(self):
+        group = ContactGroup.objects.create(tenant=self.tenant, user=self.user, name='VIP')
+        self._create_contacts(3, group=group)
+        self._create_contacts(4)
+        response = self.client.get(
+            BASE_URL, {'group': str(group.pk), 'page': 1, 'per_page': 2}, **self.slug
+        )
+        body = response.json()
+        self.assertEqual(len(body['contacts']), 2)
+        self.assertEqual(body['pagination']['total'], 3)
+        self.assertTrue(all(c['group']['id'] == str(group.pk) for c in body['contacts']))
+
+    def test_list_contacts_cross_tenant_pagination_isolated(self):
+        other_tenant = _create_tenant('other-contacts-pagination')
+        other_user = _create_superuser(other_tenant, 'other@contacts-pagination.com')
+        Contact.objects.create(tenant=other_tenant, user=other_user, first_name='Other')
+        self._create_contacts(2)
+        response = self.client.get(BASE_URL, {'page': 1}, **self.slug)
+        self.assertEqual(response.json()['pagination']['total'], 2)

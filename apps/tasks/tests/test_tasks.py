@@ -129,3 +129,116 @@ class TestTaskViews(APITestCase):
         url = f'{TASKS_URL}{other_task.pk}/'
         response = self.client.get(url, **self.slug)
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    # ── List tasks (pagination) ──────────────────────────────────────────────
+
+    def _create_tasks(self, n, **overrides):
+        tasks = []
+        for i in range(n):
+            defaults = {
+                'tenant': self.tenant,
+                'board': self.board,
+                'created_by': self.user,
+                'title': f'Task {i}',
+                'order': i,
+            }
+            defaults.update(overrides)
+            tasks.append(Task.objects.create(**defaults))
+        return tasks
+
+    def test_list_tasks_without_page_returns_everything(self):
+        """GET /tasks/ without ?page= keeps today's behavior: no slicing."""
+        self._create_tasks(25)
+        response = self.client.get(TASKS_URL, **self.slug)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        body = response.json()
+        self.assertEqual(len(body['tasks']), 25)
+        self.assertEqual(body['pagination'], {'page': 1, 'per_page': 25, 'total': 25})
+
+    def test_list_tasks_first_page_default_per_page(self):
+        """?page=1 without per_page defaults to 20 items per page."""
+        self._create_tasks(25)
+        response = self.client.get(TASKS_URL, {'page': 1}, **self.slug)
+        body = response.json()
+        self.assertEqual(len(body['tasks']), 20)
+        self.assertEqual(body['pagination'], {'page': 1, 'per_page': 20, 'total': 25})
+
+    def test_list_tasks_second_page(self):
+        """?page=2 returns the remaining items."""
+        self._create_tasks(25)
+        response = self.client.get(TASKS_URL, {'page': 2}, **self.slug)
+        body = response.json()
+        self.assertEqual(len(body['tasks']), 5)
+        self.assertEqual(body['pagination'], {'page': 2, 'per_page': 20, 'total': 25})
+
+    def test_list_tasks_custom_per_page(self):
+        """?per_page= overrides the default page size."""
+        self._create_tasks(25)
+        response = self.client.get(TASKS_URL, {'page': 1, 'per_page': 5}, **self.slug)
+        body = response.json()
+        self.assertEqual(len(body['tasks']), 5)
+        self.assertEqual(body['pagination']['per_page'], 5)
+
+    def test_list_tasks_per_page_clamped_to_100(self):
+        """per_page above 100 is clamped, doesn't 500 or leak unbounded rows."""
+        self._create_tasks(3)
+        response = self.client.get(TASKS_URL, {'page': 1, 'per_page': 500}, **self.slug)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.json()['pagination']['per_page'], 100)
+
+    def test_list_tasks_page_out_of_range_returns_empty(self):
+        """A page beyond the last one returns 200 with an empty list, not 404."""
+        self._create_tasks(3)
+        response = self.client.get(TASKS_URL, {'page': 999}, **self.slug)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        body = response.json()
+        self.assertEqual(body['tasks'], [])
+        self.assertEqual(body['pagination']['total'], 3)
+
+    def test_list_tasks_invalid_page_falls_back_to_default(self):
+        """A non-numeric page falls back to page=1 instead of 500ing."""
+        self._create_tasks(3)
+        response = self.client.get(TASKS_URL, {'page': 'abc'}, **self.slug)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.json()['pagination']['page'], 1)
+
+    def test_list_tasks_invalid_per_page_falls_back_to_default(self):
+        """A non-numeric per_page falls back to 20 instead of 500ing."""
+        self._create_tasks(3)
+        response = self.client.get(TASKS_URL, {'page': 1, 'per_page': 'xyz'}, **self.slug)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.json()['pagination']['per_page'], 20)
+
+    def test_list_tasks_negative_page_clamped_to_one(self):
+        """A negative page is clamped to 1."""
+        self._create_tasks(3)
+        response = self.client.get(TASKS_URL, {'page': -5}, **self.slug)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.json()['pagination']['page'], 1)
+
+    def test_list_tasks_filters_combined_with_pagination(self):
+        """total reflects only the filtered subset, not the whole tenant."""
+        self._create_tasks(3, status='todo')
+        self._create_tasks(4, status='done')
+        response = self.client.get(
+            TASKS_URL, {'status': 'todo', 'page': 1, 'per_page': 2}, **self.slug
+        )
+        body = response.json()
+        self.assertEqual(len(body['tasks']), 2)
+        self.assertEqual(body['pagination']['total'], 3)
+        self.assertTrue(all(t['status'] == 'todo' for t in body['tasks']))
+
+    def test_list_tasks_cross_tenant_pagination_isolated(self):
+        """total/pagination never counts another tenant's tasks."""
+        other_tenant = _create_tenant('other-pagination')
+        other_user = _create_superuser(other_tenant, 'other@pagination.com')
+        other_board = TaskBoard.objects.create(
+            tenant=other_tenant, created_by=other_user, name='Other Board'
+        )
+        Task.objects.create(
+            tenant=other_tenant, board=other_board,
+            created_by=other_user, title='Other tenant task',
+        )
+        self._create_tasks(2)
+        response = self.client.get(TASKS_URL, {'page': 1}, **self.slug)
+        self.assertEqual(response.json()['pagination']['total'], 2)

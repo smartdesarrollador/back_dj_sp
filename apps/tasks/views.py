@@ -19,8 +19,8 @@ Endpoints:
   POST   /app/tasks/<task_pk>/comments/        → create comment
 """
 from django.contrib.auth import get_user_model
-from drf_spectacular.utils import OpenApiParameter, extend_schema
 from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import OpenApiParameter, extend_schema
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -142,6 +142,8 @@ class TaskListCreateView(APIView):
             OpenApiParameter('assignee', OpenApiTypes.UUID, description='Filter by assignee'),
             OpenApiParameter('priority', OpenApiTypes.STR, description='Filter by priority'),
             OpenApiParameter('search', OpenApiTypes.STR, description='Search in title'),
+            OpenApiParameter('page', OpenApiTypes.INT, description='Page number. Omit to get all results unpaginated.'),
+            OpenApiParameter('per_page', OpenApiTypes.INT, description='Results per page (default: 20, max: 100)'),
         ],
     )
     def get(self, request):
@@ -161,7 +163,27 @@ class TaskListCreateView(APIView):
             qs = qs.filter(priority=priority)
         if search:
             qs = qs.filter(title__icontains=search)
-        return Response({'tasks': TaskSerializer(qs, many=True).data})
+
+        total = qs.count()
+        raw_page = request.query_params.get('page')
+        if raw_page is None:
+            tasks = qs
+            pagination = {'page': 1, 'per_page': total, 'total': total}
+        else:
+            try:
+                page = max(1, int(raw_page))
+                per_page = min(100, max(1, int(request.query_params.get('per_page', 20))))
+            except (ValueError, TypeError):
+                page = 1
+                per_page = 20
+            offset = (page - 1) * per_page
+            tasks = qs[offset:offset + per_page]
+            pagination = {'page': page, 'per_page': per_page, 'total': total}
+
+        return Response({
+            'tasks': TaskSerializer(tasks, many=True).data,
+            'pagination': pagination,
+        })
 
     @extend_schema(tags=['app-tasks'], summary='Create task')
     def post(self, request):

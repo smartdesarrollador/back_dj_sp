@@ -19,8 +19,8 @@ import csv
 
 from django.db.models import Q
 from django.http import HttpResponse
-from drf_spectacular.utils import OpenApiParameter, extend_schema
 from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import OpenApiParameter, extend_schema
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -31,7 +31,7 @@ from apps.contacts.serializers import (
     ContactGroupSerializer,
     ContactSerializer,
 )
-from apps.rbac.permissions import HasFeature, HasPermission, check_plan_limit, _user_has_permission
+from apps.rbac.permissions import HasFeature, HasPermission, _user_has_permission, check_plan_limit
 from apps.sharing.models import Share
 from core.mixins import AuditMixin
 from utils.plans import get_plan_limit
@@ -66,6 +66,8 @@ class ContactListCreateView(APIView):
         parameters=[
             OpenApiParameter('group', OpenApiTypes.UUID, description='Filter by group'),
             OpenApiParameter('search', OpenApiTypes.STR, description='Search by name/email'),
+            OpenApiParameter('page', OpenApiTypes.INT, description='Page number. Omit to get all results unpaginated (legacy shape).'),
+            OpenApiParameter('per_page', OpenApiTypes.INT, description='Results per page (default: 20, max: 100)'),
         ],
     )
     def get(self, request):
@@ -87,10 +89,28 @@ class ContactListCreateView(APIView):
                 Q(last_name__icontains=search) |
                 Q(email__icontains=search)
             )
-        contacts = ContactSerializer(
-            qs, many=True, context={'request': request, 'shared_by_map': shared_by_map}
-        ).data
-        return Response({'results': contacts, 'count': len(contacts), 'contacts': contacts})
+
+        context = {'request': request, 'shared_by_map': shared_by_map}
+        raw_page = request.query_params.get('page')
+
+        if raw_page is None:
+            contacts = ContactSerializer(qs, many=True, context=context).data
+            return Response({'results': contacts, 'count': len(contacts), 'contacts': contacts})
+
+        total = qs.count()
+        try:
+            page = max(1, int(raw_page))
+            per_page = min(100, max(1, int(request.query_params.get('per_page', 20))))
+        except (ValueError, TypeError):
+            page = 1
+            per_page = 20
+
+        offset = (page - 1) * per_page
+        contacts = ContactSerializer(qs[offset:offset + per_page], many=True, context=context).data
+        return Response({
+            'contacts': contacts,
+            'pagination': {'page': page, 'per_page': per_page, 'total': total},
+        })
 
     @extend_schema(tags=['app-contacts'], summary='Create contact')
     def post(self, request):

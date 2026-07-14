@@ -16,15 +16,19 @@ Endpoints:
   DELETE /app/notes/categories/<pk>/   → delete category
 """
 from django.db.models import Q
-from drf_spectacular.utils import OpenApiParameter, extend_schema
 from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import OpenApiParameter, extend_schema
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.notes.models import Note, NoteCategory
-from apps.notes.serializers import NoteCategorySerializer, NoteCreateUpdateSerializer, NoteSerializer
-from apps.rbac.permissions import HasFeature, HasPermission, check_plan_limit, _user_has_permission
+from apps.notes.serializers import (
+    NoteCategorySerializer,
+    NoteCreateUpdateSerializer,
+    NoteSerializer,
+)
+from apps.rbac.permissions import HasFeature, HasPermission, _user_has_permission, check_plan_limit
 from apps.sharing.models import Share
 from core.mixins import AuditMixin
 from utils.plans import get_plan_limit
@@ -61,6 +65,8 @@ class NoteListCreateView(APIView):
             OpenApiParameter('category', OpenApiTypes.UUID, description='Filter by category'),
             OpenApiParameter('search', OpenApiTypes.STR, description='Search in title/content'),
             OpenApiParameter('tag', OpenApiTypes.STR, description='Filter by tag'),
+            OpenApiParameter('page', OpenApiTypes.INT, description='Page number for non-pinned notes. Omit to get all results unpaginated (legacy shape).'),
+            OpenApiParameter('per_page', OpenApiTypes.INT, description='Non-pinned results per page (default: 20, max: 100)'),
         ],
     )
     def get(self, request):
@@ -81,10 +87,34 @@ class NoteListCreateView(APIView):
             qs = qs.filter(Q(title__icontains=search) | Q(content__icontains=search))
         if tag:
             qs = qs.filter(tags__contains=[tag])
-        notes = NoteSerializer(
-            qs, many=True, context={'request': request, 'shared_by_map': shared_by_map}
-        ).data
-        return Response({'results': notes, 'count': len(notes), 'notes': notes})
+
+        context = {'request': request, 'shared_by_map': shared_by_map}
+        raw_page = request.query_params.get('page')
+
+        if raw_page is None:
+            notes = NoteSerializer(qs, many=True, context=context).data
+            return Response({'results': notes, 'count': len(notes), 'notes': notes})
+
+        try:
+            page = max(1, int(raw_page))
+            per_page = min(100, max(1, int(request.query_params.get('per_page', 20))))
+        except (ValueError, TypeError):
+            page = 1
+            per_page = 20
+
+        # Fijadas siempre completas; solo las no-fijadas se paginan.
+        pinned_qs = qs.filter(is_pinned=True)
+        unpinned_qs = qs.filter(is_pinned=False)
+        total_unpinned = unpinned_qs.count()
+        offset = (page - 1) * per_page
+        unpinned_page = unpinned_qs[offset:offset + per_page]
+
+        combined = list(pinned_qs) + list(unpinned_page)
+        notes = NoteSerializer(combined, many=True, context=context).data
+        return Response({
+            'notes': notes,
+            'pagination': {'page': page, 'per_page': per_page, 'total': total_unpinned},
+        })
 
     @extend_schema(tags=['app-notes'], summary='Create note')
     def post(self, request):
