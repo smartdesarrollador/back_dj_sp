@@ -17,7 +17,8 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.hashers import check_password, make_password
 from django.core.cache import cache
 from django.utils import timezone
-from drf_spectacular.utils import extend_schema
+from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import OpenApiParameter, extend_schema
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -310,7 +311,16 @@ class VaultRecoverView(AuditMixin, APIView):
 class VaultItemListCreateView(AuditMixin, APIView):
     permission_classes = [IsAuthenticated]
 
-    @extend_schema(tags=['app-vault'], summary='List vault items (titles, no secrets)')
+    @extend_schema(
+        tags=['app-vault'],
+        summary='List vault items (titles, no secrets)',
+        parameters=[
+            OpenApiParameter('item_type', OpenApiTypes.STR, description='Filter by item type'),
+            OpenApiParameter('search', OpenApiTypes.STR, description='Search in title'),
+            OpenApiParameter('page', OpenApiTypes.INT, description='Page number. Omit to get all results unpaginated.'),
+            OpenApiParameter('per_page', OpenApiTypes.INT, description='Results per page (default: 20, max: 100)'),
+        ],
+    )
     def get(self, request):
         qs = VaultItem.objects.filter(tenant=request.tenant, user=request.user)
         item_type = request.query_params.get('item_type')
@@ -319,8 +329,27 @@ class VaultItemListCreateView(AuditMixin, APIView):
             qs = qs.filter(item_type=item_type)
         if search:
             qs = qs.filter(title__icontains=search)
-        data = VaultItemListSerializer(qs, many=True).data
-        return Response({'items': data, 'count': len(data)})
+
+        raw_page = request.query_params.get('page')
+
+        if raw_page is None:
+            data = VaultItemListSerializer(qs, many=True).data
+            return Response({'items': data, 'count': len(data)})
+
+        total = qs.count()
+        try:
+            page = max(1, int(raw_page))
+            per_page = min(100, max(1, int(request.query_params.get('per_page', 20))))
+        except (ValueError, TypeError):
+            page = 1
+            per_page = 20
+
+        offset = (page - 1) * per_page
+        data = VaultItemListSerializer(qs[offset:offset + per_page], many=True).data
+        return Response({
+            'items': data,
+            'pagination': {'page': page, 'per_page': per_page, 'total': total},
+        })
 
     @extend_schema(tags=['app-vault'], summary='Create a vault item (requires unlock)')
     def post(self, request):

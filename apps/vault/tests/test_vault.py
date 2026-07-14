@@ -141,6 +141,100 @@ class TestVault(APITestCase):
         self.assertNotIn('data', item)
         self.assertNotIn('data_ciphertext', item)
 
+    # ── List items (pagination) ──────────────────────────────────────────────
+
+    def _create_items(self, n, **overrides):
+        items = []
+        for i in range(n):
+            defaults = {
+                'tenant': self.tenant, 'user': self.alice,
+                'title': f'Item {i}', 'data_ciphertext': 'x',
+            }
+            defaults.update(overrides)
+            items.append(VaultItem.objects.create(**defaults))
+        return items
+
+    def test_list_items_first_page_default_per_page(self):
+        self._auth(self.alice)
+        self._create_items(25)
+        res = self.client.get(f'{BASE}items/', {'page': 1}, **self.headers)
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        body = res.json()
+        self.assertEqual(len(body['items']), 20)
+        self.assertEqual(body['pagination'], {'page': 1, 'per_page': 20, 'total': 25})
+
+    def test_list_items_second_page(self):
+        self._auth(self.alice)
+        self._create_items(25)
+        res = self.client.get(f'{BASE}items/', {'page': 2}, **self.headers)
+        body = res.json()
+        self.assertEqual(len(body['items']), 5)
+        self.assertEqual(body['pagination']['page'], 2)
+
+    def test_list_items_custom_per_page(self):
+        self._auth(self.alice)
+        self._create_items(10)
+        res = self.client.get(f'{BASE}items/', {'page': 1, 'per_page': 5}, **self.headers)
+        body = res.json()
+        self.assertEqual(len(body['items']), 5)
+        self.assertEqual(body['pagination']['per_page'], 5)
+
+    def test_list_items_per_page_clamped_to_100(self):
+        self._auth(self.alice)
+        self._create_items(3)
+        res = self.client.get(f'{BASE}items/', {'page': 1, 'per_page': 500}, **self.headers)
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(res.json()['pagination']['per_page'], 100)
+
+    def test_list_items_page_out_of_range_returns_empty(self):
+        self._auth(self.alice)
+        self._create_items(3)
+        res = self.client.get(f'{BASE}items/', {'page': 999}, **self.headers)
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        body = res.json()
+        self.assertEqual(body['items'], [])
+        self.assertEqual(body['pagination']['total'], 3)
+
+    def test_list_items_invalid_page_falls_back_to_default(self):
+        self._auth(self.alice)
+        self._create_items(3)
+        res = self.client.get(f'{BASE}items/', {'page': 'abc'}, **self.headers)
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(res.json()['pagination']['page'], 1)
+
+    def test_list_items_invalid_per_page_falls_back_to_default(self):
+        self._auth(self.alice)
+        self._create_items(3)
+        res = self.client.get(f'{BASE}items/', {'page': 1, 'per_page': 'xyz'}, **self.headers)
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(res.json()['pagination']['per_page'], 20)
+
+    def test_list_items_negative_page_clamped_to_one(self):
+        self._auth(self.alice)
+        self._create_items(3)
+        res = self.client.get(f'{BASE}items/', {'page': -5}, **self.headers)
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(res.json()['pagination']['page'], 1)
+
+    def test_list_items_filters_combined_with_pagination(self):
+        self._auth(self.alice)
+        self._create_items(3, item_type='login')
+        self._create_items(4, item_type='api_key')
+        res = self.client.get(
+            f'{BASE}items/', {'item_type': 'login', 'page': 1, 'per_page': 2}, **self.headers
+        )
+        body = res.json()
+        self.assertEqual(len(body['items']), 2)
+        self.assertEqual(body['pagination']['total'], 3)
+        self.assertTrue(all(i['item_type'] == 'login' for i in body['items']))
+
+    def test_list_items_cross_user_pagination_isolated(self):
+        self._auth(self.alice)
+        self._create_items(2)
+        self._create_items(5, user=self.bob)
+        res = self.client.get(f'{BASE}items/', {'page': 1}, **self.headers)
+        self.assertEqual(res.json()['pagination']['total'], 2)
+
     # ── Change master password ───────────────────────────────────────────────
 
     def test_change_master_keeps_items_decryptable(self):
