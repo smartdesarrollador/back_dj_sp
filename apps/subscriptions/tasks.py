@@ -52,11 +52,14 @@ def notify_yape_payment(proof_id: str) -> None:
             'final_amount':    str(redemption.final_amount),
         }
 
+    from apps.subscriptions.models import YapeConfig
+
     payload = {
-        'proof_id':    str(proof.id),
-        'plan':        proof.plan,
-        'amount':      str(proof.amount),
-        'promo':       promo,
+        'proof_id':      str(proof.id),
+        'plan':          proof.plan,
+        'amount':        str(proof.amount),
+        'promo':         promo,
+        'exchange_rate': str(YapeConfig.get().exchange_rate),
         'tenant': {
             'id':        str(tenant.id),
             'name':      tenant.name,
