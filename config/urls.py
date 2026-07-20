@@ -52,6 +52,7 @@ urlpatterns = [
         path('contact/', include('apps.contact.admin_urls')),
         path('catalog/', include('apps.catalog.admin_urls')),
         path('announcements/', include('apps.announcements.admin_urls')),
+        path('promotions/', include('apps.promotions.admin_urls')),
     ])),
 
     # App API (per-user resources)
@@ -95,6 +96,7 @@ urlpatterns = [
         path('', include('apps.site_config.public_urls')),
         path('catalog/', include('apps.catalog.public_urls')),
         path('announcements/', include('apps.announcements.public_urls')),
+        path('promotions/', include('apps.promotions.public_urls')),
     ])),
 
     # Support

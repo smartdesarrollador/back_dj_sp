@@ -9,7 +9,6 @@ from django.contrib.auth import get_user_model
 from django.core.mail import send_mail
 from django.db import transaction
 from django.utils import timezone
-from rest_framework import status
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -36,11 +35,24 @@ def _serialize_proof(proof: YapePaymentProof) -> dict:
     base_url = getattr(settings, 'APP_BASE_URL', '').rstrip('/')
     tenant   = proof.subscription.tenant
     owner    = tenant.users.order_by('created_at').first()
+
+    # Canje de cupón asociado (reverse OneToOne: AttributeError si no existe)
+    redemption = getattr(proof, 'redemption', None)
+    promo = None
+    if redemption is not None:
+        promo = {
+            'code':            redemption.promotion.code,
+            'original_amount': str(redemption.original_amount),
+            'discount_amount': str(redemption.discount_amount),
+            'final_amount':    str(redemption.final_amount),
+        }
+
     return {
         'id':             str(proof.id),
         'screenshot_url': f"{base_url}/media/{proof.screenshot.name}" if proof.screenshot else '',
         'plan':           proof.plan,
         'amount':         str(proof.amount),
+        'promo':          promo,
         'status':         proof.status,
         'tenant_name':    tenant.name,
         'tenant_email':   owner.email if owner else '',
@@ -107,7 +119,7 @@ class YapeProofListView(APIView):
             return Response({'detail': 'Staff access required.'}, status=403)
 
         qs = YapePaymentProof.objects.select_related(
-            'subscription__tenant'
+            'subscription__tenant', 'redemption__promotion'
         ).order_by('-created_at')
 
         # Filters
@@ -206,6 +218,8 @@ class YapeProofReviewView(APIView):
             logger.info('YapeReview: proof %s approved by staff %s', proof.id, request.user.email)
 
         else:  # rejected
+            from apps.promotions.services import release_redemption_for_proof
+
             with transaction.atomic():
                 subscription.plan   = 'free'
                 subscription.status = 'active'
@@ -215,6 +229,7 @@ class YapeProofReviewView(APIView):
                 proof.status      = 'rejected'
                 proof.reviewed_at = timezone.now()
                 proof.save(update_fields=['status', 'reviewed_at', 'updated_at'])
+                release_redemption_for_proof(proof)
 
             owner = tenant.users.order_by('created_at').first()
             if owner:

@@ -10,8 +10,8 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.hashers import check_password, make_password
 from django.core.cache import cache
 from django.core.mail import send_mail
+from django.db import transaction
 from drf_spectacular.utils import OpenApiResponse, extend_schema
-from decimal import Decimal, InvalidOperation
 
 from rest_framework import status
 from rest_framework.parsers import FormParser, MultiPartParser
@@ -48,14 +48,15 @@ from .serializers import (
 )
 from .tokens import (
     TenantRefreshToken,
+    consume_payment_upload_token,
     create_email_verification_token,
     create_mfa_session_token,
     create_password_reset_token,
     create_payment_upload_token,
+    peek_payment_upload_token,
     verify_email_token,
     verify_mfa_session_token,
     verify_password_reset_token,
-    verify_payment_upload_token,
 )
 
 User = get_user_model()
@@ -586,10 +587,19 @@ class YapePaymentProofView(APIView):
         summary='Upload Yape payment proof screenshot',
         responses={
             201: OpenApiResponse(description='Proof received, pending admin review'),
-            400: OpenApiResponse(description='Invalid token, missing file, or invalid plan'),
+            400: OpenApiResponse(description='Invalid token, missing file, invalid plan or promo code'),
         },
     )
     def post(self, request):
+        from decimal import Decimal
+
+        from apps.promotions.models import PromotionRedemption
+        from apps.promotions.services import (
+            REASON_MESSAGES,
+            compute_discount,
+            find_valid_promotion,
+            get_plan_price,
+        )
         from apps.subscriptions.models import Subscription, YapePaymentProof
         from apps.subscriptions.tasks import notify_yape_payment
 
@@ -597,7 +607,9 @@ class YapePaymentProofView(APIView):
         if not upload_token:
             return Response({'detail': 'payment_upload_token is required.'}, status=400)
 
-        tenant_id = verify_payment_upload_token(upload_token)
+        # peek: el token solo se consume tras crear el proof — un submit que
+        # falla una validación (ej. cupón agotado) debe poder reintentarse.
+        tenant_id = peek_payment_upload_token(upload_token)
         if not tenant_id:
             return Response({'detail': 'Invalid or expired upload token.'}, status=400)
 
@@ -610,27 +622,139 @@ class YapePaymentProofView(APIView):
             return Response({'detail': 'Invalid plan.'}, status=400)
 
         try:
-            amount = Decimal(request.data.get('amount', '0'))
-        except InvalidOperation:
-            return Response({'detail': 'Invalid amount.'}, status=400)
-
-        try:
             subscription = Subscription.objects.select_related('tenant').get(tenant_id=tenant_id)
         except Subscription.DoesNotExist:
             return Response({'detail': 'Subscription not found.'}, status=400)
 
-        admin_token = secrets.token_urlsafe(48)
-        proof = YapePaymentProof.objects.create(
-            subscription=subscription,
-            screenshot=screenshot,
-            plan=plan,
-            amount=amount,
-            admin_token=admin_token,
-        )
+        # El monto se calcula SIEMPRE en servidor; el amount del cliente se ignora.
+        promo_code = str(request.data.get('promo_code', '')).strip()
+        promotion = None
+        if promo_code:
+            promotion, reason = find_valid_promotion(
+                promo_code, plan, tenant=subscription.tenant,
+            )
+            if promotion is None:
+                return Response(
+                    {'detail': REASON_MESSAGES[reason], 'promo_reason': reason},
+                    status=400,
+                )
+            amounts = compute_discount(promotion, plan)
+        else:
+            price = get_plan_price(plan)
+            amounts = {'original': price, 'discount': Decimal('0.00'), 'final': price}
 
+        admin_token = secrets.token_urlsafe(48)
+        with transaction.atomic():
+            proof = YapePaymentProof.objects.create(
+                subscription=subscription,
+                screenshot=screenshot,
+                plan=plan,
+                amount=amounts['final'],
+                admin_token=admin_token,
+            )
+            if promotion is not None:
+                PromotionRedemption.objects.create(
+                    promotion=promotion,
+                    tenant=subscription.tenant,
+                    yape_proof=proof,
+                    plan=plan,
+                    original_amount=amounts['original'],
+                    discount_amount=amounts['discount'],
+                    final_amount=amounts['final'],
+                )
+
+        consume_payment_upload_token(upload_token)
         notify_yape_payment.delay(str(proof.id))
 
         return Response(
             {'message': 'Payment proof submitted. We will review it shortly.', 'proof_id': str(proof.id)},
             status=status.HTTP_201_CREATED,
         )
+
+
+class YapeActivateFreeView(APIView):
+    """
+    Activación directa cuando un cupón deja el monto en $0 (descuento 100%):
+    no hay comprobante que subir. Revalida el cupón y el monto en servidor —
+    no confía en que el Hub haya decidido omitir el paso de pago.
+    """
+    permission_classes = [AllowAny]
+    authentication_classes = []
+
+    @extend_schema(
+        tags=['auth'],
+        summary='Activate a paid plan directly via a 100%-discount promo code',
+        responses={
+            200: OpenApiResponse(description='Plan activated, no payment required'),
+            400: OpenApiResponse(description='Invalid token, plan or promo code, or amount not zero'),
+        },
+    )
+    def post(self, request):
+        from apps.promotions.models import PromotionRedemption
+        from apps.promotions.services import (
+            REASON_MESSAGES,
+            compute_discount,
+            confirm_redemption,
+            find_valid_promotion,
+        )
+        from apps.subscriptions.models import Subscription
+        from apps.subscriptions.services import activate_subscription_plan
+
+        upload_token = str(request.data.get('payment_upload_token', '')).strip()
+        if not upload_token:
+            return Response({'detail': 'payment_upload_token is required.'}, status=400)
+
+        tenant_id = peek_payment_upload_token(upload_token)
+        if not tenant_id:
+            return Response({'detail': 'Invalid or expired upload token.'}, status=400)
+
+        plan = str(request.data.get('plan', '')).strip()
+        if plan not in ('starter', 'professional', 'enterprise'):
+            return Response({'detail': 'Invalid plan.'}, status=400)
+
+        promo_code = str(request.data.get('promo_code', '')).strip()
+        if not promo_code:
+            return Response({'detail': 'promo_code is required.'}, status=400)
+
+        try:
+            subscription = Subscription.objects.select_related('tenant').get(tenant_id=tenant_id)
+        except Subscription.DoesNotExist:
+            return Response({'detail': 'Subscription not found.'}, status=400)
+
+        promotion, reason = find_valid_promotion(promo_code, plan, tenant=subscription.tenant)
+        if promotion is None:
+            return Response(
+                {'detail': REASON_MESSAGES[reason], 'promo_reason': reason},
+                status=400,
+            )
+
+        amounts = compute_discount(promotion, plan)
+        if amounts['final'] != 0:
+            return Response(
+                {'detail': 'El cupón no cubre el 100% del plan.', 'promo_reason': 'not_free'},
+                status=400,
+            )
+
+        with transaction.atomic():
+            redemption = PromotionRedemption.objects.create(
+                promotion=promotion,
+                tenant=subscription.tenant,
+                yape_proof=None,
+                plan=plan,
+                original_amount=amounts['original'],
+                discount_amount=amounts['discount'],
+                final_amount=amounts['final'],
+            )
+            confirm_redemption(redemption)
+            activate_subscription_plan(
+                subscription, plan,
+                amount=amounts['final'],
+                invoice_ref=f'promo_{redemption.id}',
+            )
+
+        consume_payment_upload_token(upload_token)
+
+        return Response({
+            'message': 'Plan activated with a 100% discount promo code.',
+            'activated': True,
+        })

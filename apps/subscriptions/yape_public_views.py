@@ -217,6 +217,8 @@ class YapeRejectView(APIView):
         subscription = proof.subscription
         hub_url      = getattr(settings, 'FRONTEND_HUB_URL', '').rstrip('/')
 
+        from apps.promotions.services import release_redemption_for_proof
+
         with transaction.atomic():
             subscription.plan   = 'free'
             subscription.status = 'active'
@@ -226,6 +228,7 @@ class YapeRejectView(APIView):
             proof.status      = 'rejected'
             proof.reviewed_at = timezone.now()
             proof.save(update_fields=['status', 'reviewed_at', 'updated_at'])
+            release_redemption_for_proof(proof)
 
         owner = tenant.users.order_by('created_at').first()
         if owner:

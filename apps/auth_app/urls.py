@@ -17,6 +17,7 @@ from .views import (
     ResendVerificationView,
     ResetPasswordView,
     VerifyEmailView,
+    YapeActivateFreeView,
     YapePaymentProofView,
 )
 
@@ -40,4 +41,5 @@ urlpatterns = [
     path('google/', GoogleOAuthInitView.as_view(), name='google-oauth-init'),
     path('google/callback/', GoogleOAuthCallbackView.as_view(), name='google-oauth-callback'),
     path('yape-payment-proof', YapePaymentProofView.as_view(), name='yape-payment-proof'),
+    path('yape-activate-free', YapeActivateFreeView.as_view(), name='yape-activate-free'),
 ]

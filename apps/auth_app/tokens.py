@@ -58,7 +58,7 @@ def verify_mfa_session_token(token: str) -> str | None:
     return user_id
 
 
-PAYMENT_UPLOAD_TTL = 1800  # 30 min — single-use, consumed on first verify call
+PAYMENT_UPLOAD_TTL = 1800  # 30 min — single-use: peek durante las validaciones, consume al éxito
 
 
 def create_payment_upload_token(tenant_id: str) -> str:
@@ -67,8 +67,11 @@ def create_payment_upload_token(tenant_id: str) -> str:
     return token
 
 
-def verify_payment_upload_token(token: str) -> str | None:
-    tenant_id = cache.get(f'payment_upload:{token}')
-    if tenant_id:
-        cache.delete(f'payment_upload:{token}')
-    return tenant_id
+def peek_payment_upload_token(token: str) -> str | None:
+    """Lee el tenant_id sin consumir el token — un submit que falla la
+    validación (ej. cupón agotado) debe poder reintentarse."""
+    return cache.get(f'payment_upload:{token}')
+
+
+def consume_payment_upload_token(token: str) -> None:
+    cache.delete(f'payment_upload:{token}')

@@ -80,4 +80,5 @@ REST_FRAMEWORK['DEFAULT_THROTTLE_RATES'].update({  # noqa: F405
     'register': '100/hour',
     'mfa': '100/minute',
     'forgot_password': '100/hour',
+    'coupon_validate': '100/minute',
 })

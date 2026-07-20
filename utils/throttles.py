@@ -22,6 +22,11 @@ class ForgotPasswordRateThrottle(AnonRateThrottle):
     scope = 'forgot_password'
 
 
+class CouponValidateRateThrottle(AnonRateThrottle):
+    """10 validaciones/minuto por IP — evita fuerza bruta de códigos de descuento."""
+    scope = 'coupon_validate'
+
+
 class PlanBasedUserThrottle(SimpleRateThrottle):
     """
     Throttle dinámico según plan del tenant.

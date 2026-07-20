@@ -42,10 +42,21 @@ def notify_yape_payment(proof_id: str) -> None:
     owner  = tenant.users.order_by('created_at').first()
     base_url = getattr(settings, 'APP_BASE_URL', '').rstrip('/')
 
+    redemption = getattr(proof, 'redemption', None)
+    promo = None
+    if redemption is not None:
+        promo = {
+            'code':            redemption.promotion.code,
+            'original_amount': str(redemption.original_amount),
+            'discount_amount': str(redemption.discount_amount),
+            'final_amount':    str(redemption.final_amount),
+        }
+
     payload = {
         'proof_id':    str(proof.id),
         'plan':        proof.plan,
         'amount':      str(proof.amount),
+        'promo':       promo,
         'tenant': {
             'id':        str(tenant.id),
             'name':      tenant.name,

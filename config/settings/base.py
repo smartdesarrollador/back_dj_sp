@@ -78,6 +78,7 @@ LOCAL_APPS = [
     'apps.search',
     'apps.catalog',
     'apps.announcements',
+    'apps.promotions',
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
@@ -202,6 +203,7 @@ REST_FRAMEWORK = {
         'mfa': '5/minute',
         'forgot_password': '5/hour',
         'chat': '30/hour',
+        'coupon_validate': '10/minute',
     },
     'EXCEPTION_HANDLER': 'core.exceptions.custom_exception_handler',
 }
