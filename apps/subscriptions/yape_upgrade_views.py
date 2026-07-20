@@ -10,8 +10,8 @@ valid JWT since the user is already logged in.
 """
 import logging
 import secrets
-from decimal import Decimal, InvalidOperation
 
+from django.db import transaction
 from drf_spectacular.utils import OpenApiResponse, extend_schema
 from rest_framework import status
 from rest_framework.parsers import FormParser, MultiPartParser
@@ -19,6 +19,13 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.promotions.models import PromotionRedemption
+from apps.promotions.services import (
+    REASON_MESSAGES,
+    compute_discount,
+    find_valid_promotion,
+    get_plan_price,
+)
 from apps.subscriptions.models import Subscription, YapePaymentProof
 from apps.subscriptions.tasks import notify_yape_payment
 
@@ -26,12 +33,6 @@ logger = logging.getLogger(__name__)
 
 VALID_PLANS = ('starter', 'professional', 'enterprise')
 PLAN_ORDER = ('free', 'starter', 'professional', 'enterprise')
-
-PLAN_PRICES_USD: dict[str, int] = {
-    'starter': 29,
-    'professional': 79,
-    'enterprise': 199,
-}
 
 
 def _get_tenant(request):
@@ -81,11 +82,20 @@ class YapeUpgradeView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        raw_amount = request.data.get('amount', str(PLAN_PRICES_USD.get(plan, 0)))
-        try:
-            amount = Decimal(raw_amount)
-        except InvalidOperation:
-            return Response({'detail': 'Monto inválido.'}, status=status.HTTP_400_BAD_REQUEST)
+        # El monto SIEMPRE se calcula en servidor — nunca se confía en el del cliente.
+        promo_code = str(request.data.get('promo_code', '')).strip()
+        promotion = None
+        if promo_code:
+            promotion, reason = find_valid_promotion(promo_code, plan, tenant=tenant)
+            if promotion is None:
+                return Response(
+                    {'detail': REASON_MESSAGES[reason], 'promo_reason': reason},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            amounts = compute_discount(promotion, plan)
+        else:
+            price = get_plan_price(plan)
+            amounts = {'original': price, 'discount': price * 0, 'final': price}
 
         subscription, _ = Subscription.objects.get_or_create(
             tenant=tenant,
@@ -93,13 +103,24 @@ class YapeUpgradeView(APIView):
         )
 
         admin_token = secrets.token_urlsafe(48)
-        proof = YapePaymentProof.objects.create(
-            subscription=subscription,
-            screenshot=screenshot,
-            plan=plan,
-            amount=amount,
-            admin_token=admin_token,
-        )
+        with transaction.atomic():
+            proof = YapePaymentProof.objects.create(
+                subscription=subscription,
+                screenshot=screenshot,
+                plan=plan,
+                amount=amounts['final'],
+                admin_token=admin_token,
+            )
+            if promotion is not None:
+                PromotionRedemption.objects.create(
+                    promotion=promotion,
+                    tenant=tenant,
+                    yape_proof=proof,
+                    plan=plan,
+                    original_amount=amounts['original'],
+                    discount_amount=amounts['discount'],
+                    final_amount=amounts['final'],
+                )
 
         try:
             notify_yape_payment.delay(str(proof.id))

@@ -2,15 +2,19 @@
 import base64
 import json
 import uuid
+from datetime import timedelta
+from decimal import Decimal
 from unittest.mock import MagicMock, patch
 
 import stripe as stripe_lib
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APIClient, APITestCase
 
-from apps.subscriptions.models import Invoice, PaymentMethod, Subscription, YapePaymentProof
+from apps.promotions.models import Promotion, PromotionRedemption
+from apps.subscriptions.models import Invoice, PaymentMethod, Plan, Subscription, YapePaymentProof
 from apps.tenants.models import Tenant
 
 _FAST_HASHERS = ['django.contrib.auth.hashers.MD5PasswordHasher']
@@ -284,17 +288,38 @@ class TestYapeUpgradeView(APITestCase):
         self.tenant = make_tenant(plan='free')
         self.user = make_user(self.tenant, is_superuser=True)
         self.client.force_authenticate(user=self.user)
+        Plan.objects.get_or_create(
+            id='professional', defaults={'display_name': 'Professional', 'price_monthly': 79},
+        )
 
     def _screenshot(self):
         return SimpleUploadedFile('proof.png', b'\x89PNG fake', content_type='image/png')
 
-    def test_yape_upgrade_success(self):
-        resp = self.client.post(
+    def _create_promotion(self, **overrides):
+        now = timezone.now()
+        defaults = {
+            'code': 'UPGRADE20',
+            'name': 'Upgrade Promo',
+            'type': 'percentage',
+            'value': Decimal('20'),
+            'applicable_plans': ['professional'],
+            'starts_at': now - timedelta(days=1),
+            'expires_at': now + timedelta(days=30),
+        }
+        defaults.update(overrides)
+        return Promotion.objects.create(**defaults)
+
+    def _upgrade(self, plan='professional', amount='79', promo_code=None):
+        data = {'plan': plan, 'screenshot': self._screenshot(), 'amount': amount}
+        if promo_code is not None:
+            data['promo_code'] = promo_code
+        return self.client.post(
             '/api/v1/admin/subscriptions/yape-upgrade/',
-            {'plan': 'professional', 'screenshot': self._screenshot(), 'amount': '79'},
-            format='multipart',
-            **slug_header(self.tenant.slug),
+            data, format='multipart', **slug_header(self.tenant.slug),
         )
+
+    def test_yape_upgrade_success(self):
+        resp = self._upgrade()
 
         self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
         self.assertIn('proof_id', resp.data)
@@ -313,13 +338,54 @@ class TestYapeUpgradeView(APITestCase):
         self.assertEqual(resp.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_yape_upgrade_same_or_lower_plan_rejected(self):
-        resp = self.client.post(
-            '/api/v1/admin/subscriptions/yape-upgrade/',
-            {'plan': 'free', 'screenshot': self._screenshot(), 'amount': '0'},
-            format='multipart',
-            **slug_header(self.tenant.slug),
-        )
+        resp = self._upgrade(plan='free', amount='0')
         self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_yape_upgrade_amount_is_server_side(self):
+        resp = self._upgrade(amount='0.01')  # monto falso del cliente — debe ignorarse
+        self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
+        proof = YapePaymentProof.objects.get(id=resp.data['proof_id'])
+        self.assertEqual(str(proof.amount), '79.00')
+
+    def test_yape_upgrade_with_promo_creates_pending_redemption(self):
+        self._create_promotion()
+        resp = self._upgrade(amount='999', promo_code='upgrade20')
+        self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
+
+        proof = YapePaymentProof.objects.get(id=resp.data['proof_id'])
+        self.assertEqual(str(proof.amount), '63.20')  # 79 − 20%
+
+        redemption = proof.redemption
+        self.assertEqual(redemption.status, 'pending')
+        self.assertEqual(redemption.tenant, self.tenant)
+        self.assertEqual(str(redemption.original_amount), '79.00')
+        self.assertEqual(str(redemption.discount_amount), '15.80')
+        self.assertEqual(str(redemption.final_amount), '63.20')
+
+    def test_yape_upgrade_invalid_promo_rejected(self):
+        self._create_promotion(max_uses=1, current_uses=1)  # agotada
+        resp = self._upgrade(promo_code='UPGRADE20')
+        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(resp.data.get('promo_reason'), 'depleted')
+        self.assertFalse(YapePaymentProof.objects.exists())
+
+    def test_yape_upgrade_new_customers_only_promo_rejected_for_existing_tenant(self):
+        Invoice.objects.create(
+            tenant=self.tenant, stripe_invoice_id='inv_existing', amount_cents=2900,
+            currency='usd', status='paid',
+        )
+        self._create_promotion(new_customers_only=True)
+        resp = self._upgrade(promo_code='UPGRADE20')
+        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(resp.data.get('promo_reason'), 'new_customers_only')
+        self.assertFalse(YapePaymentProof.objects.exists())
+
+    def test_yape_upgrade_without_promo_unchanged(self):
+        resp = self._upgrade()
+        self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
+        proof = YapePaymentProof.objects.get(id=resp.data['proof_id'])
+        self.assertEqual(str(proof.amount), '79.00')
+        self.assertFalse(PromotionRedemption.objects.filter(yape_proof=proof).exists())
 
 
 # ─── StartTrialView ───────────────────────────────────────────────────────────
