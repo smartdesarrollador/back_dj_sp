@@ -30,6 +30,7 @@ from utils.throttles import (
     MFARateThrottle,
     RegisterRateThrottle,
 )
+from utils.uploads import validate_upload
 from .models import MFARecoveryCode
 from .serializers import (
     AcceptInviteSerializer,
@@ -616,6 +617,7 @@ class YapePaymentProofView(APIView):
         screenshot = request.FILES.get('screenshot')
         if not screenshot:
             return Response({'detail': 'screenshot file is required.'}, status=400)
+        validate_upload(screenshot, category='payment_proof')
 
         plan = request.data.get('plan', '').strip()
         if plan not in ('starter', 'professional', 'enterprise'):

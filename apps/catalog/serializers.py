@@ -1,6 +1,7 @@
 from rest_framework import serializers
 
 from utils.media import build_media_url
+from utils.uploads import validate_upload
 
 from .models import CatalogItem
 
@@ -48,6 +49,6 @@ class CatalogItemWriteSerializer(CatalogItemSerializer):
         fields = CatalogItemSerializer.Meta.fields + ['image']
 
     def validate_image(self, value):
-        if value and value.size > 2 * 1024 * 1024:
-            raise serializers.ValidationError('La imagen no puede superar 2 MB.')
+        if value:
+            validate_upload(value, category='platform_image')
         return value

@@ -48,7 +48,9 @@ class FeaturesView(APIView):
                 "users": 25,
                 "projects": null,
                 "storage_gb": 20,
-                "api_calls_per_month": 100000
+                "api_calls_per_month": 100000,
+                "image_upload_mb": 10,
+                "file_upload_mb": 25
             }
         }
     """
@@ -76,6 +78,8 @@ class FeaturesView(APIView):
             'storage_gb': effective.get('storage_gb'),
             'api_calls_per_month': effective.get('api_calls_per_month'),
             'vault_items': effective.get('max_vault_items'),
+            'image_upload_mb': effective.get('max_image_upload_mb'),
+            'file_upload_mb': effective.get('max_file_upload_mb'),
         }
 
         return Response({'plan': plan, 'features': feature_flags, 'limits': limits})

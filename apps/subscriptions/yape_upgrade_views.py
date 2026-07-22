@@ -28,6 +28,7 @@ from apps.promotions.services import (
 )
 from apps.subscriptions.models import Subscription, YapePaymentProof
 from apps.subscriptions.tasks import notify_yape_payment
+from utils.uploads import validate_upload
 
 logger = logging.getLogger(__name__)
 
@@ -81,6 +82,7 @@ class YapeUpgradeView(APIView):
                 {'detail': 'Se requiere el comprobante (screenshot).'},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+        validate_upload(screenshot, category='payment_proof')
 
         # El monto SIEMPRE se calcula en servidor — nunca se confía en el del cliente.
         promo_code = str(request.data.get('promo_code', '')).strip()

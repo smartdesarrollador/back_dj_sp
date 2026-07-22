@@ -16,6 +16,7 @@ from rest_framework.test import APIClient, APITestCase
 from apps.promotions.models import Promotion, PromotionRedemption
 from apps.subscriptions.models import Invoice, PaymentMethod, Plan, Subscription, YapePaymentProof
 from apps.tenants.models import Tenant
+from core.tests.helpers import png_bytes
 
 _FAST_HASHERS = ['django.contrib.auth.hashers.MD5PasswordHasher']
 
@@ -293,7 +294,8 @@ class TestYapeUpgradeView(APITestCase):
         )
 
     def _screenshot(self):
-        return SimpleUploadedFile('proof.png', b'\x89PNG fake', content_type='image/png')
+        # PNG real: validate_upload comprueba el contenido, no solo la extensión.
+        return SimpleUploadedFile('proof.png', png_bytes(), content_type='image/png')
 
     def _create_promotion(self, **overrides):
         now = timezone.now()

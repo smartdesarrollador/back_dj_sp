@@ -38,8 +38,9 @@ from apps.chat.serializers import (
     MessageSerializer,
 )
 from apps.chat.realtime import broadcast_membership_changed, broadcast_message
-from apps.rbac.permissions import _user_has_permission, check_plan_limit, check_storage_limit
+from apps.rbac.permissions import _user_has_permission, check_plan_limit
 from core.mixins import AuditMixin
+from utils.uploads import is_image, validate_upload
 
 User = ConversationMember._meta.get_field('user').related_model
 
@@ -48,7 +49,6 @@ _NOT_FOUND = Response(
 )
 
 _MESSAGES_PAGE_SIZE = 30
-_MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024  # 10 MB
 
 
 def _member_qs(user):
@@ -363,10 +363,8 @@ class MessageListCreateView(AuditMixin, APIView):
         upload = request.FILES.get('file')
         if not content and not upload:
             raise ValidationError({'content': 'El mensaje no puede estar vacío.'})
-        if upload and upload.size > _MAX_ATTACHMENT_BYTES:
-            raise ValidationError({'file': 'El archivo supera el límite de 10 MB.'})
         if upload:
-            check_storage_limit(request.tenant, upload.size)
+            validate_upload(upload, category='chat_attachment', tenant=request.tenant)
 
         reply_to = None
         reply_to_id = request.data.get('reply_to')
@@ -385,7 +383,9 @@ class MessageListCreateView(AuditMixin, APIView):
                 reply_to=reply_to,
             )
             if upload:
-                kind = 'image' if (upload.content_type or '').startswith('image/') else 'file'
+                # El tipo sale del contenido ya verificado por validate_upload, no del
+                # content_type que envía el cliente (falsificable).
+                kind = 'image' if is_image(upload) else 'file'
                 MessageAttachment.objects.create(
                     message=message, file=upload, kind=kind,
                     original_name=upload.name[:255], size=upload.size,

@@ -126,6 +126,8 @@ class PlanLimitsSerializer(serializers.Serializer):
     max_projects         = serializers.IntegerField(min_value=0, required=False, allow_null=True)
     max_custom_roles     = serializers.IntegerField(min_value=0, required=False, allow_null=True)
     api_calls_per_month  = serializers.IntegerField(min_value=0, required=False, allow_null=True)
+    max_image_upload_mb  = serializers.IntegerField(min_value=0, required=False, allow_null=True)
+    max_file_upload_mb   = serializers.IntegerField(min_value=0, required=False, allow_null=True)
 
 
 class PlanSerializer(serializers.ModelSerializer):

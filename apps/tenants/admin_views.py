@@ -15,9 +15,10 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework import status
 
-from apps.rbac.permissions import HasPermission, IsStaffUser, check_storage_limit
+from apps.rbac.permissions import HasPermission, IsStaffUser
 from apps.tenants.models import Tenant
 from apps.tenants.serializers import ClientListSerializer, OrganizationSerializer
+from utils.uploads import validate_upload
 
 
 class ClientListView(APIView):
@@ -75,11 +76,9 @@ class OrganizationView(APIView):
     def patch(self, request):
         tenant = request.tenant
         update_fields = []
-        incoming_bytes = sum(
-            request.FILES[key].size for key in ('logo', 'favicon') if key in request.FILES
-        )
-        if incoming_bytes:
-            check_storage_limit(tenant, incoming_bytes)
+        for key in ('logo', 'favicon'):
+            if key in request.FILES:
+                validate_upload(request.FILES[key], category='tenant_branding', tenant=tenant)
         if 'name' in request.data:
             tenant.name = request.data['name']
             update_fields.append('name')

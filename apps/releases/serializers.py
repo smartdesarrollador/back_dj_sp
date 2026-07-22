@@ -1,9 +1,8 @@
-import os
-
 from django.urls import reverse
 from rest_framework import serializers
 
-from apps.releases.models import ALLOWED_EXTENSIONS, MAX_FILE_SIZE_BYTES, DesktopRelease
+from apps.releases.models import DesktopRelease
+from utils.uploads import validate_upload
 
 
 class DesktopReleaseSerializer(serializers.ModelSerializer):
@@ -36,17 +35,7 @@ class DesktopReleaseCreateSerializer(serializers.ModelSerializer):
         fields = ['version', 'platform', 'app_type', 'file', 'release_notes']
 
     def validate_file(self, value):
-        ext = os.path.splitext(value.name)[1].lower()
-        if ext not in ALLOWED_EXTENSIONS:
-            raise serializers.ValidationError(
-                f'Extensión no permitida: {ext}. Solo se aceptan: '
-                + ', '.join(sorted(ALLOWED_EXTENSIONS))
-            )
-        if value.size > MAX_FILE_SIZE_BYTES:
-            size_mb = value.size / (1024 * 1024)
-            raise serializers.ValidationError(
-                f'El archivo supera el límite de 500 MB ({size_mb:.1f} MB).'
-            )
+        validate_upload(value, category='desktop_release')
         return value
 
     def validate(self, attrs):

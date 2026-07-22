@@ -13,6 +13,7 @@ from rest_framework.test import APITestCase
 
 from apps.tenants.models import Tenant
 from core.exceptions import PlanLimitExceeded
+from core.tests.helpers import png_bytes
 
 User = get_user_model()
 
@@ -51,7 +52,7 @@ class TestOrganizationView(APITestCase):
         self.assertEqual(self.tenant.name, 'New Name')
 
     def test_update_logo_success(self):
-        logo = SimpleUploadedFile('logo.png', b'\x89PNG fake', content_type='image/png')
+        logo = SimpleUploadedFile('logo.png', png_bytes(), content_type='image/png')
         response = self.client.patch(
             ORG_URL, {'logo': logo}, format='multipart', HTTP_X_TENANT_SLUG='org-corp'
         )
@@ -59,10 +60,37 @@ class TestOrganizationView(APITestCase):
         self.tenant.refresh_from_db()
         self.assertTrue(bool(self.tenant.logo))
 
-    @patch('apps.tenants.admin_views.check_storage_limit')
+    def test_executable_renamed_to_png_rejected_as_logo(self):
+        # Antes de la validación central esto se guardaba como logo del tenant.
+        fake = SimpleUploadedFile(
+            'logo.png', b'MZ\x90\x00\x03\x00\x00\x00', content_type='image/png'
+        )
+        response = self.client.patch(
+            ORG_URL, {'logo': fake}, format='multipart', HTTP_X_TENANT_SLUG='org-corp'
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.tenant.refresh_from_db()
+        self.assertFalse(bool(self.tenant.logo))
+        # El motivo concreto debe llegar al cliente, no un genérico "Validation error":
+        # depende de que el detalle viaje como lista (ver utils/uploads.py).
+        self.assertIn('no es una imagen', response.json()['error']['message'])
+
+    def test_executable_extension_rejected_as_favicon(self):
+        fake = SimpleUploadedFile('icon.exe', b'MZ\x90\x00', content_type='image/x-icon')
+        response = self.client.patch(
+            ORG_URL, {'favicon': fake}, format='multipart', HTTP_X_TENANT_SLUG='org-corp'
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.tenant.refresh_from_db()
+        self.assertFalse(bool(self.tenant.favicon))
+        self.assertIn('no está permitido', response.json()['error']['message'])
+
+    # El módulo de origen, no apps.tenants.admin_views: validate_upload importa
+    # check_storage_limit dentro de la función.
+    @patch('apps.rbac.permissions.check_storage_limit')
     def test_logo_over_storage_limit_rejected(self, mock_limit):
         mock_limit.side_effect = PlanLimitExceeded()
-        logo = SimpleUploadedFile('logo.png', b'\x89PNG fake', content_type='image/png')
+        logo = SimpleUploadedFile('logo.png', png_bytes(), content_type='image/png')
         response = self.client.patch(
             ORG_URL, {'logo': logo}, format='multipart', HTTP_X_TENANT_SLUG='org-corp'
         )

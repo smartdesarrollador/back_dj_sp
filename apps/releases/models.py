@@ -17,8 +17,8 @@ APP_TYPE_CHOICES = [
     ('sidebar', 'Sidebar Offline'),
 ]
 
-ALLOWED_EXTENSIONS = {'.exe', '.msi', '.dmg'}
-MAX_FILE_SIZE_BYTES = 500 * 1024 * 1024  # 500 MB
+# Las extensiones y el tope de tamaño viven en la categoría 'desktop_release'
+# de utils/uploads.py, junto al resto de la política de subidas.
 
 
 def _release_upload_path(instance, filename):

@@ -25,6 +25,7 @@ from apps.promotions.models import Promotion, PromotionRedemption
 from apps.subscriptions.models import Invoice, Plan, Subscription, YapePaymentProof
 from apps.subscriptions.services import activate_yape_proof
 from apps.tenants.models import Tenant
+from core.tests.helpers import png_bytes
 
 User = get_user_model()
 
@@ -63,7 +64,8 @@ def _create_promotion(**overrides) -> Promotion:
 
 
 def _screenshot():
-    return SimpleUploadedFile('proof.png', b'\x89PNG fake image bytes', content_type='image/png')
+    # PNG real: validate_upload comprueba el contenido, no solo la extensión.
+    return SimpleUploadedFile('proof.png', png_bytes(), content_type='image/png')
 
 
 @override_settings(PASSWORD_HASHERS=_FAST_HASHERS, CACHES=_LOCMEM_CACHE)

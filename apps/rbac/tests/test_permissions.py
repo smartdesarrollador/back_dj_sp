@@ -424,6 +424,28 @@ class FeaturesViewTest(APITestCase):
         self.assertIn('custom_roles', response.data['features'])
         self.assertIn('users', response.data['limits'])
 
+    def test_upload_limits_exposed(self):
+        """Los límites de subida viajan en `limits`, sin prefijo max_, con el valor del plan."""
+        from rest_framework.request import Request
+
+        from apps.rbac.views import FeaturesView
+
+        request = APIRequestFactory().get('/api/v1/features/')
+        user = MagicMock(is_authenticated=True)
+        tenant = MagicMock(plan='starter')
+        request.user, request.tenant = user, tenant
+
+        with patch.object(FeaturesView, 'permission_classes', []):
+            drf_request = Request(request)
+            drf_request.user, drf_request.tenant = user, tenant
+            response = FeaturesView().get(drf_request)
+
+        # starter: imagen 5 MB, archivo 10 MB (utils/plans.PLAN_FEATURES).
+        self.assertEqual(response.data['limits']['image_upload_mb'], 5)
+        self.assertEqual(response.data['limits']['file_upload_mb'], 10)
+        # No deben aparecer como flags booleanos.
+        self.assertNotIn('max_image_upload_mb', response.data['features'])
+
 
 # ─── TenantModelViewSet Tests ──────────────────────────────────────────────────
 

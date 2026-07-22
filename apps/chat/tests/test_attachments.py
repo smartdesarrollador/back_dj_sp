@@ -17,6 +17,7 @@ from apps.chat.tests.conftest_helpers import (
     create_user,
 )
 from core.exceptions import PlanLimitExceeded
+from core.tests.helpers import png_bytes
 
 BASE = '/api/v1/app/chat/'
 
@@ -35,7 +36,7 @@ class TestAttachments(APITestCase):
         self.client.force_authenticate(user=self.alice)
 
     def test_send_message_with_image_attachment(self):
-        upload = SimpleUploadedFile('photo.png', b'\x89PNG\r\n\x1a\n fake', content_type='image/png')
+        upload = SimpleUploadedFile('photo.png', png_bytes(), content_type='image/png')
         res = self.client.post(
             f'{BASE}messages/',
             {'conversation': str(self.conv.id), 'content': '', 'file': upload},
@@ -67,19 +68,54 @@ class TestAttachments(APITestCase):
         )
         self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
 
-    def test_oversized_attachment_rejected(self):
-        big = SimpleUploadedFile('big.bin', b'x' * (10 * 1024 * 1024 + 1), content_type='application/octet-stream')
+    def test_disallowed_extension_rejected(self):
+        big = SimpleUploadedFile(
+            'app.bin', b'x' * 1024, content_type='application/octet-stream'
+        )
         res = self.client.post(
             f'{BASE}messages/',
             {'conversation': str(self.conv.id), 'file': big},
             format='multipart', **self.headers,
         )
         self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(MessageAttachment.objects.count(), 0)
 
-    @patch('apps.chat.views.check_storage_limit')
+    def test_oversized_attachment_rejected(self):
+        # Se baja el tope del plan desde el Admin en vez de materializar los 25 MB del
+        # default de 'professional': de paso comprueba que el override llega al endpoint.
+        from apps.subscriptions.models import Plan
+        Plan.objects.create(
+            id='professional', display_name='Professional', limits={'max_file_upload_mb': 1},
+        )
+        big = SimpleUploadedFile(
+            'doc.pdf', b'%PDF-1.4' + b'x' * 1024 * 1024, content_type='application/pdf',
+        )
+        res = self.client.post(
+            f'{BASE}messages/',
+            {'conversation': str(self.conv.id), 'file': big},
+            format='multipart', **self.headers,
+        )
+        self.assertEqual(res.status_code, status.HTTP_402_PAYMENT_REQUIRED)
+        self.assertEqual(MessageAttachment.objects.count(), 0)
+
+    def test_executable_renamed_to_png_rejected(self):
+        fake = SimpleUploadedFile(
+            'inocente.png', b'MZ\x90\x00\x03\x00\x00\x00', content_type='image/png'
+        )
+        res = self.client.post(
+            f'{BASE}messages/',
+            {'conversation': str(self.conv.id), 'file': fake},
+            format='multipart', **self.headers,
+        )
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(MessageAttachment.objects.count(), 0)
+
+    # El módulo de origen, no apps.chat.views: validate_upload importa
+    # check_storage_limit dentro de la función.
+    @patch('apps.rbac.permissions.check_storage_limit')
     def test_attachment_over_storage_limit_rejected(self, mock_limit):
         mock_limit.side_effect = PlanLimitExceeded()
-        upload = SimpleUploadedFile('photo.png', b'\x89PNG\r\n\x1a\n fake', content_type='image/png')
+        upload = SimpleUploadedFile('photo.png', png_bytes(), content_type='image/png')
         res = self.client.post(
             f'{BASE}messages/',
             {'conversation': str(self.conv.id), 'file': upload},
