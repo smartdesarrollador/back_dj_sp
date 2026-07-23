@@ -165,7 +165,7 @@ class UploadSizeLimitTest(TestCase):
             validate_upload(upload('doc.pdf', b'%PDF-1.4', size=6 * MB),
                             category='chat_attachment', tenant=tenant)
         self.assertIn('5 MB', str(ctx.exception))
-        self.assertIn('Actualiza tu plan', str(ctx.exception))
+        self.assertIn('Cambia a un plan superior', str(ctx.exception))
 
     def test_enterprise_at_hard_cap_raises_400_not_402(self):
         # Enterprise coincide con el tope duro (100 MB): invitarle a un upgrade no tiene sentido.

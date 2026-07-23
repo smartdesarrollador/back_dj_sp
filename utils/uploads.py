@@ -258,8 +258,8 @@ def validate_upload(file: Any, *, category: str, tenant: Any = None) -> None:
             from core.exceptions import PlanLimitExceeded
 
             raise PlanLimitExceeded(
-                detail=f'El archivo supera el límite de {max_mb} MB de tu plan {tenant.plan}. '
-                       f'Actualiza tu plan para subir archivos más grandes.'
+                detail=f'El archivo supera el límite de {max_mb} MB de tu plan. '
+                       f'Cambia a un plan superior para aumentar la capacidad.'
             )
         raise ValidationError({'file': [f'El archivo supera el límite de {max_mb} MB.']})
 
