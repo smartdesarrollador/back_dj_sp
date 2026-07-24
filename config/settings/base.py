@@ -279,6 +279,10 @@ CELERY_BEAT_SCHEDULE = {
         'task': 'apps.subscriptions.tasks.remind_professional_trial_expiry',
         'schedule': crontab(hour=10, minute=0),  # Daily at 10:00 AM UTC
     },
+    'collect-orphan-digital-assets': {
+        'task': 'apps.digital_services.tasks.collect_orphan_digital_assets',
+        'schedule': crontab(hour=4, minute=30),  # Daily at 4:30 AM UTC
+    },
 }
 
 # ─── reCAPTCHA ────────────────────────────────────────────────────────────────

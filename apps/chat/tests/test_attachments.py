@@ -124,3 +124,37 @@ class TestAttachments(APITestCase):
         self.assertEqual(res.status_code, status.HTTP_402_PAYMENT_REQUIRED)
         self.assertEqual(MessageAttachment.objects.count(), 0)
         self.assertEqual(Message.objects.count(), 0)
+
+    def test_delete_own_message_frees_storage(self):
+        import tempfile
+
+        from django.core.files.storage import default_storage
+
+        from utils.storage import get_tenant_storage_bytes
+
+        with override_settings(MEDIA_ROOT=tempfile.mkdtemp()):
+            msg = Message.objects.create(conversation=self.conv, sender=self.alice, content='')
+            att = MessageAttachment.objects.create(
+                message=msg,
+                file=SimpleUploadedFile('f.png', png_bytes(), content_type='image/png'),
+                kind='image', original_name='f.png', size=4096,
+            )
+            name = att.file.name
+            self.assertEqual(get_tenant_storage_bytes(self.tenant), 4096)
+
+            res = self.client.delete(f'{BASE}messages/{msg.id}/', **self.headers)
+
+            self.assertEqual(res.status_code, status.HTTP_204_NO_CONTENT)
+            # Soft-delete: la fila permanece como tombstone, pero el adjunto se borra de verdad.
+            msg.refresh_from_db()
+            self.assertIsNotNone(msg.deleted_at)
+            self.assertFalse(MessageAttachment.objects.filter(id=att.id).exists())
+            self.assertEqual(get_tenant_storage_bytes(self.tenant), 0)  # cuota liberada
+            self.assertFalse(default_storage.exists(name))  # binario borrado del disco
+
+    def test_cannot_delete_another_users_message(self):
+        # alice (autenticada) intenta borrar un mensaje de bob → 404, sigue existiendo.
+        msg = Message.objects.create(conversation=self.conv, sender=self.bob, content='hola')
+        res = self.client.delete(f'{BASE}messages/{msg.id}/', **self.headers)
+        self.assertEqual(res.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertTrue(Message.objects.filter(id=msg.id).exists())

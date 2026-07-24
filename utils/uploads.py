@@ -69,6 +69,15 @@ UPLOAD_CATEGORIES: dict[str, UploadCategory] = {
         hard_max_mb=10,
         counts_toward_storage=True,
     ),
+    # Imágenes de las páginas públicas de Vista (tarjeta, portafolio, landing, CV). Reemplazan
+    # las URLs externas por archivos gestionados que sí cuentan hacia storage_gb del tenant.
+    # SVG excluido a propósito: se serviría desde /media/ público → XSS almacenado.
+    'digital_asset': UploadCategory(
+        extensions=frozenset({'.png', '.jpg', '.jpeg', '.webp', '.gif'}),
+        plan_key='max_image_upload_mb',
+        hard_max_mb=10,
+        counts_toward_storage=True,
+    ),
     # Deliberadamente NO gateado por plan NI por cuota: con el tope de imagen de Free (2 MB) un
     # screenshot de móvil (3-8 MB) bloquearía al cliente justo al intentar pagar su upgrade, y con
     # la cuota llena no podría pagar el plan que le daría más espacio. El comprobante sigue sumando

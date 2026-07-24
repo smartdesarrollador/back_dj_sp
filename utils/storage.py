@@ -3,8 +3,9 @@ Cálculo del almacenamiento consumido por un tenant, para compararlo contra
 utils.plans.PLAN_FEATURES[plan]['storage_gb'].
 
 Solo cuenta archivos binarios subidos por el tenant (adjuntos de chat, logo/favicon,
-comprobantes de pago Yape) — excluye contenido global de plataforma (releases, catálogo,
-anuncios) y los campos cifrados de texto (Bóveda, env vars, SSH keys, SSL certs).
+comprobantes de pago Yape, imágenes de Vista) — excluye contenido global de plataforma
+(releases, catálogo, anuncios) y los campos cifrados de texto (Bóveda, env vars, SSH keys,
+SSL certs).
 """
 from django.db.models import Sum
 
@@ -12,6 +13,7 @@ from django.db.models import Sum
 def get_tenant_storage_bytes(tenant) -> int:
     """Suma en bytes de todo lo que cuenta como almacenamiento del tenant."""
     from apps.chat.models import MessageAttachment
+    from apps.digital_services.models import DigitalAsset
     from apps.subscriptions.models import YapePaymentProof
 
     total = MessageAttachment.objects.filter(
@@ -25,5 +27,11 @@ def get_tenant_storage_bytes(tenant) -> int:
 
     for proof in YapePaymentProof.objects.filter(subscription__tenant=tenant).only('screenshot'):
         total += proof.screenshot.size
+
+    # Imágenes de Vista: el tamaño está persistido en DigitalAsset.size, así que basta una
+    # agregación sin abrir los archivos. Aislamiento por profile → user → tenant.
+    total += DigitalAsset.objects.filter(
+        profile__user__tenant=tenant
+    ).aggregate(total=Sum('size'))['total'] or 0
 
     return total

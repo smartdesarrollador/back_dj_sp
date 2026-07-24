@@ -8,19 +8,18 @@ requesting user is a ConversationMember. No global ``chat.*`` RBAC permission is
 required (those are not seeded), so views use ``IsAuthenticated`` + membership
 filtering — mirroring apps/support.
 """
+from django.conf import settings
+from django.core.mail import send_mail
 from django.db import transaction
 from django.db.models import Count, Prefetch, Q
 from django.utils import timezone
-from drf_spectacular.utils import OpenApiParameter, extend_schema
 from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import OpenApiParameter, OpenApiResponse, extend_schema
 from rest_framework import status
 from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
-
-from django.conf import settings
-from django.core.mail import send_mail
 
 from apps.chat.models import (
     ChatConnection,
@@ -30,6 +29,7 @@ from apps.chat.models import (
     MessageAttachment,
     connected_user_ids,
 )
+from apps.chat.realtime import broadcast_membership_changed, broadcast_message
 from apps.chat.serializers import (
     ChatConnectionSerializer,
     ChatUserSerializer,
@@ -37,7 +37,6 @@ from apps.chat.serializers import (
     ConversationListSerializer,
     MessageSerializer,
 )
-from apps.chat.realtime import broadcast_membership_changed, broadcast_message
 from apps.rbac.permissions import _user_has_permission, check_plan_limit
 from core.mixins import AuditMixin
 from utils.uploads import is_image, validate_upload
@@ -397,6 +396,34 @@ class MessageListCreateView(AuditMixin, APIView):
         message_data = MessageSerializer(message, context={'request': request}).data
         broadcast_message(membership.conversation_id, message_data)
         return Response(message_data, status=status.HTTP_201_CREATED)
+
+
+class MessageDetailView(AuditMixin, APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        tags=['app-chat'],
+        summary='Delete own message (soft-delete + removes its attachment, frees storage)',
+        responses={
+            204: OpenApiResponse(description='Mensaje marcado como eliminado; su adjunto se borra y libera cuota.'),
+            404: OpenApiResponse(description='Mensaje inexistente, ajeno o ya eliminado.'),
+        },
+    )
+    def delete(self, request, pk):
+        # Solo el remitente borra su propio mensaje; ajenos o ya borrados → 404.
+        message = Message.objects.filter(
+            pk=pk, sender=request.user, deleted_at__isnull=True
+        ).first()
+        if not message:
+            return _NOT_FOUND
+        # Soft-delete (tombstone "Mensaje eliminado", ver MessageSerializer.get_is_deleted). Los
+        # adjuntos SÍ se borran de verdad (filas + binario vía post_delete) para liberar la cuota.
+        with transaction.atomic():
+            message.attachments.all().delete()
+            message.deleted_at = timezone.now()
+            message.save(update_fields=['deleted_at', 'updated_at'])
+        self.log_action(request, 'delete', 'chat_message', pk)
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class MessageConvertView(AuditMixin, APIView):

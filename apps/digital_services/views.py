@@ -22,8 +22,9 @@ import secrets
 
 import weasyprint
 from django.shortcuts import get_object_or_404
-from drf_spectacular.utils import extend_schema
-from rest_framework import status
+from drf_spectacular.utils import OpenApiResponse, extend_schema, inline_serializer
+from rest_framework import serializers, status
+from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -32,6 +33,7 @@ from apps.digital_services.analytics import build_service_analytics
 from apps.digital_services.models import (
     CustomDomain,
     CVDocument,
+    DigitalAsset,
     DigitalCard,
     LandingTemplate,
     PortfolioItem,
@@ -48,7 +50,11 @@ from apps.digital_services.serializers import (
     PublicProfileSerializer,
 )
 from apps.rbac.permissions import HasFeature, check_plan_limit
+from core.mixins import AuditMixin
 from utils.plans import PLAN_FEATURES
+from utils.uploads import validate_upload
+
+_VALID_ASSET_SLOTS = frozenset(dict(DigitalAsset.SLOT_CHOICES))
 
 _NOT_FOUND = Response(
     {'error': {'code': 'not_found', 'message': 'Not found.'}},
@@ -496,3 +502,121 @@ class PortfolioSettingsView(APIView):
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response(serializer.data)
+
+
+# ─── Image Assets ─────────────────────────────────────────────────────────────
+
+class DigitalAssetView(AuditMixin, APIView):
+    """
+    Subida y listado de imágenes gestionadas de Vista (avatar, portada, galería, foto CV…).
+    A diferencia de los campos `*_url`, estos archivos cuentan hacia storage_gb del tenant.
+    """
+    permission_classes = [IsAuthenticated, HasFeature('digital_card')]
+    parser_classes = [MultiPartParser, FormParser]
+
+    @extend_schema(tags=['app-digital'], summary='List own Vista image assets')
+    def get(self, request):
+        profile = _get_profile(request.user)
+        if not profile:
+            return Response({'assets': []})
+        assets = DigitalAsset.objects.filter(profile=profile).order_by('-created_at')
+        return Response({'assets': [self._serialize(request, a) for a in assets]})
+
+    @extend_schema(
+        tags=['app-digital'],
+        summary='Upload a Vista image asset',
+        request=inline_serializer(
+            name='DigitalAssetUploadRequest',
+            fields={
+                'file': serializers.ImageField(),
+                'slot': serializers.ChoiceField(choices=sorted(_VALID_ASSET_SLOTS)),
+            },
+        ),
+        responses={
+            201: inline_serializer(
+                name='DigitalAssetResponse',
+                fields={
+                    'id': serializers.UUIDField(),
+                    'url': serializers.URLField(),
+                    'size': serializers.IntegerField(),
+                    'slot': serializers.CharField(),
+                    'original_name': serializers.CharField(),
+                },
+            ),
+            400: OpenApiResponse(
+                description='Archivo faltante, slot inválido, contenido que no es una imagen '
+                            'válida, o el usuario aún no tiene perfil.'
+            ),
+            402: OpenApiResponse(
+                description='La imagen supera el tope del plan o la cuota de almacenamiento '
+                            '(storage_gb) del tenant.'
+            ),
+        },
+    )
+    def post(self, request):
+        profile = _get_profile(request.user)
+        if not profile:
+            return Response(
+                {'error': {'code': 'profile_required', 'message': 'Create a profile first.'}},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        upload = request.FILES.get('file')
+        slot = request.data.get('slot', '')
+        if not upload:
+            return Response(
+                {'error': {'code': 'file_required', 'message': 'file is required.'}},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if slot not in _VALID_ASSET_SLOTS:
+            return Response(
+                {'error': {'code': 'invalid_slot',
+                           'message': f'slot must be one of: {", ".join(sorted(_VALID_ASSET_SLOTS))}.'}},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # El tenant se toma de request.user: Vista autentica solo con Bearer y no envía el
+        # header X-Tenant-Slug, así que request.tenant vendría None (ver tenants/middleware.py).
+        # Valida tipo real (Pillow, nunca el content_type) + tope de plan + cuota storage_gb.
+        validate_upload(upload, category='digital_asset', tenant=request.user.tenant)
+
+        asset = DigitalAsset.objects.create(
+            profile=profile,
+            slot=slot,
+            file=upload,
+            size=upload.size,
+            original_name=upload.name[:255],
+        )
+        self.log_action(request, 'create', 'digital_asset', asset.id, {'slot': slot})
+        return Response(self._serialize(request, asset), status=status.HTTP_201_CREATED)
+
+    @staticmethod
+    def _serialize(request, asset) -> dict:
+        return {
+            'id': str(asset.id),
+            'url': request.build_absolute_uri(asset.file.url),
+            'size': asset.size,
+            'slot': asset.slot,
+            'original_name': asset.original_name,
+        }
+
+
+class DigitalAssetDetailView(AuditMixin, APIView):
+    permission_classes = [IsAuthenticated, HasFeature('digital_card')]
+
+    @extend_schema(
+        tags=['app-digital'],
+        summary='Delete a Vista image asset',
+        responses={
+            204: OpenApiResponse(description='Asset eliminado; su archivo se borra y libera cuota.'),
+            404: OpenApiResponse(description='Asset inexistente o que no pertenece al usuario.'),
+        },
+    )
+    def delete(self, request, pk):
+        asset = DigitalAsset.objects.select_related('profile').filter(pk=pk).first()
+        # Aislamiento por dueño, mismo patrón que PortfolioDetailView.
+        if not asset or asset.profile.user_id != request.user.pk:
+            return _NOT_FOUND
+        # El archivo físico lo borra el post_delete de DigitalAsset (signals.py) → libera cuota.
+        asset.delete()
+        self.log_action(request, 'delete', 'digital_asset', pk)
+        return Response(status=status.HTTP_204_NO_CONTENT)

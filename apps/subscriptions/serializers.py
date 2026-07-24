@@ -122,12 +122,17 @@ class PaymentMethodUpdateSerializer(serializers.Serializer):
 class PlanLimitsSerializer(serializers.Serializer):
     """Subset comercial de límites técnicos editable desde el Admin (ver Plan.limits)."""
     max_users            = serializers.IntegerField(min_value=0, required=False, allow_null=True)
-    storage_gb           = serializers.IntegerField(min_value=0, required=False, allow_null=True)
+    # Admite fracciones de GB (p.ej. 0.25 GB = 256 MB). Float y no Decimal: Plan.limits es un
+    # JSONField y Decimal no es serializable con el encoder por defecto. Se redondea a 2 decimales.
+    storage_gb           = serializers.FloatField(min_value=0, required=False, allow_null=True)
     max_projects         = serializers.IntegerField(min_value=0, required=False, allow_null=True)
     max_custom_roles     = serializers.IntegerField(min_value=0, required=False, allow_null=True)
     api_calls_per_month  = serializers.IntegerField(min_value=0, required=False, allow_null=True)
     max_image_upload_mb  = serializers.IntegerField(min_value=0, required=False, allow_null=True)
     max_file_upload_mb   = serializers.IntegerField(min_value=0, required=False, allow_null=True)
+
+    def validate_storage_gb(self, value):
+        return round(value, 2) if value is not None else value
 
 
 class PlanSerializer(serializers.ModelSerializer):

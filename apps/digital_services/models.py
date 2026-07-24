@@ -396,3 +396,45 @@ class PageEvent(BaseModel):
 
     def __str__(self) -> str:
         return f'{self.event_type}:{self.service} @ {self.profile.username}'
+
+
+class DigitalAsset(BaseModel):
+    """
+    Imagen subida por el usuario para sus páginas públicas de Vista.
+
+    A diferencia de los campos `*_url` del resto de Digital Services (que apuntan a URLs
+    externas y no ocupan almacenamiento), un DigitalAsset es un archivo gestionado por la
+    plataforma que **sí cuenta hacia la cuota storage_gb del tenant** (ver utils/storage.py).
+
+    El vínculo con el tenant se resuelve por `profile → user → tenant`, mismo patrón de
+    aislamiento que MessageAttachment (`message__sender__tenant`).
+    """
+    SLOT_CHOICES = [
+        ('avatar', 'Avatar'),
+        ('og_image', 'OG Image'),
+        ('portfolio_cover', 'Portada de portafolio'),
+        ('portfolio_gallery', 'Galería de portafolio'),
+        ('cv_photo', 'Foto de CV'),
+        ('landing_image', 'Imagen de landing'),
+    ]
+
+    profile = models.ForeignKey(
+        PublicProfile,
+        on_delete=models.CASCADE,
+        related_name='assets',
+    )
+    slot = models.CharField(max_length=20, choices=SLOT_CHOICES)
+    file = models.ImageField(upload_to='digital_assets/%Y/%m/')
+    # Peso en bytes, persistido para sumar la cuota con una sola agregación sin abrir cada
+    # archivo del disco. Lo llena el endpoint de subida (Fase 2) con file.size.
+    size = models.PositiveIntegerField()
+    original_name = models.CharField(max_length=255, blank=True)
+
+    class Meta:
+        db_table = 'digital_assets'
+        indexes = [
+            models.Index(fields=['profile', 'slot'], name='digital_assets_prof_slot_idx'),
+        ]
+
+    def __str__(self) -> str:
+        return f'{self.slot} @ {self.profile.username}'

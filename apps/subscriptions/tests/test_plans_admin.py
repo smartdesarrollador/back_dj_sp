@@ -66,6 +66,26 @@ class TestAdminPlanLimits(APITestCase):
         plan = Plan.objects.get(id='free')
         self.assertEqual(plan.limits['max_users'], 8)
 
+    def test_patch_storage_gb_accepts_fraction_rounded_to_2_decimals(self):
+        from apps.rbac.permissions import check_storage_limit
+        from core.exceptions import PlanLimitExceeded
+
+        response = self.client.patch(
+            f'{ADMIN_PLANS_URL}free/',
+            {'limits': {'max_users': 5, 'storage_gb': 0.256, 'max_projects': 2,
+                        'max_custom_roles': 0, 'api_calls_per_month': 1000}},
+            format='json', **self.headers,
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        # 0.256 → redondeado a 2 decimales.
+        self.assertEqual(Plan.objects.get(id='free').limits['storage_gb'], 0.26)
+
+        # El límite fraccionario se hace cumplir: 0.26 GB ≈ 279 MB; subir 300 MB supera la cuota.
+        cache.clear()
+        free_tenant = _create_tenant(f'free-{uuid.uuid4().hex[:8]}', plan='free')
+        with self.assertRaises(PlanLimitExceeded):
+            check_storage_limit(free_tenant, 300 * 1024 * 1024)
+
     def test_patch_upload_limits_persists_and_overrides(self):
         from utils.plans import get_effective_plan_limits
 

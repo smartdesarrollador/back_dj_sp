@@ -1,9 +1,19 @@
 """
-Link pending email-based chat invitations to a user when they register.
+Chat signals: enlazar invitaciones pendientes y limpiar archivos de adjuntos borrados.
 """
 from django.conf import settings
-from django.db.models.signals import post_save
+from django.db.models.signals import post_delete, post_save
 from django.dispatch import receiver
+
+from apps.chat.models import MessageAttachment
+
+
+@receiver(post_delete, sender=MessageAttachment)
+def delete_message_attachment_file(sender, instance, **kwargs) -> None:
+    # Al borrar un mensaje, el CASCADE elimina la fila del adjunto pero no el binario del
+    # disco: hay que borrarlo a mano para liberar la cuota de almacenamiento de verdad.
+    if instance.file:
+        instance.file.delete(save=False)
 
 
 @receiver(post_save, sender=settings.AUTH_USER_MODEL)

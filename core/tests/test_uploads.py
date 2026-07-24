@@ -258,6 +258,53 @@ class UploadStorageQuotaTest(TestCase):
                         category='payment_proof', tenant=tenant)
 
 
+# ─── digital_asset: imágenes de Vista que cuentan a la cuota ──────────────────
+
+@override_settings(CACHES=_LOCMEM_CACHE)
+class DigitalAssetUploadTest(TestCase):
+    def setUp(self):
+        cache.clear()
+
+    def test_real_png_within_plan_limit_passes(self):
+        tenant = make_tenant('free')  # tope de imagen Free = 2 MB
+        validate_upload(png_upload('avatar.png', size=1 * MB),
+                        category='digital_asset', tenant=tenant)
+
+    def test_svg_is_rejected(self):
+        tenant = make_tenant('free')
+        with self.assertRaises(ValidationError):
+            validate_upload(upload('logo.svg', b'<svg xmlns="http://www.w3.org/2000/svg"></svg>'),
+                            category='digital_asset', tenant=tenant)
+
+    def test_executable_renamed_to_png_is_rejected(self):
+        tenant = make_tenant('free')
+        with self.assertRaises(ValidationError):
+            validate_upload(upload('avatar.png', b'MZ\x90\x00'),
+                            category='digital_asset', tenant=tenant)
+
+    def test_over_plan_image_limit_raises_402(self):
+        tenant = make_tenant('free')  # 2 MB
+        with self.assertRaises(PlanLimitExceeded) as ctx:
+            validate_upload(png_upload('avatar.png', size=3 * MB),
+                            category='digital_asset', tenant=tenant)
+        self.assertIn('2 MB', str(ctx.exception))
+
+    def test_counts_toward_storage_quota(self):
+        from apps.subscriptions.models import Plan
+
+        # storage_gb = 0 → cualquier byte adicional supera la cuota → 402.
+        Plan.objects.create(id='free', display_name='Free', limits={'storage_gb': 0})
+        tenant = make_tenant('free')
+        with self.assertRaises(PlanLimitExceeded):
+            validate_upload(png_upload('avatar.png', size=1024),
+                            category='digital_asset', tenant=tenant)
+
+    def test_tenant_is_required(self):
+        # Categoría gateada por plan sin tenant → error de programación (ValueError), no 400.
+        with self.assertRaises(ValueError):
+            validate_upload(png_upload('avatar.png'), category='digital_asset')
+
+
 # ─── Contrato de la API ───────────────────────────────────────────────────────
 
 class UploadApiContractTest(TestCase):
