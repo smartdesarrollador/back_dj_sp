@@ -29,8 +29,10 @@ _LOCMEM_CACHE = {'default': {'BACKEND': 'django.core.cache.backends.locmem.LocMe
 
 SUMMARY_URL = '/api/v1/admin/reports/summary/'
 SERVICE_ADOPTION_URL = '/api/v1/admin/reports/service-adoption/'
+STORAGE_URL = '/api/v1/admin/reports/storage/'
 VISTA_TRAFFIC_URL = '/api/v1/admin/reports/vista-traffic/'
 DESKTOP_LICENSES_URL = '/api/v1/admin/reports/desktop-licenses/'
+_GB = 1024 ** 3
 
 
 def _create_tenant(slug, plan='professional'):
@@ -711,3 +713,88 @@ class TestDesktopLicenseFunnelMetrics(APITestCase):
         self.assertEqual(body['total'], 0)
         self.assertEqual(body['sent'], 0)
         self.assertEqual(body['activated'], 0)
+
+
+def _add_storage(tenant, username, *sizes):
+    """
+    Crea un PublicProfile con uno o más DigitalAsset de tamaños conocidos.
+
+    Se pasan varios `sizes` en vez de uno grande porque DigitalAsset.size es
+    PositiveIntegerField (máx ~2 GB en Postgres); en la vida real cada archivo está
+    topado en ≤100 MB y el Sum agregado es BIGINT, así que no hay overflow.
+    """
+    from django.core.files.uploadedfile import SimpleUploadedFile
+
+    from apps.digital_services.models import DigitalAsset
+
+    profile = _create_public_profile(tenant, username)
+    for i, size in enumerate(sizes):
+        DigitalAsset.objects.create(
+            profile=profile, slot='avatar',
+            file=SimpleUploadedFile(f'{username}-{i}.png', b'x'),
+            size=size, original_name=f'{username}.png',
+        )
+    return profile
+
+
+@override_settings(PASSWORD_HASHERS=_FAST_HASHERS, CACHES=_LOCMEM_CACHE)
+class TestStorageReport(APITestCase):
+    def setUp(self):
+        cache.clear()
+        self.own_tenant = _create_tenant('own-corp')
+        self.staff = _create_staff(self.own_tenant, 'staff@own-corp.com')
+        _grant_permission(self.staff, 'customers.analytics')
+        self.client.force_authenticate(user=self.staff)
+        self.headers = {'HTTP_X_TENANT_SLUG': 'own-corp'}
+
+        # free (límite 1 GB) al 90% ; starter (5 GB) al 60% ; enterprise (ilimitado) 3.5 GB.
+        # Se usan varios assets < 2 GB por tenant (ver _add_storage).
+        self.t_free = _create_tenant('acme-free', plan='free')
+        self.t_starter = _create_tenant('acme-starter', plan='starter')
+        self.t_ent = _create_tenant('acme-ent', plan='enterprise')
+        _add_storage(self.t_free, 'freeuser', int(0.9 * _GB))                     # 0.9 GB
+        _add_storage(self.t_starter, 'staruser', int(1.5 * _GB), int(1.5 * _GB))  # 3.0 GB
+        _add_storage(self.t_ent, 'entuser', int(1.75 * _GB), int(1.75 * _GB))     # 3.5 GB
+        # own tenant también consume, para verificar que se excluye
+        _add_storage(self.own_tenant, 'ownuser', int(1.5 * _GB))
+
+    def test_non_staff_is_blocked(self):
+        # IsStaffUser es load-bearing: un usuario no-staff es bloqueado (403) aunque sea
+        # dueño legítimo del tenant. La combinación staff+RBAC está cubierta a fondo para el
+        # mismo permission_classes en TestAdminSummaryViewStaffOnly.
+        owner = User.objects.create_user(
+            email='owner@own-corp.com', name='Owner', password='x', tenant=self.own_tenant,
+        )
+        self.client.force_authenticate(user=owner)
+        res = self.client.get(STORAGE_URL, **self.headers)
+        self.assertEqual(res.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_totals_by_plan_top_and_occupancy(self):
+        res = self.client.get(STORAGE_URL, **self.headers)
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        body = res.json()
+
+        # Total excluye al own tenant (0.9 + 3.0 + 3.5 = 7.4), y cuenta 3 tenants.
+        self.assertEqual(body['total_used_gb'], 7.4)
+        self.assertEqual(body['tenant_count'], 3)
+
+        by_plan = {r['plan']: r for r in body['by_plan']}
+        self.assertEqual(by_plan['free']['used_gb'], 0.9)
+        self.assertEqual(by_plan['free']['tenant_count'], 1)
+        self.assertEqual(by_plan['starter']['used_gb'], 3.0)
+        self.assertEqual(by_plan['enterprise']['used_gb'], 3.5)
+        self.assertEqual(by_plan['professional']['tenant_count'], 0)
+
+        # Top ordenado desc por uso; pct correcto (None para ilimitado).
+        top = body['top_tenants']
+        self.assertEqual([t['tenant'] for t in top[:3]],
+                         ['Acme-ent', 'Acme-starter', 'Acme-free'])
+        self.assertIsNone(top[0]['pct'])            # enterprise ilimitado
+        self.assertEqual(top[1]['pct'], 60.0)       # starter 3/5
+        self.assertEqual(top[2]['pct'], 90.0)       # free 0.9/1
+
+        occ = {b['bucket']: b['tenant_count'] for b in body['occupancy']}
+        self.assertEqual(occ['50-80%'], 1)          # starter
+        self.assertEqual(occ['80-100%'], 1)         # free
+        self.assertEqual(occ['unlimited'], 1)       # enterprise
+        self.assertEqual(occ['0-50%'], 0)

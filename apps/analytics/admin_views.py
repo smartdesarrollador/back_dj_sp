@@ -6,6 +6,7 @@ URL namespace: /api/v1/admin/reports/
 Endpoints:
   GET /admin/reports/summary/            → MRR/ARR/churn/user metrics across all OTHER tenants
   GET /admin/reports/service-adoption/   → acquired vs. activated tenants per catalog service
+  GET /admin/reports/storage/            → storage consumption (total, per plan, top tenants, occupancy)
   GET /admin/reports/vista-traffic/      → views/unique visitors/shares per public-page service
   GET /admin/reports/desktop-licenses/   → license-level sent/activated/pending/revoked funnel
 
@@ -21,10 +22,10 @@ from datetime import timedelta
 
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
-from django.db.models import Count, OuterRef, Q, Subquery
+from django.db.models import Count, OuterRef, Q, Subquery, Sum
 from django.utils import timezone
-from drf_spectacular.utils import OpenApiParameter, extend_schema
 from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import OpenApiParameter, extend_schema
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -179,6 +180,94 @@ def _compute_service_adoption(own_tenant_id) -> list[dict]:
     return results
 
 
+_PLAN_ORDER = ('free', 'starter', 'professional', 'enterprise')
+
+
+def _compute_storage_report(own_tenant_id) -> dict:
+    """
+    Consumo de almacenamiento agregado de todos los OTROS tenants (total, por plan, top y ocupación).
+
+    Eficiencia: agrega en 2 queries agrupadas las fuentes con `size` en BD, que son las dominantes
+    (adjuntos de chat + imágenes de Vista). Se omiten logo/favicon/comprobantes Yape a propósito
+    (no guardan `size` y exigirían un `stat` por archivo); su peso es marginal frente al total, así
+    que el agregado puede quedar levemente por debajo del que muestra el Hub por tenant.
+    """
+    from apps.chat.models import MessageAttachment
+    from apps.digital_services.models import DigitalAsset
+    from apps.tenants.models import Tenant
+    from apps.tenants.serializers import PLAN_NAME_MAP
+    from utils.plans import get_effective_plan_limits
+
+    gb = 1024 ** 3
+
+    used: dict = {}  # tenant_id -> bytes
+    for row in (MessageAttachment.objects
+                .exclude(message__sender__tenant_id=own_tenant_id)
+                .values('message__sender__tenant').annotate(b=Sum('size'))):
+        tid = row['message__sender__tenant']
+        if tid is not None:
+            used[tid] = used.get(tid, 0) + (row['b'] or 0)
+    for row in (DigitalAsset.objects
+                .exclude(profile__user__tenant_id=own_tenant_id)
+                .values('profile__user__tenant').annotate(b=Sum('size'))):
+        tid = row['profile__user__tenant']
+        if tid is not None:
+            used[tid] = used.get(tid, 0) + (row['b'] or 0)
+
+    tenants = list(
+        Tenant.objects.exclude(id=own_tenant_id).filter(is_active=True)
+        .values('id', 'name', 'plan')
+    )
+
+    limit_cache: dict = {}  # plan -> storage_gb (None = ilimitado)
+
+    def _limit_gb(plan):
+        if plan not in limit_cache:
+            limit_cache[plan] = get_effective_plan_limits(plan).get('storage_gb')
+        return limit_cache[plan]
+
+    total_bytes = 0
+    by_plan_bytes = {p: 0 for p in _PLAN_ORDER}
+    by_plan_count = {p: 0 for p in _PLAN_ORDER}
+    occ = {'0-50%': 0, '50-80%': 0, '80-100%': 0, 'unlimited': 0}
+    rows = []
+
+    for t in tenants:
+        plan, b = t['plan'], used.get(t['id'], 0)
+        total_bytes += b
+        if plan in by_plan_bytes:
+            by_plan_bytes[plan] += b
+            by_plan_count[plan] += 1
+        limit_gb = _limit_gb(plan)
+        if limit_gb is None:
+            occ['unlimited'] += 1
+            pct = None
+        else:
+            pct = round(b / (limit_gb * gb) * 100, 1) if limit_gb else (100.0 if b else 0.0)
+            occ['0-50%' if pct < 50 else '50-80%' if pct < 80 else '80-100%'] += 1
+        rows.append({
+            'tenant': t['name'], 'plan': plan, 'used_gb': round(b / gb, 3),
+            'limit_gb': limit_gb, 'pct': pct,
+        })
+
+    rows.sort(key=lambda r: r['used_gb'], reverse=True)
+
+    return {
+        'total_used_gb': round(total_bytes / gb, 3),
+        'tenant_count': len(tenants),
+        'by_plan': [
+            {'plan': p, 'plan_name': PLAN_NAME_MAP.get(p, p.title()),
+             'used_gb': round(by_plan_bytes[p] / gb, 3), 'tenant_count': by_plan_count[p]}
+            for p in _PLAN_ORDER
+        ],
+        'top_tenants': rows[:10],
+        'occupancy': [
+            {'bucket': k, 'tenant_count': occ[k]}
+            for k in ('0-50%', '50-80%', '80-100%', 'unlimited')
+        ],
+    }
+
+
 def _compute_vista_traffic(own_tenant_id, period_days: int) -> dict:
     from apps.digital_services.models import PageEvent
 
@@ -308,6 +397,24 @@ class ServiceAdoptionView(APIView):
         data = cache.get(cache_key)
         if data is None:
             data = {'services': _compute_service_adoption(request.tenant.id)}
+            cache.set(cache_key, data, 300)
+        return Response(data)
+
+
+class StorageReportView(APIView):
+    # Same reasoning as AdminSummaryView/ServiceAdoptionView: cross-tenant storage data,
+    # staff-only + RBAC.
+    permission_classes = [IsStaffUser, HasPermission('customers.analytics')]
+
+    @extend_schema(
+        tags=['admin-reports'],
+        summary='Get platform-wide storage consumption (total, per plan, top tenants, occupancy)',
+    )
+    def get(self, request):
+        cache_key = f'admin:reports:storage:{request.tenant.pk}'
+        data = cache.get(cache_key)
+        if data is None:
+            data = _compute_storage_report(request.tenant.id)
             cache.set(cache_key, data, 300)
         return Response(data)
 
