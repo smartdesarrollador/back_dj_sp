@@ -140,6 +140,95 @@ class TestCurrentSubscriptionView(APITestCase):
         self.assertIn('storage', usage)
         self.assertIn('services', usage)
 
+    def _get_current(self):
+        resp = self.client.get(
+            '/api/v1/admin/subscriptions/current/', **slug_header(self.tenant.slug),
+        )
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        return resp.data['subscription']
+
+    def _set_period(self, days_left, **extra):
+        sub = Subscription.objects.get(tenant=self.tenant)
+        sub.current_period_end = timezone.now() + timedelta(days=days_left)
+        for field, value in extra.items():
+            setattr(sub, field, value)
+        sub.save()
+        return sub
+
+    def test_current_subscription_exposes_renewal_fields(self):
+        data = self._get_current()
+        for field in ['grace_until', 'renewal_state', 'days_until_expiry',
+                      'is_renewable', 'has_pending_proof']:
+            self.assertIn(field, data)
+
+    def test_renewal_state_active_when_far_from_expiry(self):
+        self.tenant.plan = 'professional'
+        self.tenant.save(update_fields=['plan'])
+        self._set_period(25)
+
+        data = self._get_current()
+        self.assertEqual(data['renewal_state'], 'active')
+        self.assertFalse(data['is_renewable'])
+        self.assertEqual(data['days_until_expiry'], 24)  # 24d y ~23h
+
+    def test_renewal_state_expiring_soon_inside_window(self):
+        self.tenant.plan = 'professional'
+        self.tenant.save(update_fields=['plan'])
+        self._set_period(8)
+
+        data = self._get_current()
+        self.assertEqual(data['renewal_state'], 'expiring_soon')
+        self.assertTrue(data['is_renewable'])
+
+    def test_renewal_state_grace_when_past_due(self):
+        self.tenant.plan = 'professional'
+        self.tenant.save(update_fields=['plan'])
+        self._set_period(-2, status='past_due', grace_until=timezone.now() + timedelta(days=5))
+
+        data = self._get_current()
+        self.assertEqual(data['renewal_state'], 'grace')
+        self.assertTrue(data['is_renewable'])
+        self.assertIsNotNone(data['grace_until'])
+        self.assertLess(data['days_until_expiry'], 0)
+
+    def test_renewal_state_expired_when_free_after_paying(self):
+        self._set_period(-10)
+        Invoice.objects.create(
+            tenant=self.tenant, stripe_invoice_id='inv_expired_state',
+            amount_cents=7900, status='paid',
+            period_start=timezone.now() - timedelta(days=40),
+            period_end=timezone.now() - timedelta(days=10),
+            invoice_date=timezone.now() - timedelta(days=40),
+        )
+
+        data = self._get_current()
+        self.assertEqual(data['renewal_state'], 'expired')
+        self.assertFalse(data['is_renewable'])
+
+    def test_days_until_expiry_is_none_without_period(self):
+        sub = Subscription.objects.get(tenant=self.tenant)
+        sub.current_period_end = None
+        sub.save(update_fields=['current_period_end'])
+
+        self.assertIsNone(self._get_current()['days_until_expiry'])
+
+    def test_has_pending_proof_reflects_proof_status(self):
+        sub = Subscription.objects.get(tenant=self.tenant)
+        # Archivo real: el serializer calcula `usage`, que suma el peso en disco de
+        # cada comprobante (utils.storage.get_tenant_storage_bytes).
+        proof = YapePaymentProof.objects.create(
+            subscription=sub, plan='professional',
+            screenshot=SimpleUploadedFile(
+                'proof.png', png_bytes(), content_type='image/png'
+            ),
+            amount=Decimal('79.00'), admin_token=uuid.uuid4().hex,
+        )
+        self.assertTrue(self._get_current()['has_pending_proof'])
+
+        proof.status = 'approved'
+        proof.save(update_fields=['status'])
+        self.assertFalse(self._get_current()['has_pending_proof'])
+
 
 # ─── UpgradeSubscriptionView ──────────────────────────────────────────────────
 

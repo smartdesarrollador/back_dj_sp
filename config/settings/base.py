@@ -283,6 +283,16 @@ CELERY_BEAT_SCHEDULE = {
         'task': 'apps.digital_services.tasks.collect_orphan_digital_assets',
         'schedule': crontab(hour=4, minute=30),  # Daily at 4:30 AM UTC
     },
+    # Planes PAGADOS vencidos: gracia y degradación. 15 min después de la de trials para
+    # no competir por la misma ventana. Ver prd/features/renovacion-y-expiracion-de-planes.md
+    'expire-paid-subscriptions': {
+        'task': 'apps.subscriptions.tasks.expire_paid_subscriptions',
+        'schedule': crontab(hour=4, minute=15),  # Daily at 4:15 AM UTC
+    },
+    'remind-subscription-expiry': {
+        'task': 'apps.subscriptions.tasks.remind_subscription_expiry',
+        'schedule': crontab(hour=10, minute=15),  # Daily at 10:15 AM UTC
+    },
 }
 
 # ─── reCAPTCHA ────────────────────────────────────────────────────────────────

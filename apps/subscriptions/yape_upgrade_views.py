@@ -1,12 +1,17 @@
 """
-YapeUpgradeView — authenticated Yape payment proof for plan upgrades.
+YapeUpgradeView — authenticated Yape payment proof for plan upgrades and renewals.
 
 POST /api/v1/admin/subscriptions/yape-upgrade/
 
-Used when a logged-in tenant wants to upgrade their plan by submitting a Yape
-payment screenshot. Unlike YapePaymentProofView (which uses a Redis token for
-unauthenticated tenants right after registration), this endpoint requires a
-valid JWT since the user is already logged in.
+Used when a logged-in tenant wants to **mejorar** su plan o **renovar** el que ya
+tiene, subiendo un comprobante de pago Yape. Unlike YapePaymentProofView (which uses
+a Redis token for unauthenticated tenants right after registration), this endpoint
+requires a valid JWT since the user is already logged in.
+
+Renovación y upgrade son el mismo acto para el sistema —subir un comprobante que un
+admin aprueba y que activa un período—, así que comparten endpoint y flujo de
+aprobación (`activate_yape_proof`). Lo único que cambia es si el plan pagado es igual
+o superior al actual. Ver ADR-008, decisión 3.
 """
 import logging
 import secrets
@@ -21,12 +26,14 @@ from rest_framework.views import APIView
 
 from apps.promotions.models import PromotionRedemption
 from apps.promotions.services import (
+    BILLING_CYCLES,
     REASON_MESSAGES,
     compute_discount,
     find_valid_promotion,
     get_plan_price,
 )
 from apps.subscriptions.models import Subscription, YapePaymentProof
+from apps.subscriptions.services import RENEWAL_WINDOW_DAYS, is_renewable
 from apps.subscriptions.tasks import notify_yape_payment
 from utils.uploads import validate_upload
 
@@ -48,10 +55,11 @@ class YapeUpgradeView(APIView):
 
     @extend_schema(
         tags=['admin-billing'],
-        summary='Submit Yape payment proof for plan upgrade (authenticated)',
+        summary='Submit Yape payment proof for plan upgrade or renewal (authenticated)',
         responses={
             201: OpenApiResponse(description='Proof submitted, pending admin review'),
             400: OpenApiResponse(description='Validation error'),
+            409: OpenApiResponse(description='A payment proof is already pending review'),
         },
     )
     def post(self, request) -> Response:
@@ -69,8 +77,49 @@ class YapeUpgradeView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        billing_cycle = str(request.data.get('billing_cycle', 'monthly')).strip() or 'monthly'
+        if billing_cycle not in BILLING_CYCLES:
+            return Response(
+                {'detail': 'Ciclo de facturación inválido. Debe ser monthly o annual.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        subscription, _ = Subscription.objects.get_or_create(
+            tenant=tenant,
+            defaults={'plan': tenant.plan, 'status': 'trialing'},
+        )
+        # El tenant ya está cargado: evita que is_renewable() vuelva a pedirlo.
+        subscription.tenant = tenant
+
+        # Un solo comprobante pendiente por tenant. Sin esto, dos submits seguidos
+        # crean dos proofs que un admin podría aprobar ambos, activando (y cobrando)
+        # dos veces — la ventana de doble aprobación de BACKLOG.md.
+        pending = subscription.yape_proofs.filter(status='pending').first()
+        if pending is not None:
+            return Response(
+                {
+                    'detail': (
+                        'Ya tienes un comprobante en revisión. Te avisaremos por email '
+                        'en cuanto lo validemos.'
+                    ),
+                    'proof_id': str(pending.id),
+                },
+                status=status.HTTP_409_CONFLICT,
+            )
+
         current_plan = tenant.plan
-        if PLAN_ORDER.index(plan) <= PLAN_ORDER.index(current_plan):
+        is_renewal = plan == current_plan
+        if is_renewal:
+            if not is_renewable(subscription):
+                return Response(
+                    {'detail': (
+                        f'Tu plan {current_plan} no está próximo a vencer. Podrás '
+                        f'renovarlo durante los últimos {RENEWAL_WINDOW_DAYS} días '
+                        f'del período.'
+                    )},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+        elif PLAN_ORDER.index(plan) < PLAN_ORDER.index(current_plan):
             return Response(
                 {'detail': f'El plan {plan} no es un upgrade desde {current_plan}.'},
                 status=status.HTTP_400_BAD_REQUEST,
@@ -94,15 +143,10 @@ class YapeUpgradeView(APIView):
                     {'detail': REASON_MESSAGES[reason], 'promo_reason': reason},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
-            amounts = compute_discount(promotion, plan)
+            amounts = compute_discount(promotion, plan, billing_cycle)
         else:
-            price = get_plan_price(plan)
+            price = get_plan_price(plan, billing_cycle)
             amounts = {'original': price, 'discount': price * 0, 'final': price}
-
-        subscription, _ = Subscription.objects.get_or_create(
-            tenant=tenant,
-            defaults={'plan': tenant.plan, 'status': 'trialing'},
-        )
 
         admin_token = secrets.token_urlsafe(48)
         with transaction.atomic():
@@ -110,6 +154,7 @@ class YapeUpgradeView(APIView):
                 subscription=subscription,
                 screenshot=screenshot,
                 plan=plan,
+                billing_cycle=billing_cycle,
                 amount=amounts['final'],
                 admin_token=admin_token,
             )
@@ -133,6 +178,8 @@ class YapeUpgradeView(APIView):
             {
                 'message': 'Comprobante recibido. Lo revisaremos pronto y te notificaremos por email.',
                 'proof_id': str(proof.id),
+                'is_renewal': is_renewal,
+                'billing_cycle': billing_cycle,
             },
             status=status.HTTP_201_CREATED,
         )

@@ -16,6 +16,11 @@ logger = logging.getLogger(__name__)
 
 PAID_PLANS = ('starter', 'professional', 'enterprise')
 
+# Ciclos de facturación válidos. Duplica deliberadamente los valores de
+# subscriptions.models.BILLING_CYCLE_CHOICES en lugar de importarlos: la dirección
+# de imports de este módulo es unidireccional (ver docstring).
+BILLING_CYCLES = ('monthly', 'annual')
+
 # Razones de rechazo de un cupón. 'invalid' es deliberadamente opaco: cubre
 # inexistente, pausado y aún-no-vigente para no filtrar qué códigos existen.
 REASON_INVALID = 'invalid'
@@ -35,17 +40,31 @@ REASON_MESSAGES = {
 }
 
 
-def get_plan_price(plan: str) -> Decimal:
-    """Precio mensual USD del plan: fila Plan si existe, si no PLAN_CATALOG."""
+def get_plan_price(plan: str, cycle: str = 'monthly') -> Decimal:
+    """
+    Precio USD del plan para el ciclo dado: fila Plan si existe, si no PLAN_CATALOG.
+
+    `cycle='monthly'` por defecto para no alterar los call sites que no eligen ciclo
+    (registro Yape, cupón 100%). `cycle='annual'` devuelve el precio del año
+    completo, no la mensualidad equivalente.
+
+    Raises:
+        ValueError: plan desconocido, o ciclo fuera de BILLING_CYCLES.
+    """
     from apps.subscriptions.models import Plan
     from utils.plans import PLAN_CATALOG
 
+    if cycle not in BILLING_CYCLES:
+        raise ValueError(f'Unknown billing cycle: {cycle}')
+
+    price_field = 'price_annual' if cycle == 'annual' else 'price_monthly'
+
     try:
-        return Decimal(Plan.objects.get(id=plan).price_monthly)
+        return Decimal(getattr(Plan.objects.get(id=plan), price_field))
     except Plan.DoesNotExist:
         for entry in PLAN_CATALOG:
             if entry['id'] == plan:
-                return Decimal(entry['price_monthly'])
+                return Decimal(entry[price_field])
         raise ValueError(f'Unknown plan: {plan}') from None
 
 
@@ -95,9 +114,15 @@ def _tenant_has_paid_history(tenant) -> bool:
     return Invoice.objects.filter(tenant=tenant, status='paid', amount_cents__gt=0).exists()
 
 
-def compute_discount(promotion: Promotion, plan: str) -> dict:
-    """{'original', 'discount', 'final'} en Decimal (2 decimales, HALF_UP)."""
-    original = get_plan_price(plan)
+def compute_discount(promotion: Promotion, plan: str, cycle: str = 'monthly') -> dict:
+    """
+    {'original', 'discount', 'final'} en Decimal (2 decimales, HALF_UP).
+
+    El descuento se calcula sobre el precio del ciclo elegido: un `percentage` del
+    20% sobre un plan anual descuenta el 20% del precio anual, y `max_discount`
+    sigue siendo un tope en USD absolutos (no se escala por ciclo).
+    """
+    original = get_plan_price(plan, cycle)
     if promotion.type == 'percentage':
         discount = original * promotion.value / Decimal('100')
         if promotion.max_discount is not None:

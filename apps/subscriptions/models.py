@@ -65,6 +65,12 @@ class Subscription(BaseModel):
     current_period_start = models.DateTimeField(null=True, blank=True)
     current_period_end = models.DateTimeField(null=True, blank=True)
     cancel_at_period_end = models.BooleanField(default=False)
+    # Fin del período de gracia tras vencer un plan pagado. NULL = no está en gracia.
+    # Ver prd/features/renovacion-y-expiracion-de-planes.md y ADR-008.
+    grace_until = models.DateTimeField(null=True, blank=True)
+    # Hitos de aviso ya enviados (ej. ["T-7", "T-3"]) — se resetea al renovar para
+    # que los recordatorios no se dupliquen si el scheduler reintenta.
+    renewal_reminders_sent = models.JSONField(default=list, blank=True)
     credit_balance = models.DecimalField(
         max_digits=10,
         decimal_places=2,
@@ -75,6 +81,7 @@ class Subscription(BaseModel):
         db_table = 'subscriptions'
         indexes = [
             models.Index(fields=['tenant', 'status']),
+            models.Index(fields=['current_period_end'], name='subs_period_end_idx'),
         ]
 
     def __str__(self) -> str:
@@ -184,6 +191,12 @@ class YapePaymentProof(BaseModel):
     )
     screenshot    = models.ImageField(upload_to='yape_proofs/')
     plan          = models.CharField(max_length=20, choices=PLAN_CHOICES)
+    # Ciclo pagado: determina precio y duración del período al aprobar el comprobante
+    # (30 vs. 365 días). Vive aquí y no solo en Subscription porque la aprobación es
+    # asíncrona — ver ADR-008, decisión 4.
+    billing_cycle = models.CharField(
+        max_length=10, choices=BILLING_CYCLE_CHOICES, default='monthly'
+    )
     amount        = models.DecimalField(max_digits=8, decimal_places=2)
     status        = models.CharField(max_length=10, choices=YAPE_PROOF_STATUS, default='pending')
     admin_token   = models.CharField(max_length=64, unique=True, db_index=True)

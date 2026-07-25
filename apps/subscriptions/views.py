@@ -384,7 +384,11 @@ class AdminPlanDetailView(APIView):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
-        serializer = PlanUpdateSerializer(data=request.data, partial=True)
+        # `plan` va por contexto para que validate() pueda comparar un PATCH parcial
+        # contra los precios ya guardados (ver PlanUpdateSerializer.validate).
+        serializer = PlanUpdateSerializer(
+            data=request.data, partial=True, context={'plan': plan}
+        )
         if not serializer.is_valid():
             return Response({'error': serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
 

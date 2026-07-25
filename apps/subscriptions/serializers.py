@@ -1,4 +1,5 @@
 """Serializers for subscription billing models."""
+from django.utils import timezone
 from rest_framework import serializers
 
 from apps.services.models import TenantService
@@ -163,6 +164,40 @@ class PlanUpdateSerializer(serializers.Serializer):
     )
     limits        = PlanLimitsSerializer(required=False)
 
+    MONTHS_PER_YEAR = 12
+
+    def validate(self, data):
+        """
+        El precio anual nunca puede superar 12 mensualidades: sería cobrarle más a
+        quien se compromete por más tiempo, contradiciendo el descuento que la UI
+        anuncia. Es el error de captura típico —editar el mensual y olvidar el
+        anual— y desde la Fase 3 el ciclo anual cobra de verdad.
+
+        En un PATCH parcial se compara contra el valor ya guardado, que llega por
+        contexto desde AdminPlanDetailView.
+        """
+        plan = self.context.get('plan')
+        price_monthly = data.get(
+            'price_monthly', getattr(plan, 'price_monthly', None)
+        )
+        price_annual = data.get('price_annual', getattr(plan, 'price_annual', None))
+
+        if price_monthly is None or price_annual is None:
+            return data
+
+        max_annual = price_monthly * self.MONTHS_PER_YEAR
+        if price_annual > max_annual:
+            # Detalle en lista: convención del repo (ver LL-104). Aquí DRF lo
+            # normalizaría igual vía as_serializer_error, pero no se depende de eso.
+            raise serializers.ValidationError({
+                'price_annual': [
+                    f'El precio anual (${price_annual}) no puede superar 12 '
+                    f'mensualidades (${max_annual}). Ajusta el precio mensual o '
+                    f'baja el anual.'
+                ]
+            })
+        return data
+
 
 class UpgradeSerializer(serializers.Serializer):
     VALID_PLANS = ['free', 'starter', 'professional', 'enterprise']
@@ -195,6 +230,10 @@ class CurrentSubscriptionSerializer(serializers.ModelSerializer):
     plan_display = serializers.SerializerMethodField()
     mrr = serializers.SerializerMethodField()
     professional_trial_used = serializers.SerializerMethodField()
+    renewal_state = serializers.SerializerMethodField()
+    days_until_expiry = serializers.SerializerMethodField()
+    is_renewable = serializers.SerializerMethodField()
+    has_pending_proof = serializers.SerializerMethodField()
 
     class Meta:
         model = Subscription
@@ -208,11 +247,16 @@ class CurrentSubscriptionSerializer(serializers.ModelSerializer):
             'trial_end',
             'current_period_start',
             'current_period_end',
+            'grace_until',
             'cancel_at_period_end',
             'mrr',
             'created_at',
             'usage',
             'professional_trial_used',
+            'renewal_state',
+            'days_until_expiry',
+            'is_renewable',
+            'has_pending_proof',
         ]
         read_only_fields = fields
 
@@ -228,6 +272,26 @@ class CurrentSubscriptionSerializer(serializers.ModelSerializer):
 
     def get_professional_trial_used(self, obj) -> bool:
         return obj.tenant.professional_trial_used
+
+    def get_renewal_state(self, obj) -> str:
+        # Derivado, nunca persistido. Se calcula en services.py para que el Hub y la
+        # vista de pago compartan un único criterio (ver docstring de ese módulo).
+        from apps.subscriptions.services import get_renewal_state
+        return get_renewal_state(obj)
+
+    def get_days_until_expiry(self, obj) -> int | None:
+        """Días hasta el fin del período; negativo si ya venció, None si no hay período."""
+        if obj.current_period_end is None:
+            return None
+        return (obj.current_period_end - timezone.now()).days
+
+    def get_is_renewable(self, obj) -> bool:
+        from apps.subscriptions.services import is_renewable
+        return is_renewable(obj)
+
+    def get_has_pending_proof(self, obj) -> bool:
+        """Comprobante esperando revisión: el Hub deshabilita el CTA de pago."""
+        return obj.yape_proofs.filter(status='pending').exists()
 
     def get_mrr(self, obj) -> float:
         last_paid = (

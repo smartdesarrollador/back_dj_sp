@@ -194,3 +194,59 @@ class TestAdminPlanLimits(APITestCase):
             f'{ADMIN_PLANS_URL}free/', {'display_name': 'x'}, format='json', **self.headers,
         )
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+
+@override_settings(PASSWORD_HASHERS=_FAST_HASHERS, CACHES=_LOCMEM_CACHE)
+class TestAdminPlanAnnualPriceGuard(APITestCase):
+    """
+    El precio anual no puede superar 12 mensualidades: cobraría más a quien se
+    compromete por más tiempo, al revés del descuento que anuncia la UI. Desde la
+    Fase 3 el ciclo anual cobra de verdad, así que el error de captura típico
+    —editar el mensual y olvidar el anual— pasa a costar dinero.
+    """
+
+    def setUp(self):
+        cache.clear()
+        Plan.objects.create(
+            id='starter', display_name='Starter', price_monthly=20, price_annual=216,
+        )
+        self.tenant = _create_tenant('guard-corp')
+        self.owner = _create_superuser(self.tenant, 'owner@guard-corp.com')
+        self.client.force_authenticate(user=self.owner)
+        self.headers = {'HTTP_X_TENANT_SLUG': 'guard-corp'}
+
+    def _patch(self, payload):
+        return self.client.patch(
+            f'{ADMIN_PLANS_URL}starter/', payload, format='json', **self.headers,
+        )
+
+    def test_annual_above_twelve_months_is_rejected(self):
+        response = self._patch({'price_monthly': 19, 'price_annual': 313})
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('price_annual', str(response.json()))
+
+        plan = Plan.objects.get(id='starter')
+        self.assertEqual(plan.price_monthly, 20)  # nada se guardó
+
+    def test_annual_equal_to_twelve_months_is_allowed(self):
+        response = self._patch({'price_monthly': 20, 'price_annual': 240})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_discounted_annual_is_allowed(self):
+        response = self._patch({'price_monthly': 79, 'price_annual': 854})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_partial_patch_compares_against_stored_monthly(self):
+        """Solo llega price_annual: se compara contra el mensual ya guardado (20)."""
+        response = self._patch({'price_annual': 313})
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_partial_patch_of_monthly_can_invalidate_stored_annual(self):
+        """Bajar el mensual a 1 dejaría el anual guardado (216) por encima del tope."""
+        response = self._patch({'price_monthly': 1})
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_patch_unrelated_field_is_unaffected(self):
+        response = self._patch({'display_name': 'Starter Plus'})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(Plan.objects.get(id='starter').display_name, 'Starter Plus')

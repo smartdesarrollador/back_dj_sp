@@ -1,4 +1,13 @@
-"""Servicios compartidos entre los distintos flujos de aprobación de pagos Yape."""
+"""
+Servicios compartidos entre los distintos flujos de aprobación de pagos Yape, y
+estado de vencimiento/renovación de una suscripción.
+
+`get_renewal_state()` / `is_renewable()` son la **única** fuente del criterio de
+renovación: los consumen tanto `YapeUpgradeView` (para aceptar o rechazar el pago
+del plan actual) como `CurrentSubscriptionSerializer` (para que el Hub sepa si
+mostrar el CTA "Renovar"). Si divergieran, el Hub ofrecería un botón que el backend
+rechaza con 400, o al contrario.
+"""
 from datetime import timedelta
 from decimal import Decimal
 
@@ -10,34 +19,140 @@ from apps.subscriptions.models import Invoice, Subscription, YapePaymentProof
 
 User = get_user_model()
 
+# Duración del período según el ciclo pagado. Las claves son los valores de
+# Subscription.BILLING_CYCLE_CHOICES.
+PERIOD_DAYS = {'monthly': 30, 'annual': 365}
+
+# Días antes de `current_period_end` en que aparece la opción de renovar. Acotar la
+# ventana evita acumulaciones raras (pagar cinco años de golpe) sin un tope artificial.
+RENEWAL_WINDOW_DAYS = 15
+
+# Días de acceso completo tras vencer un plan pagado, antes de degradar a Free. El pago
+# por Yape es manual y lo revisa una persona: sin gracia, un retraso de revisión cortaría
+# el servicio a quien ya pagó. Ver ADR-008, decisión 2.
+GRACE_DAYS = 7
+
+# Hitos de aviso previo al vencimiento (días antes) y media-ventana de búsqueda, que
+# absorbe el jitter del scheduler. La idempotencia NO depende de la ventana: se apoya en
+# Subscription.renewal_reminders_sent.
+REMINDER_MILESTONES = (7, 3, 1)
+REMINDER_WINDOW_HOURS = 12
+
+STATE_ACTIVE = 'active'
+STATE_EXPIRING_SOON = 'expiring_soon'
+STATE_GRACE = 'grace'
+STATE_EXPIRED = 'expired'
+
+RENEWABLE_STATES = (STATE_EXPIRING_SOON, STATE_GRACE)
+
+
+def get_renewal_state(subscription: Subscription) -> str:
+    """
+    Estado de vencimiento derivado — no se persiste. Ver ADR-008.
+
+      'grace'         plan de pago vencido, dentro del período de gracia
+      'expiring_soon' plan de pago al que le quedan <= RENEWAL_WINDOW_DAYS días
+      'expired'       ya degradado a Free tras haber pagado alguna vez
+      'active'        todo lo demás (incluye Free que nunca pagó, y trials)
+
+    `expired` exige una Invoice pagada a propósito: sin ese filtro, un tenant cuyo
+    *trial* Professional venció —`expire_professional_trials` deja `plan='free'` y
+    `StartTrialView` había fijado `current_period_end`— se reportaría como "tu plan
+    venció" sin haber pagado nunca.
+    """
+    now = timezone.now()
+    period_end = subscription.current_period_end
+    plan = subscription.tenant.plan
+
+    if plan == 'free':
+        has_lapsed_period = period_end is not None and period_end <= now
+        if has_lapsed_period and Invoice.objects.filter(
+            tenant_id=subscription.tenant_id, status='paid'
+        ).exists():
+            return STATE_EXPIRED
+        return STATE_ACTIVE
+
+    if subscription.status == 'past_due':
+        return STATE_GRACE
+
+    if period_end is not None and period_end - now <= timedelta(days=RENEWAL_WINDOW_DAYS):
+        return STATE_EXPIRING_SOON
+
+    return STATE_ACTIVE
+
+
+def is_renewable(subscription: Subscription) -> bool:
+    """
+    True si el tenant puede pagar HOY el plan que ya tiene. Un tenant ya degradado a
+    Free no renueva: vuelve a contratar por el camino de upgrade normal.
+    """
+    if subscription.tenant.plan == 'free':
+        return False
+    return get_renewal_state(subscription) in RENEWABLE_STATES
+
 
 def activate_subscription_plan(
     subscription: Subscription,
     plan: str,
     amount: Decimal,
     invoice_ref: str,
+    billing_cycle: str = 'monthly',
 ) -> Invoice:
     """
-    Activa un plan de pago: Subscription/Tenant activos por 30 días, usuarios
-    reactivados e Invoice pagado. Núcleo compartido entre la aprobación de un
-    comprobante Yape y la activación directa por cupón 100% (amount=0).
-    Corre dentro de transaction.atomic() (la abre si no hay una activa).
+    Activa un plan de pago: Subscription/Tenant activos por el ciclo pagado (30 o
+    365 días), usuarios reactivados e Invoice pagado. Núcleo compartido entre la
+    aprobación de un comprobante Yape y la activación directa por cupón 100%
+    (amount=0). Corre dentro de transaction.atomic() (la abre si no hay una activa).
+
+    Si el período vigente aún no venció, el nuevo se **suma** a lo que quedaba: pagar
+    anticipado (renovación o upgrade a mitad de período) no pierde días, y pagar
+    después de vencer no regala el tiempo en que el servicio estuvo impago. Ver
+    ADR-008, decisión 5.
+
+    Pagar también limpia el estado de vencimiento (`grace_until`,
+    `renewal_reminders_sent`) que consume la tarea de expiración, y revoca una
+    cancelación pendiente (`cancel_at_period_end`).
+
+    Raises:
+        ValueError: ciclo de facturación desconocido.
     """
+    if billing_cycle not in PERIOD_DAYS:
+        raise ValueError(f'Unknown billing cycle: {billing_cycle}')
+
     tenant = subscription.tenant
     now = timezone.now()
-    period_end = now + timedelta(days=30)
+    period_length = timedelta(days=PERIOD_DAYS[billing_cycle])
+    current_end = subscription.current_period_end
+
+    update_fields = [
+        'plan', 'status', 'billing_cycle', 'current_period_end',
+        'trial_start', 'trial_end', 'grace_until', 'renewal_reminders_sent',
+        'cancel_at_period_end', 'updated_at',
+    ]
+    if current_end and current_end > now:
+        # Extensión: el período vigente se alarga. `current_period_start` no se toca
+        # —empezó cuando empezó—; la factura cubre solo el tramo recién comprado.
+        period_end = current_end + period_length
+        invoice_period_start = current_end
+    else:
+        period_end = now + period_length
+        invoice_period_start = now
+        subscription.current_period_start = now
+        update_fields.append('current_period_start')
 
     with transaction.atomic():
         subscription.plan = plan
         subscription.status = 'active'
-        subscription.current_period_start = now
+        subscription.billing_cycle = billing_cycle
         subscription.current_period_end = period_end
         subscription.trial_start = None
         subscription.trial_end = None
-        subscription.save(update_fields=[
-            'plan', 'status', 'current_period_start', 'current_period_end',
-            'trial_start', 'trial_end', 'updated_at',
-        ])
+        subscription.grace_until = None
+        subscription.renewal_reminders_sent = []
+        # Pagar revoca una baja pedida: dejar el flag haría que la tarea de
+        # expiración degradase al tenant al llegar el período, pese a haber pagado.
+        subscription.cancel_at_period_end = False
+        subscription.save(update_fields=update_fields)
         tenant.plan = plan
         tenant.is_active = True
         tenant.save(update_fields=['plan', 'is_active', 'updated_at'])
@@ -49,7 +164,7 @@ def activate_subscription_plan(
             amount_cents=int(amount * 100),
             currency='usd',
             status='paid',
-            period_start=now,
+            period_start=invoice_period_start,
             period_end=period_end,
             invoice_date=now,
             paid_at=now,
@@ -72,6 +187,7 @@ def activate_yape_proof(proof: YapePaymentProof) -> Invoice:
             proof.subscription, proof.plan,
             amount=proof.amount,
             invoice_ref=f'yape_{proof.id}',
+            billing_cycle=proof.billing_cycle,
         )
         proof.status = 'approved'
         proof.reviewed_at = timezone.now()

@@ -44,13 +44,16 @@ def _create_promotion(**overrides) -> Promotion:
 class PromotionValidateTests(APITestCase):
     def setUp(self):
         cache.clear()
-        Plan.objects.create(id='starter', display_name='Starter', price_monthly=19)
+        Plan.objects.create(
+            id='starter', display_name='Starter', price_monthly=19, price_annual=200,
+        )
         cfg = YapeConfig.get()
         cfg.exchange_rate = Decimal('3.75')
         cfg.save(update_fields=['exchange_rate'])
 
-    def _validate(self, code='VERANO20', plan='starter'):
-        return self.client.post(VALIDATE_URL, {'code': code, 'plan': plan}, format='json')
+    def _validate(self, code='VERANO20', plan='starter', **extra):
+        payload = {'code': code, 'plan': plan, **extra}
+        return self.client.post(VALIDATE_URL, payload, format='json')
 
     def test_valid_percentage_with_pen_conversion(self):
         _create_promotion()
@@ -61,12 +64,35 @@ class PromotionValidateTests(APITestCase):
             'code': 'VERANO20',
             'type': 'percentage',
             'value': 20.0,
+            'billing_cycle': 'monthly',
             'original_price': 19.0,
             'discount_amount': 3.8,
             'final_price': 15.2,
             'exchange_rate': '3.75',
             'final_price_pen': 57.0,
         })
+
+    def test_annual_cycle_uses_annual_price(self):
+        _create_promotion()
+        response = self._validate(billing_cycle='annual')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['billing_cycle'], 'annual')
+        self.assertEqual(response.data['original_price'], 200.0)
+        self.assertEqual(response.data['discount_amount'], 40.0)
+        self.assertEqual(response.data['final_price'], 160.0)
+
+    def test_cycle_defaults_to_monthly_when_absent_or_blank(self):
+        _create_promotion()
+        for payload in [{}, {'billing_cycle': ''}, {'billing_cycle': '  '}]:
+            response = self._validate(**payload)
+            self.assertEqual(response.data['billing_cycle'], 'monthly', payload)
+            self.assertEqual(response.data['original_price'], 19.0, payload)
+
+    def test_invalid_cycle_is_400(self):
+        _create_promotion()
+        for cycle in ['yearly', 'ANNUAL', 'quarterly']:
+            response = self._validate(billing_cycle=cycle)
+            self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST, cycle)
 
     def test_code_is_case_insensitive(self):
         _create_promotion()

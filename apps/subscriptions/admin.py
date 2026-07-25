@@ -6,7 +6,8 @@ from apps.subscriptions.models import Invoice, PaymentMethod, Plan, Subscription
 @admin.register(Subscription)
 class SubscriptionAdmin(admin.ModelAdmin):
     list_display = [
-        'tenant', 'plan', 'status', 'billing_cycle', 'cancel_at_period_end', 'created_at'
+        'tenant', 'plan', 'status', 'billing_cycle', 'current_period_end',
+        'grace_until', 'cancel_at_period_end', 'created_at'
     ]
     list_filter = ['plan', 'status', 'billing_cycle']
     search_fields = ['tenant__name', 'tenant__slug']
