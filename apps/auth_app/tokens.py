@@ -58,7 +58,12 @@ def verify_mfa_session_token(token: str) -> str | None:
     return user_id
 
 
-PAYMENT_UPLOAD_TTL = 1800  # 30 min — single-use: peek durante las validaciones, consume al éxito
+# 24h — single-use: peek durante las validaciones, consume al éxito. Era 30 min, plazo que
+# no sobrevive al pago real ("abro Yape, pago desde otro teléfono, busco el screenshot") y
+# dejaba cuentas creadas sin forma de pagar. El token solo permite crear un comprobante
+# PENDIENTE de un tenant que ya existe, y un admin lo revisa igual: subirlo a 24h (el mismo
+# plazo que la verificación de email) no amplía lo que un tercero podría hacer con él.
+PAYMENT_UPLOAD_TTL = 86400
 
 
 def create_payment_upload_token(tenant_id: str) -> str:
@@ -71,6 +76,27 @@ def peek_payment_upload_token(token: str) -> str | None:
     """Lee el tenant_id sin consumir el token — un submit que falla la
     validación (ej. cupón agotado) debe poder reintentarse."""
     return cache.get(f'payment_upload:{token}')
+
+
+def payment_upload_token_ttl(token: str) -> int | None:
+    """
+    Segundos que le quedan al token, o None si no existe (nunca existió, caducó o ya se
+    consumió). Permite avisar ANTES de que el cliente suba el comprobante, en vez de
+    rechazarlo después con un 400 opaco.
+    """
+    key = f'payment_upload:{token}'
+    # `ttl()` es de django-redis; los tests corren con LocMemCache, que no la tiene. Ahí
+    # basta con saber si el token existe: el TTL exacto no es lo que se está probando.
+    ttl_fn = getattr(cache, 'ttl', None)
+    if ttl_fn is None:
+        return PAYMENT_UPLOAD_TTL if cache.get(key) is not None else None
+
+    ttl = ttl_fn(key)
+    # django-redis: 0 = la clave no existe; None = existe sin expiración (no ocurre aquí,
+    # todos se crean con timeout, pero se trata como "sin información de caducidad").
+    if not ttl:
+        return None
+    return int(ttl)
 
 
 def consume_payment_upload_token(token: str) -> None:

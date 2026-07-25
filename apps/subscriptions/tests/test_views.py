@@ -158,7 +158,7 @@ class TestCurrentSubscriptionView(APITestCase):
     def test_current_subscription_exposes_renewal_fields(self):
         data = self._get_current()
         for field in ['grace_until', 'renewal_state', 'days_until_expiry',
-                      'is_renewable', 'has_pending_proof']:
+                      'is_renewable', 'has_pending_proof', 'pending_plan']:
             self.assertIn(field, data)
 
     def test_renewal_state_active_when_far_from_expiry(self):
@@ -228,6 +228,39 @@ class TestCurrentSubscriptionView(APITestCase):
         proof.status = 'approved'
         proof.save(update_fields=['status'])
         self.assertFalse(self._get_current()['has_pending_proof'])
+
+    def _abandon_registration(self, plan='professional'):
+        """Deja el tenant como un registro con plan pagado que nunca se pagó."""
+        sub = Subscription.objects.get(tenant=self.tenant)
+        sub.plan = plan
+        sub.status = 'pending_payment'
+        sub.save(update_fields=['plan', 'status'])
+        self.tenant.plan = 'free'
+        self.tenant.save(update_fields=['plan'])
+        return sub
+
+    def test_pending_plan_expone_el_plan_que_quedo_sin_pagar(self):
+        self._abandon_registration()
+
+        data = self._get_current()
+        # `plan` sigue siendo el del tenant (Free, LL-049); `pending_plan` es lo único
+        # que le dice al Hub qué contrató y nunca pagó.
+        self.assertEqual(data['plan'], 'free')
+        self.assertEqual(data['pending_plan'], 'professional')
+
+    def test_pending_plan_es_none_con_el_plan_ya_activo(self):
+        # Un `status` desactualizado sobre un plan ya activo no debe pedir pagar de nuevo.
+        sub = Subscription.objects.get(tenant=self.tenant)
+        sub.plan = 'professional'
+        sub.status = 'pending_payment'
+        sub.save(update_fields=['plan', 'status'])
+        self.tenant.plan = 'professional'
+        self.tenant.save(update_fields=['plan'])
+
+        self.assertIsNone(self._get_current()['pending_plan'])
+
+    def test_pending_plan_es_none_cuando_la_suscripcion_esta_activa(self):
+        self.assertIsNone(self._get_current()['pending_plan'])
 
 
 # ─── UpgradeSubscriptionView ──────────────────────────────────────────────────

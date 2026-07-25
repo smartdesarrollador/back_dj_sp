@@ -11,7 +11,7 @@ from django.contrib.auth.hashers import check_password, make_password
 from django.core.cache import cache
 from django.core.mail import send_mail
 from django.db import transaction
-from drf_spectacular.utils import OpenApiResponse, extend_schema
+from drf_spectacular.utils import OpenApiParameter, OpenApiResponse, extend_schema
 
 from rest_framework import status
 from rest_framework.parsers import FormParser, MultiPartParser
@@ -54,6 +54,7 @@ from .tokens import (
     create_mfa_session_token,
     create_password_reset_token,
     create_payment_upload_token,
+    payment_upload_token_ttl,
     peek_payment_upload_token,
     verify_email_token,
     verify_mfa_session_token,
@@ -571,6 +572,43 @@ class MFARecoveryView(APIView):
         matched.save(update_fields=['is_used'])
 
         return Response(_build_token_response(user))
+
+
+class PaymentTokenStatusView(APIView):
+    """
+    ¿Sigue vivo el payment_upload_token?
+
+    El Hub la consulta al **rehidratar** el paso de pago (tras un refresco o un back),
+    para poder avisar antes de que el cliente suba el comprobante: sin esto, un token
+    caducado se descubre después de la subida, con un 400 que no explica nada.
+
+    Devuelve solo si sirve y cuánto le queda: **ningún dato del tenant ni del usuario**.
+    Quien pregunta no está autenticado, y el token es lo único que presenta.
+    """
+    permission_classes = [AllowAny]
+    authentication_classes = []
+
+    @extend_schema(
+        tags=['auth'],
+        summary='Check whether a payment upload token is still usable',
+        parameters=[
+            OpenApiParameter(
+                name='token', type=str, location=OpenApiParameter.QUERY, required=True,
+                description='payment_upload_token devuelto por /auth/register',
+            ),
+        ],
+        responses={
+            200: OpenApiResponse(description='{ valid, expires_in }'),
+            400: OpenApiResponse(description='token query param is required'),
+        },
+    )
+    def get(self, request):
+        token = request.query_params.get('token', '').strip()
+        if not token:
+            return Response({'detail': 'token is required.'}, status=400)
+
+        ttl = payment_upload_token_ttl(token)
+        return Response({'valid': ttl is not None, 'expires_in': ttl})
 
 
 class YapePaymentProofView(APIView):

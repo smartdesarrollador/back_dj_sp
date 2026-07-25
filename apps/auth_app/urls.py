@@ -11,6 +11,7 @@ from .views import (
     MFARecoveryView,
     MFAValidateView,
     MFAVerifySetupView,
+    PaymentTokenStatusView,
     ProfileView,
     RefreshTokenView,
     RegisterView,
@@ -40,6 +41,7 @@ urlpatterns = [
     path('sso/', include('apps.auth_app.sso_urls')),
     path('google/', GoogleOAuthInitView.as_view(), name='google-oauth-init'),
     path('google/callback/', GoogleOAuthCallbackView.as_view(), name='google-oauth-callback'),
+    path('payment-token-status', PaymentTokenStatusView.as_view(), name='payment-token-status'),
     path('yape-payment-proof', YapePaymentProofView.as_view(), name='yape-payment-proof'),
     path('yape-activate-free', YapeActivateFreeView.as_view(), name='yape-activate-free'),
 ]

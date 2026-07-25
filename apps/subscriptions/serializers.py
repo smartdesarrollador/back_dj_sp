@@ -234,6 +234,7 @@ class CurrentSubscriptionSerializer(serializers.ModelSerializer):
     days_until_expiry = serializers.SerializerMethodField()
     is_renewable = serializers.SerializerMethodField()
     has_pending_proof = serializers.SerializerMethodField()
+    pending_plan = serializers.SerializerMethodField()
 
     class Meta:
         model = Subscription
@@ -257,6 +258,7 @@ class CurrentSubscriptionSerializer(serializers.ModelSerializer):
             'days_until_expiry',
             'is_renewable',
             'has_pending_proof',
+            'pending_plan',
         ]
         read_only_fields = fields
 
@@ -292,6 +294,20 @@ class CurrentSubscriptionSerializer(serializers.ModelSerializer):
     def get_has_pending_proof(self, obj) -> bool:
         """Comprobante esperando revisión: el Hub deshabilita el CTA de pago."""
         return obj.yape_proofs.filter(status='pending').exists()
+
+    def get_pending_plan(self, obj) -> str | None:
+        """
+        Plan que el tenant eligió al registrarse y nunca llegó a pagar, o None.
+
+        El registro con plan pagado deja `Subscription.plan` con el elegido y el tenant en
+        `free` (`plan` arriba devuelve `tenant.plan` a propósito, LL-049). Quien abandona el
+        paso de pago queda así: con una cuenta usable en Free y sin ninguna señal de qué
+        contrató. Exigir `tenant.plan == 'free'` evita anunciar "pendiente" a quien ya tiene
+        el plan activo y solo arrastra un `status` desactualizado.
+        """
+        if obj.status != 'pending_payment' or obj.tenant.plan != 'free':
+            return None
+        return obj.plan
 
     def get_mrr(self, obj) -> float:
         last_paid = (
