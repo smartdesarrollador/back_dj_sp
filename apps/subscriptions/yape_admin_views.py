@@ -51,6 +51,9 @@ def _serialize_proof(proof: YapePaymentProof) -> dict:
         'id':             str(proof.id),
         'screenshot_url': f"{base_url}/media/{proof.screenshot.name}" if proof.screenshot else '',
         'plan':           proof.plan,
+        # Sin el ciclo, el revisor no distingue un pago anual legítimo de un importe
+        # anómalo — y al aprobar activa 30 o 365 días según cuál sea.
+        'billing_cycle':  proof.billing_cycle,
         'amount':         str(proof.amount),
         'promo':          promo,
         'status':         proof.status,

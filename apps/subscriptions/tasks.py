@@ -108,6 +108,10 @@ def notify_yape_payment(proof_id: str) -> None:
     payload = {
         'proof_id':      str(proof.id),
         'plan':          proof.plan,
+        # Sin el ciclo, quien aprueba desde Telegram ve "$854" para un plan que sabe
+        # que cuesta $79/mes y no puede distinguir un pago anual legítimo de un error
+        # — y con un clic activa 365 días.
+        'billing_cycle': proof.billing_cycle,
         'amount':        str(proof.amount),
         'promo':         promo,
         'exchange_rate': str(YapeConfig.get().exchange_rate),

@@ -274,6 +274,9 @@ class RedemptionLifecycleTests(APITestCase):
         # El tipo de cambio real (YapeConfig) viaja en el payload para que n8n
         # calcule el S/ con el mismo rate que vio el cliente
         self.assertEqual(payload['exchange_rate'], '3.75')
+        # Sin el ciclo, el mensaje de Telegram deja al revisor sin saber si el importe
+        # corresponde a un mes o a un año — y aprobar concede 30 o 365 días.
+        self.assertEqual(payload['billing_cycle'], 'monthly')
 
     def test_admin_proofs_list_includes_promo_breakdown(self):
         staff = User.objects.create_user(
@@ -302,6 +305,49 @@ class RedemptionLifecycleTests(APITestCase):
         })
         without_promo = next(p for pid, p in by_id.items() if pid != str(self.proof.id))
         self.assertIsNone(without_promo['promo'])
+        # El revisor necesita el ciclo para interpretar el monto y saber qué concede.
+        self.assertEqual(with_promo['billing_cycle'], 'monthly')
+
+    def test_admin_proofs_list_exposes_annual_cycle(self):
+        staff = User.objects.create_user(
+            email='staff-annual@acme.com', name='Staff', password='pass123',
+            tenant=self.tenant, is_staff=True,
+        )
+        annual = YapePaymentProof.objects.create(
+            subscription=self.subscription,
+            screenshot=_screenshot(),
+            plan='professional',
+            billing_cycle='annual',
+            amount=Decimal('854.00'),
+            admin_token=uuid.uuid4().hex,
+        )
+        self.client.force_authenticate(user=staff)
+
+        response = self.client.get('/api/v1/admin/yape/proofs/')
+
+        row = next(p for p in response.data['proofs'] if p['id'] == str(annual.id))
+        self.assertEqual(row['billing_cycle'], 'annual')
+        self.assertEqual(row['amount'], '854.00')
+
+    def test_notify_payload_carries_annual_cycle(self):
+        from apps.subscriptions.tasks import notify_yape_payment
+
+        annual = YapePaymentProof.objects.create(
+            subscription=self.subscription,
+            screenshot=_screenshot(),
+            plan='professional',
+            billing_cycle='annual',
+            amount=Decimal('854.00'),
+            admin_token=uuid.uuid4().hex,
+        )
+        with override_settings(N8N_YAPE_PAYMENT_WEBHOOK_URL='http://n8n.test/webhook'):
+            with patch('apps.subscriptions.tasks.requests.post') as mock_post:
+                mock_post.return_value.status_code = 200
+                notify_yape_payment(str(annual.id))
+
+        payload = mock_post.call_args.kwargs['json']
+        self.assertEqual(payload['billing_cycle'], 'annual')
+        self.assertEqual(payload['amount'], '854.00')
 
     def test_notify_payload_promo_is_none_without_redemption(self):
         from apps.subscriptions.tasks import notify_yape_payment
