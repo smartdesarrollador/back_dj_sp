@@ -596,6 +596,7 @@ class YapePaymentProofView(APIView):
 
         from apps.promotions.models import PromotionRedemption
         from apps.promotions.services import (
+            BILLING_CYCLES,
             REASON_MESSAGES,
             compute_discount,
             find_valid_promotion,
@@ -614,14 +615,22 @@ class YapePaymentProofView(APIView):
         if not tenant_id:
             return Response({'detail': 'Invalid or expired upload token.'}, status=400)
 
+        plan = request.data.get('plan', '').strip()
+        if plan not in ('starter', 'professional', 'enterprise'):
+            return Response({'detail': 'Invalid plan.'}, status=400)
+
+        # Se valida antes de `validate_upload` para no gastar el procesado de imagen en
+        # un request que se va a rechazar igualmente.
+        billing_cycle = str(request.data.get('billing_cycle', 'monthly')).strip() or 'monthly'
+        if billing_cycle not in BILLING_CYCLES:
+            return Response(
+                {'detail': 'Invalid billing cycle. Must be monthly or annual.'}, status=400
+            )
+
         screenshot = request.FILES.get('screenshot')
         if not screenshot:
             return Response({'detail': 'screenshot file is required.'}, status=400)
         validate_upload(screenshot, category='payment_proof')
-
-        plan = request.data.get('plan', '').strip()
-        if plan not in ('starter', 'professional', 'enterprise'):
-            return Response({'detail': 'Invalid plan.'}, status=400)
 
         try:
             subscription = Subscription.objects.select_related('tenant').get(tenant_id=tenant_id)
@@ -640,9 +649,9 @@ class YapePaymentProofView(APIView):
                     {'detail': REASON_MESSAGES[reason], 'promo_reason': reason},
                     status=400,
                 )
-            amounts = compute_discount(promotion, plan)
+            amounts = compute_discount(promotion, plan, billing_cycle)
         else:
-            price = get_plan_price(plan)
+            price = get_plan_price(plan, billing_cycle)
             amounts = {'original': price, 'discount': Decimal('0.00'), 'final': price}
 
         admin_token = secrets.token_urlsafe(48)
@@ -651,6 +660,7 @@ class YapePaymentProofView(APIView):
                 subscription=subscription,
                 screenshot=screenshot,
                 plan=plan,
+                billing_cycle=billing_cycle,
                 amount=amounts['final'],
                 admin_token=admin_token,
             )
@@ -669,7 +679,11 @@ class YapePaymentProofView(APIView):
         notify_yape_payment.delay(str(proof.id))
 
         return Response(
-            {'message': 'Payment proof submitted. We will review it shortly.', 'proof_id': str(proof.id)},
+            {
+                'message': 'Payment proof submitted. We will review it shortly.',
+                'proof_id': str(proof.id),
+                'billing_cycle': billing_cycle,
+            },
             status=status.HTTP_201_CREATED,
         )
 
@@ -694,6 +708,7 @@ class YapeActivateFreeView(APIView):
     def post(self, request):
         from apps.promotions.models import PromotionRedemption
         from apps.promotions.services import (
+            BILLING_CYCLES,
             REASON_MESSAGES,
             compute_discount,
             confirm_redemption,
@@ -714,6 +729,14 @@ class YapeActivateFreeView(APIView):
         if plan not in ('starter', 'professional', 'enterprise'):
             return Response({'detail': 'Invalid plan.'}, status=400)
 
+        # Determina el precio que el cupón debe cubrir por completo y, sobre todo, la
+        # duración del período que se activa (30 vs. 365 días).
+        billing_cycle = str(request.data.get('billing_cycle', 'monthly')).strip() or 'monthly'
+        if billing_cycle not in BILLING_CYCLES:
+            return Response(
+                {'detail': 'Invalid billing cycle. Must be monthly or annual.'}, status=400
+            )
+
         promo_code = str(request.data.get('promo_code', '')).strip()
         if not promo_code:
             return Response({'detail': 'promo_code is required.'}, status=400)
@@ -730,8 +753,10 @@ class YapeActivateFreeView(APIView):
                 status=400,
             )
 
-        amounts = compute_discount(promotion, plan)
+        amounts = compute_discount(promotion, plan, billing_cycle)
         if amounts['final'] != 0:
+            # Un cupón de monto fijo que cubre el mensual normalmente NO cubre el anual:
+            # el rechazo es el comportamiento correcto, no un caso a esquivar.
             return Response(
                 {'detail': 'El cupón no cubre el 100% del plan.', 'promo_reason': 'not_free'},
                 status=400,
@@ -752,6 +777,7 @@ class YapeActivateFreeView(APIView):
                 subscription, plan,
                 amount=amounts['final'],
                 invoice_ref=f'promo_{redemption.id}',
+                billing_cycle=billing_cycle,
             )
 
         consume_payment_upload_token(upload_token)

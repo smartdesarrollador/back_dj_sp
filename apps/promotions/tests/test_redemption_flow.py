@@ -380,3 +380,155 @@ class ActivateFreeTests(APITestCase):
             'payment_upload_token': token, 'plan': 'starter',
         }, format='json')
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+
+@override_settings(PASSWORD_HASHERS=_FAST_HASHERS, CACHES=_LOCMEM_CACHE)
+class RegistrationBillingCycleTests(APITestCase):
+    """
+    Ciclo de facturación en el pago del registro.
+
+    Sin esto, quien se registra eligiendo el plan anual pagaba el precio mensual y
+    recibía 30 días: el ciclo no llegaba al comprobante ni a la activación. El resto de
+    la cadena ya lo soportaba (`activate_yape_proof` propaga `proof.billing_cycle`).
+    """
+
+    def setUp(self):
+        cache.clear()
+        # price_annual explícito: sin él se caería al fallback de PLAN_CATALOG y el
+        # test afirmaría un número que no controla.
+        Plan.objects.create(
+            id='starter', display_name='Starter', price_monthly=19, price_annual=205,
+        )
+
+    def _register_paid(self, plan='starter'):
+        with patch('apps.auth_app.views.send_mail', return_value=1):
+            response = self.client.post(REGISTER_URL, _register_payload(plan=plan), format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        return response.data['payment_upload_token']
+
+    def _upload(self, token, plan='starter', **extra):
+        data = {
+            'payment_upload_token': token,
+            'screenshot': _screenshot(),
+            'plan': plan,
+            'amount': '1.00',  # monto falso del cliente — debe ignorarse siempre
+            **extra,
+        }
+        with patch('apps.subscriptions.tasks.notify_yape_payment.delay'):
+            return self.client.post(PROOF_URL, data, format='multipart')
+
+    def _activate_free(self, token, plan='starter', **extra):
+        return self.client.post(ACTIVATE_FREE_URL, {
+            'payment_upload_token': token,
+            'plan': plan,
+            'promo_code': 'GRATIS100',
+            **extra,
+        }, format='json')
+
+    # ── Comprobante ──────────────────────────────────────────────────────────────
+
+    def test_annual_cycle_is_persisted_and_priced(self):
+        response = self._upload(self._register_paid(), billing_cycle='annual')
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data['billing_cycle'], 'annual')
+        proof = YapePaymentProof.objects.get(pk=response.data['proof_id'])
+        self.assertEqual(proof.billing_cycle, 'annual')
+        self.assertEqual(proof.amount, Decimal('205.00'))
+
+    def test_defaults_to_monthly(self):
+        response = self._upload(self._register_paid())
+
+        self.assertEqual(response.data['billing_cycle'], 'monthly')
+        proof = YapePaymentProof.objects.get(pk=response.data['proof_id'])
+        self.assertEqual(proof.billing_cycle, 'monthly')
+        self.assertEqual(proof.amount, Decimal('19.00'))
+
+    def test_blank_cycle_falls_back_to_monthly(self):
+        response = self._upload(self._register_paid(), billing_cycle='   ')
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data['billing_cycle'], 'monthly')
+
+    def test_invalid_cycle_is_rejected_without_creating_proof(self):
+        for cycle in ('yearly', 'ANNUAL', 'quarterly'):
+            with self.subTest(cycle=cycle):
+                response = self._upload(self._register_paid(), billing_cycle=cycle)
+                self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertFalse(YapePaymentProof.objects.exists())
+
+    def test_invalid_cycle_does_not_burn_the_token(self):
+        token = self._register_paid()
+        self.assertEqual(
+            self._upload(token, billing_cycle='yearly').status_code,
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+        retry = self._upload(token, billing_cycle='annual')
+
+        self.assertEqual(retry.status_code, status.HTTP_201_CREATED)
+
+    def test_promo_applies_over_the_annual_price(self):
+        _create_promotion(code='ANUAL20', value=Decimal('20'), new_customers_only=False)
+
+        response = self._upload(
+            self._register_paid(), billing_cycle='annual', promo_code='ANUAL20',
+        )
+
+        proof = YapePaymentProof.objects.get(pk=response.data['proof_id'])
+        self.assertEqual(proof.amount, Decimal('164.00'))  # 205 − 20%
+        redemption = PromotionRedemption.objects.get(yape_proof=proof)
+        self.assertEqual(redemption.original_amount, Decimal('205.00'))
+
+    # ── Activación directa por cupón 100% ────────────────────────────────────────
+
+    def test_full_coupon_on_annual_activates_365_days(self):
+        _create_promotion(code='GRATIS100', value=Decimal('100'), new_customers_only=False)
+        token = self._register_paid()
+
+        response = self._activate_free(token, billing_cycle='annual')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        sub = Subscription.objects.get(plan='starter')
+        self.assertEqual(sub.billing_cycle, 'annual')
+        self.assertAlmostEqual(
+            sub.current_period_end,
+            timezone.now() + timedelta(days=365),
+            delta=timedelta(minutes=5),
+        )
+
+    def test_full_coupon_defaults_to_30_days(self):
+        _create_promotion(code='GRATIS100', value=Decimal('100'), new_customers_only=False)
+        token = self._register_paid()
+
+        self._activate_free(token)
+
+        sub = Subscription.objects.get(plan='starter')
+        self.assertEqual(sub.billing_cycle, 'monthly')
+        self.assertAlmostEqual(
+            sub.current_period_end,
+            timezone.now() + timedelta(days=30),
+            delta=timedelta(minutes=5),
+        )
+
+    def test_fixed_coupon_covering_monthly_does_not_cover_annual(self):
+        # $19 cubre el mensual entero, pero sobre 205 deja saldo → 400 'not_free'.
+        _create_promotion(
+            code='GRATIS100', type='fixed_amount', value=Decimal('19'),
+            new_customers_only=False,
+        )
+        token = self._register_paid()
+
+        response = self._activate_free(token, billing_cycle='annual')
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data.get('promo_reason'), 'not_free')
+        self.assertFalse(PromotionRedemption.objects.exists())
+
+    def test_activate_free_rejects_invalid_cycle(self):
+        _create_promotion(code='GRATIS100', value=Decimal('100'), new_customers_only=False)
+
+        response = self._activate_free(self._register_paid(), billing_cycle='yearly')
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertFalse(PromotionRedemption.objects.exists())
