@@ -30,6 +30,7 @@ from utils.throttles import (
     MFARateThrottle,
     RegisterRateThrottle,
 )
+from utils.currency import capture_pen_snapshot
 from utils.uploads import validate_upload
 from .models import MFARecoveryCode
 from .serializers import (
@@ -693,6 +694,9 @@ class YapePaymentProofView(APIView):
             amounts = {'original': price, 'discount': Decimal('0.00'), 'final': price}
 
         admin_token = secrets.token_urlsafe(48)
+        # Foto de la tasa en el momento del pago: el cliente transfirió soles y la
+        # aprobación puede tardar días, con la tasa moviéndose por medio.
+        exchange_rate, amount_pen = capture_pen_snapshot(amounts['final'])
         with transaction.atomic():
             proof = YapePaymentProof.objects.create(
                 subscription=subscription,
@@ -700,6 +704,8 @@ class YapePaymentProofView(APIView):
                 plan=plan,
                 billing_cycle=billing_cycle,
                 amount=amounts['final'],
+                exchange_rate=exchange_rate,
+                amount_pen=amount_pen,
                 admin_token=admin_token,
             )
             if promotion is not None:

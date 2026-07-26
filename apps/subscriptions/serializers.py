@@ -1,9 +1,17 @@
 """Serializers for subscription billing models."""
+from decimal import Decimal
+
 from django.utils import timezone
 from rest_framework import serializers
 
 from apps.services.models import TenantService
-from apps.subscriptions.models import Invoice, PaymentMethod, Plan, Subscription
+from apps.subscriptions.models import (
+    CurrencyConfig,
+    Invoice,
+    PaymentMethod,
+    Plan,
+    Subscription,
+)
 from utils.plans import get_effective_plan_limits
 from utils.storage import get_tenant_storage_bytes
 
@@ -32,6 +40,7 @@ class InvoiceSerializer(serializers.ModelSerializer):
     amount_display = serializers.SerializerMethodField()
     number = serializers.SerializerMethodField()
     amount = serializers.SerializerMethodField()
+    amount_pen = serializers.SerializerMethodField()
 
     class Meta:
         model = Invoice
@@ -43,6 +52,11 @@ class InvoiceSerializer(serializers.ModelSerializer):
             'amount',
             'amount_display',
             'currency',
+            # Testigo del cobro: lo que el cliente transfirió de verdad y con qué
+            # tasa. `null` cuando no hubo conversión — el cliente no debe ver S/ 0.
+            'exchange_rate',
+            'amount_pen_cents',
+            'amount_pen',
             'status',
             'pdf_url',
             'period_start',
@@ -63,6 +77,10 @@ class InvoiceSerializer(serializers.ModelSerializer):
 
     def get_amount(self, obj) -> float:
         return obj.amount_cents / 100
+
+    def get_amount_pen(self, obj) -> float | None:
+        """Espeja `amount`. `None` —no 0— cuando no hubo conversión registrada."""
+        return None if obj.amount_pen_cents is None else obj.amount_pen_cents / 100
 
 
 class PaymentMethodSerializer(serializers.ModelSerializer):
@@ -339,3 +357,65 @@ class CurrentSubscriptionSerializer(serializers.ModelSerializer):
                 'limit': None,
             },
         }
+
+
+class CurrencyConfigSerializer(serializers.ModelSerializer):
+    """Lectura admin. `rates` replica la forma del endpoint público."""
+
+    rates = serializers.SerializerMethodField()
+    updated_by_email = serializers.CharField(
+        source='updated_by.email', default=None, read_only=True
+    )
+
+    class Meta:
+        model = CurrencyConfig
+        fields = [
+            'usd_to_pen', 'default_display_currency', 'source',
+            'rates', 'updated_at', 'updated_by_email',
+        ]
+        read_only_fields = fields
+
+    def get_rates(self, obj) -> dict:
+        return {'USD': '1.0000', 'PEN': str(obj.usd_to_pen)}
+
+
+class CurrencyConfigUpdateSerializer(serializers.Serializer):
+    """
+    Escritura admin del tipo de cambio.
+
+    `source` NO es escribible a propósito: la vista lo fuerza a 'manual'. Si
+    viniera del cliente, un PATCH podría marcar como 'auto' una edición hecha a
+    mano y confundir a cualquier futuro fetcher automático.
+    """
+
+    usd_to_pen = serializers.DecimalField(
+        max_digits=10, decimal_places=4, required=False
+    )
+    default_display_currency = serializers.ChoiceField(
+        choices=[c[0] for c in CurrencyConfig.CURRENCY_CHOICES], required=False
+    )
+
+    # Guardarraíl contra el error de captura por orden de magnitud (375 en vez de
+    # 3.75, o 0.375). El rango es deliberadamente amplio y no una banda alrededor
+    # del valor actual: protege del dedazo sin bloquear una devaluación real.
+    MIN_RATE = Decimal('1.0000')
+    MAX_RATE = Decimal('20.0000')
+
+    def validate_usd_to_pen(self, value: Decimal) -> Decimal:
+        if not (self.MIN_RATE <= value <= self.MAX_RATE):
+            # Detalle en LISTA: convención del repo (LL-104). Con un string suelto,
+            # core/exceptions.py lo degradaría a un genérico "Validation error" y el
+            # admin no vería el motivo.
+            raise serializers.ValidationError([
+                f'El tipo de cambio ({value}) está fuera del rango permitido '
+                f'({self.MIN_RATE} – {self.MAX_RATE}). Verifica que sean soles '
+                f'por dólar (ej. 3.7500), no céntimos.'
+            ])
+        return value
+
+    def validate(self, data):
+        if not data:
+            raise serializers.ValidationError({
+                'non_field_errors': ['Debes enviar al menos un campo a actualizar.']
+            })
+        return data

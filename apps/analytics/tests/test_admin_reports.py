@@ -194,6 +194,21 @@ class TestAdminSummaryMetrics(APITestCase):
         self.assertEqual(body['mrr'], 29.0)
         self.assertEqual(body['arr'], 348.0)
 
+    def test_mrr_ignores_invoices_in_another_currency(self):
+        # El MRR suma centavos como enteros: contar una factura en euros sería
+        # sumarlos como si fueran dólares. Se excluye en vez de convertirla — no
+        # tenemos su tasa histórica.
+        tenant = _create_tenant('tenant-eur')
+        invoice = _paid_invoice(
+            tenant, 9900, self.now - timedelta(days=1), self.now + timedelta(days=29),
+        )
+        invoice.currency = 'eur'
+        invoice.save(update_fields=['currency'])
+
+        response = self.client.get(SUMMARY_URL, **self.headers)
+
+        self.assertEqual(response.json()['mrr'], 0.0)
+
     def test_churn_rate_detects_lapsed_coverage(self):
         period_days = 30
         cutoff = self.now - timedelta(days=period_days)

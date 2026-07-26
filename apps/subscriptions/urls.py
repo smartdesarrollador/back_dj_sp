@@ -1,6 +1,7 @@
 from django.urls import path
 from django.views.decorators.csrf import csrf_exempt
 
+from apps.subscriptions.currency_views import AdminCurrencyConfigView
 from apps.subscriptions.views import (
     AdminPlanDetailView,
     AdminPlanListView,
@@ -17,4 +18,5 @@ urlpatterns = [
     path('webhooks/', csrf_exempt(WebhookView.as_view()), name='stripe-webhook'),
     path('plans/', AdminPlanListView.as_view(), name='admin-plans-list'),
     path('plans/<str:plan_id>/', AdminPlanDetailView.as_view(), name='admin-plans-detail'),
+    path('currency/', AdminCurrencyConfigView.as_view(), name='admin-currency-config'),
 ]

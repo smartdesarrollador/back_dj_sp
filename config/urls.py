@@ -87,6 +87,7 @@ urlpatterns = [
     path('api/v1/public/', include([
         path('', include('apps.digital_services.public_urls')),
         path('plans/', include('apps.subscriptions.public_urls')),
+        path('currency/', include('apps.subscriptions.currency_public_urls')),
         path('desktop/', include('apps.releases.public_urls')),
         path('desktop-license/', include('apps.licenses.public_urls')),
         path('branding/', include('apps.tenants.public_branding_urls')),

@@ -7,6 +7,8 @@ PaymentMethod — Stored payment method metadata (tokenized by Stripe)
 """
 from decimal import Decimal
 
+from django.conf import settings
+from django.core.validators import MinValueValidator
 from django.db import models
 from django.db.models import CASCADE
 
@@ -100,7 +102,22 @@ class Invoice(BaseModel):
     )
     stripe_invoice_id = models.CharField(max_length=255, unique=True, blank=True)
     amount_cents = models.PositiveIntegerField(default=0)  # cents USD
-    currency = models.CharField(max_length=3, default='usd')
+    currency = models.CharField(max_length=3, default='usd')  # describe amount_cents
+    # ── Testigo histórico del cobro ───────────────────────────────────────────
+    # Se HEREDAN del comprobante que originó el pago (ver YapePaymentProof), no se
+    # recalculan al activar: la factura debe reflejar lo que vio y pagó el cliente,
+    # aunque la tasa se haya movido entre el pago y la aprobación.
+    #
+    # NULL cuando no hubo conversión: Stripe (cobra en tarjeta, con su propia
+    # moneda), activaciones por cupón 100% y todo lo anterior a estos campos.
+    # NUNCA rellenar con la tasa de hoy — sería inventar un dato histórico.
+    #
+    # NO sumar `amount_pen_cents` en ningún agregado (MRR/ARR): no es un ingreso
+    # adicional, es una anotación sobre el mismo cobro que ya está en amount_cents.
+    exchange_rate = models.DecimalField(
+        max_digits=10, decimal_places=4, null=True, blank=True,
+    )
+    amount_pen_cents = models.PositiveIntegerField(null=True, blank=True)
     status = models.CharField(max_length=20, choices=INVOICE_STATUS, default='draft')
     pdf_url = models.URLField(blank=True)
     period_start = models.DateTimeField(null=True, blank=True)
@@ -119,6 +136,16 @@ class Invoice(BaseModel):
     def amount_display(self) -> str:
         """Convert cents to formatted dollar amount."""
         return f"${self.amount_cents / 100:.2f}"
+
+    @property
+    def amount_pen_display(self) -> str | None:
+        """
+        Importe en soles que el cliente transfirió de verdad, o `None` si no hubo
+        conversión registrada — el llamador omite la línea, no pinta `S/ 0.00`.
+        """
+        if self.amount_pen_cents is None:
+            return None
+        return f"S/ {self.amount_pen_cents / 100:.2f}"
 
     def __str__(self) -> str:
         return f"{self.tenant.slug} — {self.amount_display} ({self.status})"
@@ -197,7 +224,25 @@ class YapePaymentProof(BaseModel):
     billing_cycle = models.CharField(
         max_length=10, choices=BILLING_CYCLE_CHOICES, default='monthly'
     )
-    amount        = models.DecimalField(max_digits=8, decimal_places=2)
+    amount        = models.DecimalField(max_digits=8, decimal_places=2)  # USD — lo que se cobra
+    # ── Testigo histórico del cobro real ──────────────────────────────────────
+    # El cliente transfiere SOLES, no dólares. La aprobación puede tardar días, y
+    # si la tasa se mueve por medio, sin estas dos columnas el importe del
+    # screenshot deja de cuadrar con lo que muestra el panel y nadie puede
+    # reconstruir por qué.
+    #
+    # NO son la fuente de verdad del cobro —esa sigue siendo `amount`, en USD—:
+    # son una foto de la tasa vigente al crear el comprobante. Se capturan en
+    # utils.currency.capture_pen_snapshot(), único sitio que las produce.
+    #
+    # NULL = sin conversión registrada (comprobantes anteriores a estos campos).
+    # NUNCA rellenar con la tasa de hoy: sería fabricar un dato histórico.
+    exchange_rate = models.DecimalField(
+        max_digits=10, decimal_places=4, null=True, blank=True,
+    )
+    amount_pen    = models.DecimalField(
+        max_digits=10, decimal_places=2, null=True, blank=True,
+    )
     status        = models.CharField(max_length=10, choices=YAPE_PROOF_STATUS, default='pending')
     admin_token   = models.CharField(max_length=64, unique=True, db_index=True)
     reviewed_at   = models.DateTimeField(null=True, blank=True)
@@ -220,6 +265,11 @@ class YapeConfig(models.Model):
     phone             = models.CharField(max_length=30, default='')
     holder_name       = models.CharField(max_length=255, default='')
     is_enabled        = models.BooleanField(default=True)
+    # DEPRECADO — la fuente de verdad es CurrencyConfig.usd_to_pen. Se mantiene
+    # sincronizado por dual-write (YapeConfigView.patch y AdminCurrencyConfigView.patch)
+    # para que ninguna lectura fuera de Python (SQL, dumps, dashboards) vea un valor
+    # obsoleto. Se elimina cuando el Admin migre al endpoint de moneda.
+    # NO leer este campo: usar utils.currency.get_exchange_rate().
     exchange_rate     = models.DecimalField(max_digits=5, decimal_places=2, default=Decimal('3.75'))
     instructions_note = models.TextField(blank=True, default='')
     updated_at        = models.DateTimeField(auto_now=True)
@@ -234,6 +284,79 @@ class YapeConfig(models.Model):
 
     def __str__(self) -> str:
         return f"YapeConfig({self.phone} — {'enabled' if self.is_enabled else 'disabled'})"
+
+
+class CurrencyConfig(models.Model):
+    """
+    Configuración de moneda de la plataforma (singleton, pk=1).
+
+    USD es la moneda base y la única en la que se persiste dinero. Este modelo
+    solo define cómo se PRESENTA: el tipo de cambio a PEN y la moneda por
+    defecto del Hub. No hereda de BaseModel a propósito — es una fila única de
+    configuración, igual que YapeConfig y FooterConfig.
+
+    Sustituye a YapeConfig.exchange_rate, que quedó acoplado a un método de pago
+    concreto siendo en realidad configuración de plataforma (el Hub necesita el
+    tipo de cambio para mostrar precios en soles, pague por Yape o no).
+
+    Leer SIEMPRE vía utils.currency.get_exchange_rate() — nunca estos campos
+    directo, que salta la caché.
+
+    Escribir SIEMPRE vía instance.save(): queryset.update() no dispara save() y
+    por tanto dejaría la caché sirviendo el valor viejo hasta 5 min.
+    """
+    CURRENCY_CHOICES = [
+        ('USD', 'US Dollar'),
+        ('PEN', 'Sol peruano'),
+    ]
+    SOURCE_CHOICES = [
+        ('manual', 'Manual'),
+        ('auto',   'Automático'),
+    ]
+
+    usd_to_pen = models.DecimalField(
+        max_digits=10,
+        decimal_places=4,
+        default=Decimal('3.7500'),
+        validators=[MinValueValidator(Decimal('0.0001'))],
+    )
+    # Moneda que el Hub muestra por defecto a quien no ha elegido nada. USD por
+    # decisión de negocio: es la moneda en la que se cobra de verdad.
+    default_display_currency = models.CharField(
+        max_length=3, choices=CURRENCY_CHOICES, default='USD'
+    )
+    # Reservado para un fetcher automático de tasas. Hoy SIEMPRE es 'manual': la
+    # vista lo fuerza y no se acepta del cliente, para que nadie pueda marcar
+    # como automática una edición hecha a mano.
+    source     = models.CharField(max_length=10, choices=SOURCE_CHOICES, default='manual')
+    updated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='+',
+    )
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'currency_config'
+
+    @classmethod
+    def get(cls) -> 'CurrencyConfig':
+        """Para ESCRITURA. Para leer, utils.currency.get_exchange_rate()."""
+        obj, _ = cls.objects.get_or_create(id=1)
+        return obj
+
+    def save(self, *args, **kwargs) -> None:
+        super().save(*args, **kwargs)
+        from utils.currency import invalidate_currency_cache
+        invalidate_currency_cache()
+
+    def __str__(self) -> str:
+        return (
+            f'CurrencyConfig(USD→PEN {self.usd_to_pen}, '
+            f'default {self.default_display_currency})'
+        )
 
 
 class Plan(models.Model):

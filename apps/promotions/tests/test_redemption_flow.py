@@ -271,7 +271,7 @@ class RedemptionLifecycleTests(APITestCase):
             'final_amount': '15.20',
         })
         self.assertEqual(payload['amount'], '15.20')
-        # El tipo de cambio real (YapeConfig) viaja en el payload para que n8n
+        # El tipo de cambio real (CurrencyConfig) viaja en el payload para que n8n
         # calcule el S/ con el mismo rate que vio el cliente
         self.assertEqual(payload['exchange_rate'], '3.75')
         # Sin el ciclo, el mensaje de Telegram deja al revisor sin saber si el importe

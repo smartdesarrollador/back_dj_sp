@@ -7,6 +7,8 @@ from celery import shared_task
 from django.conf import settings
 from django.utils import timezone
 
+from utils.currency import get_legacy_exchange_rate_str
+
 logger = logging.getLogger(__name__)
 
 
@@ -103,8 +105,6 @@ def notify_yape_payment(proof_id: str) -> None:
             'final_amount':    str(redemption.final_amount),
         }
 
-    from apps.subscriptions.models import YapeConfig
-
     payload = {
         'proof_id':      str(proof.id),
         'plan':          proof.plan,
@@ -114,7 +114,9 @@ def notify_yape_payment(proof_id: str) -> None:
         'billing_cycle': proof.billing_cycle,
         'amount':        str(proof.amount),
         'promo':         promo,
-        'exchange_rate': str(YapeConfig.get().exchange_rate),
+        # Formato heredado (2 decimales): n8n hace parseFloat, pero el mensaje de
+        # Telegram muestra el valor tal cual.
+        'exchange_rate': get_legacy_exchange_rate_str(),
         'tenant': {
             'id':        str(tenant.id),
             'name':      tenant.name,

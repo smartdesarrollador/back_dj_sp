@@ -3,17 +3,23 @@ Admin API endpoints for Yape payment configuration and proof management.
 Requires is_staff=True. Staff can configure Yape settings and review payment proofs.
 """
 import logging
+from decimal import Decimal
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.mail import send_mail
 from django.db import transaction
 from django.utils import timezone
+from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .models import YapeConfig, YapePaymentProof
+from core.mixins import AuditMixin
+from utils.currency import get_legacy_exchange_rate_str
+
+from .models import CurrencyConfig, YapeConfig, YapePaymentProof
+from .serializers import CurrencyConfigUpdateSerializer
 from .services import activate_yape_proof
 
 logger = logging.getLogger(__name__)
@@ -25,7 +31,9 @@ def _serialize_config(cfg: YapeConfig) -> dict:
         'phone':             cfg.phone,
         'holder_name':       cfg.holder_name,
         'is_enabled':        cfg.is_enabled,
-        'exchange_rate':     str(cfg.exchange_rate),
+        # La fuente de verdad es CurrencyConfig; cfg.exchange_rate es una sombra
+        # dual-escrita que se elimina cuando el Admin migre al endpoint de moneda.
+        'exchange_rate':     get_legacy_exchange_rate_str(),
         'instructions_note': cfg.instructions_note,
         'updated_at':        cfg.updated_at.isoformat() if cfg.updated_at else None,
     }
@@ -55,6 +63,13 @@ def _serialize_proof(proof: YapePaymentProof) -> dict:
         # anómalo — y al aprobar activa 30 o 365 días según cuál sea.
         'billing_cycle':  proof.billing_cycle,
         'amount':         str(proof.amount),
+        # Soles que el cliente transfirió de verdad, con la tasa de ESE momento —
+        # es contra lo que el revisor compara el screenshot. `None` en comprobantes
+        # anteriores al snapshot: el panel dice "sin conversión registrada" en vez
+        # de recalcular con la tasa de hoy, que es lo que hace irreconstruible el
+        # descuadre.
+        'exchange_rate':  str(proof.exchange_rate) if proof.exchange_rate is not None else None,
+        'amount_pen':     str(proof.amount_pen) if proof.amount_pen is not None else None,
         'promo':          promo,
         'status':         proof.status,
         'tenant_name':    tenant.name,
@@ -73,20 +88,27 @@ class YapeConfigPublicView(APIView):
     authentication_classes = []
 
     def get(self, request):
-        cfg = YapeConfig.get()
-        return Response({
-            'phone':             cfg.phone,
-            'holder_name':       cfg.holder_name,
-            'is_enabled':        cfg.is_enabled,
-            'exchange_rate':     str(cfg.exchange_rate),
-            'instructions_note': cfg.instructions_note,
-        })
+        # Reutiliza _serialize_config en vez de duplicar el dict: eran dos copias
+        # del mismo contrato y solo una leía la fuente de verdad nueva.
+        # `updated_at` se descarta a propósito — el contrato público son 5 claves
+        # y ampliarlo aquí no aporta nada al Hub.
+        data = _serialize_config(YapeConfig.get())
+        data.pop('updated_at', None)
+        return Response(data)
 
 
 # ── Admin config endpoint ─────────────────────────────────────────────────────
 
-class YapeConfigView(APIView):
-    """GET/PATCH Yape configuration. Staff only."""
+class YapeConfigView(AuditMixin, APIView):
+    """
+    GET/PATCH Yape configuration. Staff only.
+
+    `exchange_rate` ya no se guarda aquí: su fuente de verdad es CurrencyConfig y
+    este endpoint actúa de fachada mientras el Admin no migre a
+    /admin/billing/currency/. Se valida con el mismo serializer que el endpoint
+    nuevo — un tipo de cambio mal tecleado multiplica todos los precios que ve el
+    cliente, así que no puede entrar por la puerta de atrás sin validar.
+    """
     permission_classes = [IsAuthenticated]
 
     def _check_staff(self, request):
@@ -103,10 +125,41 @@ class YapeConfigView(APIView):
         if err := self._check_staff(request):
             return err
         cfg = YapeConfig.get()
-        allowed = {'phone', 'holder_name', 'is_enabled', 'exchange_rate', 'instructions_note'}
+        allowed = {'phone', 'holder_name', 'is_enabled', 'instructions_note'}
         for field, value in request.data.items():
             if field in allowed:
                 setattr(cfg, field, value)
+
+        # El tipo de cambio se redirige a CurrencyConfig, validado. El orden
+        # importa: currency.save() invalida la caché ANTES de que
+        # _serialize_config la vuelva a leer, así el PATCH devuelve el valor nuevo.
+        if 'exchange_rate' in request.data:
+            serializer = CurrencyConfigUpdateSerializer(
+                data={'usd_to_pen': request.data['exchange_rate']}, partial=True
+            )
+            if not serializer.is_valid():
+                # Re-etiquetado: este endpoint habla 'exchange_rate'. Devolver el
+                # error bajo 'usd_to_pen' obligaría al form del Admin a conocer el
+                # nombre interno del modelo nuevo.
+                raise ValidationError(
+                    {'exchange_rate': serializer.errors.get('usd_to_pen', ['Valor inválido.'])}
+                )
+            currency = CurrencyConfig.get()
+            before = currency.usd_to_pen
+            currency.usd_to_pen = serializer.validated_data['usd_to_pen']
+            currency.source     = 'manual'
+            currency.updated_by = request.user
+            currency.save()
+            cfg.exchange_rate = currency.usd_to_pen.quantize(Decimal('0.01'))  # sombra
+            self.log_action(
+                request, 'update', 'currency_config', '1',
+                extra={
+                    'usd_to_pen_before': str(before),
+                    'usd_to_pen_after':  str(currency.usd_to_pen),
+                    'via': 'legacy_yape_endpoint',
+                },
+            )
+
         cfg.save()
         return Response(_serialize_config(cfg))
 

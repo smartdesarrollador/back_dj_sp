@@ -17,7 +17,7 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from apps.promotions.models import Promotion
-from apps.subscriptions.models import Plan, YapeConfig
+from apps.subscriptions.models import CurrencyConfig, Plan
 
 _FAST_HASHERS = ['django.contrib.auth.hashers.MD5PasswordHasher']
 _LOCMEM_CACHE = {'default': {'BACKEND': 'django.core.cache.backends.locmem.LocMemCache'}}
@@ -47,9 +47,12 @@ class PromotionValidateTests(APITestCase):
         Plan.objects.create(
             id='starter', display_name='Starter', price_monthly=19, price_annual=200,
         )
-        cfg = YapeConfig.get()
-        cfg.exchange_rate = Decimal('3.75')
-        cfg.save(update_fields=['exchange_rate'])
+        # Fuente de verdad del tipo de cambio: CurrencyConfig (YapeConfig.exchange_rate
+        # es una sombra deprecada). Fijarlo aquí y no confiar en el default hace que
+        # el test siga detectando regresiones si el default cambiara.
+        cfg = CurrencyConfig.get()
+        cfg.usd_to_pen = Decimal('3.7500')
+        cfg.save(update_fields=['usd_to_pen'])
 
     def _validate(self, code='VERANO20', plan='starter', **extra):
         payload = {'code': code, 'plan': plan, **extra}

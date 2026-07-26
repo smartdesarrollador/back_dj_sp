@@ -41,6 +41,11 @@ def _latest_paid_invoices(tenant_ids):
     return (
         Invoice.objects.filter(
             tenant_id__in=tenant_ids, status='paid', period_end__isnull=False,
+            # MRR/ARR se expresan en USD y se suman como enteros de centavos: una
+            # factura en otra moneda (posible vía el sync de Stripe) sumaría euros
+            # como si fueran dólares. Se EXCLUYE en vez de convertirse — no tenemos
+            # su tasa histórica y convertirla con la de hoy inventaría un ingreso.
+            currency='usd',
         )
         .order_by('tenant_id', '-period_end')
         .distinct('tenant_id')
@@ -68,6 +73,8 @@ def _compute_admin_summary(own_tenant_id, period_days: int) -> dict:
     latest_paid = list(_latest_paid_invoices(other_tenant_ids))
     covered = [inv for inv in latest_paid if inv.period_end >= now]
     covered_tenant_ids = {inv.tenant_id for inv in covered}
+    # NUNCA sumar aquí `amount_pen_cents`: no es un ingreso adicional, es una
+    # anotación sobre el mismo cobro que ya está en amount_cents.
     mrr = round(sum(inv.amount_cents for inv in covered) / 100, 2)
     arr = round(mrr * 12, 2)
     avg_revenue_per_user = round(mrr / total_users, 2) if total_users else 0.0

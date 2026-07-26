@@ -97,6 +97,8 @@ def activate_subscription_plan(
     amount: Decimal,
     invoice_ref: str,
     billing_cycle: str = 'monthly',
+    exchange_rate: Decimal | None = None,
+    amount_pen: Decimal | None = None,
 ) -> Invoice:
     """
     Activa un plan de pago: Subscription/Tenant activos por el ciclo pagado (30 o
@@ -113,11 +115,21 @@ def activate_subscription_plan(
     `renewal_reminders_sent`) que consume la tarea de expiración, y revoca una
     cancelación pendiente (`cancel_at_period_end`).
 
+    `exchange_rate`/`amount_pen` son el testigo histórico del cobro: se **reciben**
+    del comprobante que originó el pago, no se consultan aquí. Consultar la tasa al
+    activar sería el bug que estos campos existen para evitar: la aprobación ocurre
+    días después del pago y la tasa puede haberse movido. `None` cuando no hubo
+    conversión (cupón 100%, Stripe).
+
     Raises:
-        ValueError: ciclo de facturación desconocido.
+        ValueError: ciclo de facturación desconocido, o snapshot incompleto.
     """
     if billing_cycle not in PERIOD_DAYS:
         raise ValueError(f'Unknown billing cycle: {billing_cycle}')
+    # Ambos o ninguno: una tasa sin importe (o al revés) es peor que no tener nada,
+    # porque aparenta trazabilidad.
+    if (exchange_rate is None) != (amount_pen is None):
+        raise ValueError('exchange_rate y amount_pen deben venir juntos o ninguno.')
 
     tenant = subscription.tenant
     now = timezone.now()
@@ -163,6 +175,10 @@ def activate_subscription_plan(
             stripe_invoice_id=invoice_ref,
             amount_cents=int(amount * 100),
             currency='usd',
+            exchange_rate=exchange_rate,
+            # `amount_pen` ya viene quantizado a 2 decimales desde
+            # capture_pen_snapshot, así que el ×100 es exacto.
+            amount_pen_cents=None if amount_pen is None else int(amount_pen * 100),
             status='paid',
             period_start=invoice_period_start,
             period_end=period_end,
@@ -188,6 +204,12 @@ def activate_yape_proof(proof: YapePaymentProof) -> Invoice:
             amount=proof.amount,
             invoice_ref=f'yape_{proof.id}',
             billing_cycle=proof.billing_cycle,
+            # Se heredan del comprobante tal cual, aunque la tasa vigente HOY sea
+            # otra: la factura debe reflejar lo que vio y pagó el cliente. Los
+            # comprobantes anteriores al snapshot los traen a None, y la factura
+            # queda igual — en vez de inventarle una conversión.
+            exchange_rate=proof.exchange_rate,
+            amount_pen=proof.amount_pen,
         )
         proof.status = 'approved'
         proof.reviewed_at = timezone.now()
