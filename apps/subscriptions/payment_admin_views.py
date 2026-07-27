@@ -1,63 +1,30 @@
 """
-Admin API endpoints for Yape payment configuration and proof management.
-Requires is_staff=True. Staff can configure Yape settings and review payment proofs.
+Cola de comprobantes de pago manual para el Admin Panel: listado con filtros y
+revisión (aprobar / rechazar). Requiere `is_staff=True`.
+
+La configuración de cada método vive en `payment_method_views.py`, bajo el mismo
+prefijo `/admin/payments/`.
 """
 import logging
-from decimal import Decimal
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.mail import send_mail
 from django.db import transaction
 from django.utils import timezone
-from rest_framework.exceptions import ValidationError
-from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from core.mixins import AuditMixin
-from utils.currency import get_legacy_exchange_rate_str
-
-from .models import CurrencyConfig, PaymentMethodConfig, YapeConfig, YapePaymentProof
+from .models import PaymentProof
 from .payment_methods import PAYMENT_METHODS, charge_currency
-from .serializers import CurrencyConfigUpdateSerializer
-from .services import activate_yape_proof
+from .services import activate_payment_proof
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
 
 
-def _yape_config() -> PaymentMethodConfig:
-    """
-    Fila `yape` de PaymentMethodConfig, que es donde viven ahora los datos de cobro.
-    `get_or_create` por si alguien despliega sobre una BD que no pasó por la data
-    migration; el caso normal es que la fila ya exista.
-    """
-    config, _ = PaymentMethodConfig.objects.get_or_create(
-        method='yape', defaults={'display_name': 'Yape', 'is_enabled': True, 'sort_order': 10},
-    )
-    return config
-
-
-def _serialize_config(cfg: PaymentMethodConfig) -> dict:
-    """
-    Contrato heredado del endpoint de Yape: **exactamente estas claves**. El Hub y el
-    Admin en producción lo consumen, así que no se amplía ni se renombra aquí — los
-    datos nuevos (métodos, PayPal) viven en /payment-methods/.
-    """
-    return {
-        'phone':             cfg.phone,
-        'holder_name':       cfg.holder_name,
-        'is_enabled':        cfg.is_enabled,
-        # La fuente de verdad es CurrencyConfig; el `exchange_rate` de YapeConfig es una
-        # sombra dual-escrita que se elimina cuando el Admin migre al endpoint de moneda.
-        'exchange_rate':     get_legacy_exchange_rate_str(),
-        'instructions_note': cfg.instructions_note,
-        'updated_at':        cfg.updated_at.isoformat() if cfg.updated_at else None,
-    }
-
-
-def _serialize_proof(proof: YapePaymentProof) -> dict:
+def _serialize_proof(proof: PaymentProof) -> dict:
     base_url = getattr(settings, 'APP_BASE_URL', '').rstrip('/')
     tenant   = proof.subscription.tenant
     owner    = tenant.users.order_by('created_at').first()
@@ -104,105 +71,17 @@ def _serialize_proof(proof: YapePaymentProof) -> dict:
     }
 
 
-# ── Public config endpoint (no auth) ─────────────────────────────────────────
-
-class YapeConfigPublicView(APIView):
-    """Public endpoint — Hub reads this to display Yape payment instructions."""
-    permission_classes     = [AllowAny]
-    authentication_classes = []
-
-    def get(self, request):
-        # Reutiliza _serialize_config en vez de duplicar el dict: eran dos copias
-        # del mismo contrato y solo una leía la fuente de verdad nueva.
-        # `updated_at` se descarta a propósito — el contrato público son 5 claves
-        # y ampliarlo aquí no aporta nada al Hub.
-        data = _serialize_config(_yape_config())
-        data.pop('updated_at', None)
-        return Response(data)
-
-
-# ── Admin config endpoint ─────────────────────────────────────────────────────
-
-class YapeConfigView(AuditMixin, APIView):
-    """
-    GET/PATCH Yape configuration. Staff only.
-
-    `exchange_rate` ya no se guarda aquí: su fuente de verdad es CurrencyConfig y
-    este endpoint actúa de fachada mientras el Admin no migre a
-    /admin/billing/currency/. Se valida con el mismo serializer que el endpoint
-    nuevo — un tipo de cambio mal tecleado multiplica todos los precios que ve el
-    cliente, así que no puede entrar por la puerta de atrás sin validar.
-    """
-    permission_classes = [IsAuthenticated]
-
-    def _check_staff(self, request):
-        if not request.user.is_staff:
-            return Response({'detail': 'Staff access required.'}, status=403)
-        return None
-
-    def get(self, request):
-        if err := self._check_staff(request):
-            return err
-        return Response(_serialize_config(_yape_config()))
-
-    def patch(self, request):
-        if err := self._check_staff(request):
-            return err
-        cfg = _yape_config()
-        allowed = {'phone', 'holder_name', 'is_enabled', 'instructions_note'}
-        for field, value in request.data.items():
-            if field in allowed:
-                setattr(cfg, field, value)
-
-        # El tipo de cambio se redirige a CurrencyConfig, validado. El orden
-        # importa: currency.save() invalida la caché ANTES de que
-        # _serialize_config la vuelva a leer, así el PATCH devuelve el valor nuevo.
-        if 'exchange_rate' in request.data:
-            serializer = CurrencyConfigUpdateSerializer(
-                data={'usd_to_pen': request.data['exchange_rate']}, partial=True
-            )
-            if not serializer.is_valid():
-                # Re-etiquetado: este endpoint habla 'exchange_rate'. Devolver el
-                # error bajo 'usd_to_pen' obligaría al form del Admin a conocer el
-                # nombre interno del modelo nuevo.
-                raise ValidationError(
-                    {'exchange_rate': serializer.errors.get('usd_to_pen', ['Valor inválido.'])}
-                )
-            currency = CurrencyConfig.get()
-            before = currency.usd_to_pen
-            currency.usd_to_pen = serializer.validated_data['usd_to_pen']
-            currency.source     = 'manual'
-            currency.updated_by = request.user
-            currency.save()
-            # Sombra en YapeConfig, que ya no guarda datos de cobro pero sigue siendo
-            # el hogar del `exchange_rate` heredado hasta su retirada.
-            yape_legacy = YapeConfig.get()
-            yape_legacy.exchange_rate = currency.usd_to_pen.quantize(Decimal('0.01'))
-            yape_legacy.save(update_fields=['exchange_rate', 'updated_at'])
-            self.log_action(
-                request, 'update', 'currency_config', '1',
-                extra={
-                    'usd_to_pen_before': str(before),
-                    'usd_to_pen_after':  str(currency.usd_to_pen),
-                    'via': 'legacy_yape_endpoint',
-                },
-            )
-
-        cfg.save()
-        return Response(_serialize_config(cfg))
-
-
 # ── Admin proofs list ─────────────────────────────────────────────────────────
 
-class YapeProofListView(APIView):
-    """GET paginated list of Yape payment proofs. Staff only."""
+class ProofListView(APIView):
+    """Listado paginado de comprobantes de pago, de todos los métodos. Solo staff."""
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
         if not request.user.is_staff:
             return Response({'detail': 'Staff access required.'}, status=403)
 
-        qs = YapePaymentProof.objects.select_related(
+        qs = PaymentProof.objects.select_related(
             'subscription__tenant', 'redemption__promotion'
         ).order_by('-created_at')
 
@@ -239,7 +118,7 @@ class YapeProofListView(APIView):
         proofs  = qs[offset: offset + per_page]
 
         # KPI counts (unfiltered by date/plan but respecting current filters for totals)
-        all_proofs = YapePaymentProof.objects.all()
+        all_proofs = PaymentProof.objects.all()
         kpi = {
             'total':    all_proofs.count(),
             'pending':  all_proofs.filter(status='pending').count(),
@@ -261,8 +140,8 @@ class YapeProofListView(APIView):
 
 # ── Admin proof review (approve / reject) ────────────────────────────────────
 
-class YapeProofReviewView(APIView):
-    """PATCH to approve or reject a Yape payment proof. Staff only."""
+class ProofReviewView(APIView):
+    """Aprueba o rechaza un comprobante de pago. Solo staff."""
     permission_classes = [IsAuthenticated]
 
     def patch(self, request, proof_id):
@@ -274,10 +153,10 @@ class YapeProofReviewView(APIView):
             return Response({'detail': 'status must be "approved" or "rejected".'}, status=400)
 
         try:
-            proof = YapePaymentProof.objects.select_related(
+            proof = PaymentProof.objects.select_related(
                 'subscription__tenant'
             ).get(pk=proof_id)
-        except YapePaymentProof.DoesNotExist:
+        except PaymentProof.DoesNotExist:
             return Response({'detail': 'Proof not found.'}, status=404)
 
         if proof.status != 'pending':
@@ -286,9 +165,12 @@ class YapeProofReviewView(APIView):
         tenant       = proof.subscription.tenant
         subscription = proof.subscription
         hub_url      = getattr(settings, 'FRONTEND_HUB_URL', '').rstrip('/')
+        # El correo nombra el método por el que pagó de verdad: decirle «tu pago Yape»
+        # a quien pagó por PayPal le hace dudar de si el mensaje es para él.
+        method_label = proof.get_method_display()
 
         if new_status == 'approved':
-            activate_yape_proof(proof)
+            activate_payment_proof(proof)
 
             owner = tenant.users.order_by('created_at').first()
             if owner:
@@ -296,7 +178,7 @@ class YapeProofReviewView(APIView):
                     subject='¡Tu cuenta ha sido activada!',
                     message=(
                         f"Hola {owner.name},\n\n"
-                        f"Tu pago Yape fue verificado exitosamente. "
+                        f"Tu pago por {method_label} fue verificado exitosamente. "
                         f"Tu plan {proof.plan.capitalize()} ya está activo.\n\n"
                         f"Ingresa a tu cuenta: {hub_url}/login\n\n"
                         f"Saludos,\nEl equipo"
@@ -305,7 +187,7 @@ class YapeProofReviewView(APIView):
                     recipient_list=[owner.email],
                     fail_silently=True,
                 )
-            logger.info('YapeReview: proof %s approved by staff %s', proof.id, request.user.email)
+            logger.info('ProofReview: proof %s approved by staff %s', proof.id, request.user.email)
 
         else:  # rejected
             from apps.promotions.services import release_redemption_for_proof
@@ -324,10 +206,10 @@ class YapeProofReviewView(APIView):
             owner = tenant.users.order_by('created_at').first()
             if owner:
                 send_mail(
-                    subject='Tu pago Yape no pudo ser verificado',
+                    subject=f'Tu pago por {method_label} no pudo ser verificado',
                     message=(
                         f"Hola {owner.name},\n\n"
-                        f"Lamentablemente no pudimos verificar tu comprobante de pago Yape "
+                        f"Lamentablemente no pudimos verificar tu comprobante de pago por {method_label} "
                         f"para el plan {proof.plan.capitalize()}.\n\n"
                         f"Tu cuenta continúa activa con el plan Free. "
                         f"Si deseas intentarlo de nuevo o tienes dudas, contáctanos respondiendo este email.\n\n"
@@ -338,6 +220,6 @@ class YapeProofReviewView(APIView):
                     recipient_list=[owner.email],
                     fail_silently=True,
                 )
-            logger.info('YapeReview: proof %s rejected by staff %s', proof.id, request.user.email)
+            logger.info('ProofReview: proof %s rejected by staff %s', proof.id, request.user.email)
 
         return Response(_serialize_proof(proof))

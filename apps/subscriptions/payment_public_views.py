@@ -1,5 +1,5 @@
 """
-Public one-click endpoints for admin Yape payment approval/rejection.
+Enlaces de un clic para aprobar o rechazar un comprobante de pago manual.
 Accessed via links sent in Telegram. No JWT auth — admin_token is the credential.
 
 GET  → confirmation page (safe for link-preview bots / crawlers)
@@ -16,7 +16,7 @@ from django.utils import timezone
 from rest_framework.permissions import AllowAny
 from rest_framework.views import APIView
 
-from .services import activate_yape_proof
+from .services import activate_payment_proof
 
 logger = logging.getLogger(__name__)
 
@@ -99,12 +99,12 @@ def _confirm_page(title: str, body: str, action_url: str,
 
 
 def _get_proof(token: str):
-    from apps.subscriptions.models import YapePaymentProof
+    from apps.subscriptions.models import PaymentProof
     try:
-        return YapePaymentProof.objects.select_related(
+        return PaymentProof.objects.select_related(
             'subscription__tenant'
         ).get(admin_token=token), None
-    except YapePaymentProof.DoesNotExist:
+    except PaymentProof.DoesNotExist:
         return None, _html_page('Enlace inválido', 'Este enlace no existe o ya no es válido.', '#ef4444')
 
 
@@ -115,7 +115,7 @@ def _already_processed(proof) -> HttpResponse | None:
     return None
 
 
-class YapeActivateView(APIView):
+class ProofActivateView(APIView):
     """
     GET  → Confirmation page (safe: link-preview bots hit this but nothing happens).
     POST → Activates the tenant subscription to the paid plan.
@@ -132,7 +132,7 @@ class YapeActivateView(APIView):
 
         tenant = proof.subscription.tenant
         return _confirm_page(
-            title='Aprobar pago Yape',
+            title=f'Aprobar pago por {proof.get_method_display()}',
             body=(
                 f'¿Confirmas que el pago de <strong>{tenant.name}</strong> '
                 f'es válido y deseas activar el plan '
@@ -152,7 +152,7 @@ class YapeActivateView(APIView):
 
         tenant = proof.subscription.tenant
 
-        activate_yape_proof(proof)
+        activate_payment_proof(proof)
 
         owner = tenant.users.order_by('created_at').first()
         if owner:
@@ -161,7 +161,7 @@ class YapeActivateView(APIView):
                 subject='¡Tu cuenta ha sido activada!',
                 message=(
                     f"Hola {owner.name},\n\n"
-                    f"Tu pago Yape fue verificado exitosamente. "
+                    f"Tu pago por {proof.get_method_display()} fue verificado exitosamente. "
                     f"Tu plan {proof.plan.capitalize()} ya está activo.\n\n"
                     f"Ingresa a tu cuenta: {hub_url}/login\n\n"
                     f"Saludos,\nEl equipo"
@@ -170,7 +170,7 @@ class YapeActivateView(APIView):
                 recipient_list=[owner.email],
                 fail_silently=True,
             )
-            logger.info('YapeActivate: proof %s approved, email sent to %s', proof.id, owner.email)
+            logger.info('ProofActivate: proof %s approved, email sent to %s', proof.id, owner.email)
 
         return _html_page(
             'Cuenta Activada',
@@ -179,7 +179,7 @@ class YapeActivateView(APIView):
         )
 
 
-class YapeRejectView(APIView):
+class ProofRejectView(APIView):
     """
     GET  → Confirmation page (safe: link-preview bots hit this but nothing happens).
     POST → Marks the proof as rejected; tenant stays on Free plan.
@@ -196,7 +196,7 @@ class YapeRejectView(APIView):
 
         tenant = proof.subscription.tenant
         return _confirm_page(
-            title='Rechazar pago Yape',
+            title=f'Rechazar pago por {proof.get_method_display()}',
             body=(
                 f'¿Confirmas que el comprobante de <strong>{tenant.name}</strong> '
                 f'para el plan <strong>{proof.plan.capitalize()}</strong> NO es válido?'
@@ -233,10 +233,11 @@ class YapeRejectView(APIView):
         owner = tenant.users.order_by('created_at').first()
         if owner:
             send_mail(
-                subject='Tu pago Yape no pudo ser verificado',
+                subject=f'Tu pago por {proof.get_method_display()} no pudo ser verificado',
                 message=(
                     f"Hola {owner.name},\n\n"
-                    f"Lamentablemente no pudimos verificar tu comprobante de pago Yape "
+                    f"Lamentablemente no pudimos verificar tu comprobante de pago por "
+                    f"{proof.get_method_display()} "
                     f"para el plan {proof.plan.capitalize()}.\n\n"
                     f"Tu cuenta continúa activa con el plan Free. "
                     f"Si deseas intentarlo de nuevo o tienes dudas, "
@@ -248,7 +249,7 @@ class YapeRejectView(APIView):
                 recipient_list=[owner.email],
                 fail_silently=True,
             )
-            logger.info('YapeReject: proof %s rejected, email sent to %s', proof.id, owner.email)
+            logger.info('ProofReject: proof %s rejected, email sent to %s', proof.id, owner.email)
 
         return _html_page(
             'Pago Rechazado',

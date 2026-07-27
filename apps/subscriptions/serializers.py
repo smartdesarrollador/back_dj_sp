@@ -312,7 +312,7 @@ class CurrentSubscriptionSerializer(serializers.ModelSerializer):
 
     def get_has_pending_proof(self, obj) -> bool:
         """Comprobante esperando revisión: el Hub deshabilita el CTA de pago."""
-        return obj.yape_proofs.filter(status='pending').exists()
+        return obj.payment_proofs.filter(status='pending').exists()
 
     def get_pending_plan(self, obj) -> str | None:
         """

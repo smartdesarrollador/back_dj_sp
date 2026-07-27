@@ -7,7 +7,7 @@ from celery import shared_task
 from django.conf import settings
 from django.utils import timezone
 
-from utils.currency import get_legacy_exchange_rate_str
+from utils.currency import get_exchange_rate
 
 logger = logging.getLogger(__name__)
 
@@ -64,31 +64,31 @@ def _audit_subscription(subscription, action: str, extra: dict) -> None:
 
 
 @shared_task(
-    name='apps.subscriptions.tasks.notify_yape_payment',
+    name='apps.subscriptions.tasks.notify_payment_proof',
     ignore_result=True,
     autoretry_for=(Exception,),
     max_retries=3,
     retry_backoff=10,
 )
-def notify_yape_payment(proof_id: str) -> None:
+def notify_payment_proof(proof_id: str) -> None:
     """
-    POST to the n8n webhook with Yape proof data so n8n can:
-    1. Analyze the screenshot with OpenAI vision
-    2. Send a Telegram message with approve/reject one-click links
+    Avisa al webhook de n8n de un comprobante nuevo para que:
+    1. analice la captura con OpenAI Vision, con el prompt del método que corresponda
+    2. mande a Telegram el mensaje con los enlaces de aprobar / rechazar
     """
-    from apps.subscriptions.models import YapePaymentProof
+    from apps.subscriptions.models import PaymentProof
 
     try:
-        proof = YapePaymentProof.objects.select_related(
+        proof = PaymentProof.objects.select_related(
             'subscription__tenant'
         ).get(pk=proof_id)
-    except YapePaymentProof.DoesNotExist:
-        logger.error('notify_yape_payment: YapePaymentProof %s not found', proof_id)
+    except PaymentProof.DoesNotExist:
+        logger.error('notify_payment_proof: PaymentProof %s not found', proof_id)
         return
 
-    webhook_url = getattr(settings, 'N8N_YAPE_PAYMENT_WEBHOOK_URL', '')
+    webhook_url = getattr(settings, 'N8N_PAYMENT_WEBHOOK_URL', '')
     if not webhook_url:
-        logger.warning('notify_yape_payment: N8N_YAPE_PAYMENT_WEBHOOK_URL not configured')
+        logger.warning('notify_payment_proof: N8N_PAYMENT_WEBHOOK_URL not configured')
         return
 
     tenant = proof.subscription.tenant
@@ -120,9 +120,9 @@ def notify_yape_payment(proof_id: str) -> None:
         'billing_cycle': proof.billing_cycle,
         'amount':        str(proof.amount),
         'promo':         promo,
-        # Formato heredado (2 decimales): n8n hace parseFloat, pero el mensaje de
-        # Telegram muestra el valor tal cual.
-        'exchange_rate': get_legacy_exchange_rate_str(),
+        # 4 decimales, como el resto del sistema. n8n hace parseFloat y solo lo usa
+        # para el importe orientativo en soles del mensaje de Telegram.
+        'exchange_rate': str(get_exchange_rate()),
         'tenant': {
             'id':        str(tenant.id),
             'name':      tenant.name,
@@ -134,15 +134,15 @@ def notify_yape_payment(proof_id: str) -> None:
             'email': owner.email if owner else '',
         },
         'image_url':   f"{base_url}/media/{proof.screenshot.name}",
-        'approve_url': f"{base_url}/api/v1/public/yape-payment/activate/{proof.admin_token}/",
-        'reject_url':  f"{base_url}/api/v1/public/yape-payment/reject/{proof.admin_token}/",
+        'approve_url': f"{base_url}/api/v1/public/payments/activate/{proof.admin_token}/",
+        'reject_url':  f"{base_url}/api/v1/public/payments/reject/{proof.admin_token}/",
         'submitted_at': timezone.now().isoformat(),
     }
 
     response = requests.post(webhook_url, json=payload, timeout=30)
     response.raise_for_status()
     logger.info(
-        'notify_yape_payment: proof %s sent to n8n (status=%s)',
+        'notify_payment_proof: proof %s sent to n8n (status=%s)',
         proof_id, response.status_code,
     )
 
@@ -278,7 +278,7 @@ def expire_paid_subscriptions(dry_run: bool = False) -> dict:
          y `Subscription.plan` a 'free'. El gating (check_plan_limit / plan_has_feature)
          lee `Tenant.plan`, así que el acceso cae solo — ver ADR-008, decisión 1.
 
-    No degrada si hay un comprobante Yape `pending`: el cobro es manual y lo revisa una
+    No degrada si hay un comprobante de pago `pending`: el cobro es manual y lo revisa una
     persona, así que cortarle a quien ya pagó sería el peor fallo posible. Sin cota de
     tiempo, pero con WARNING y contador en el resumen para que se vea.
 
@@ -366,7 +366,7 @@ def expire_paid_subscriptions(dry_run: bool = False) -> dict:
     ).exclude(plan='free').select_related('tenant')
 
     for sub in expiring:
-        pending = sub.yape_proofs.filter(status='pending').order_by('created_at').first()
+        pending = sub.payment_proofs.filter(status='pending').order_by('created_at').first()
         if pending is not None:
             summary['skipped_pending_proof'] += 1
             summary['details'].append((sub.tenant.slug, sub.tenant.plan, 'skipped_pending_proof'))

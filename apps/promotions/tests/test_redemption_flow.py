@@ -1,6 +1,6 @@
 """
 Tests E2E del flujo de canje: registro con plan pago → upload del comprobante
-Yape con cupón → aprobación/rechazo → ciclo de vida de la redemption.
+Pago manual con cupón → aprobación/rechazo → ciclo de vida de la redemption.
 
 Covers: monto SIEMPRE server-side (el amount del cliente se ignora), redemption
 pending al subir, token peek/consume (un cupón rechazado en submit no quema el
@@ -22,8 +22,8 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from apps.promotions.models import Promotion, PromotionRedemption
-from apps.subscriptions.models import Invoice, Plan, Subscription, YapePaymentProof
-from apps.subscriptions.services import activate_yape_proof
+from apps.subscriptions.models import Invoice, Plan, Subscription, PaymentProof
+from apps.subscriptions.services import activate_payment_proof
 from apps.tenants.models import Tenant
 from core.tests.helpers import png_bytes
 
@@ -33,8 +33,8 @@ _FAST_HASHERS = ['django.contrib.auth.hashers.MD5PasswordHasher']
 _LOCMEM_CACHE = {'default': {'BACKEND': 'django.core.cache.backends.locmem.LocMemCache'}}
 
 REGISTER_URL = '/api/v1/auth/register'
-PROOF_URL = '/api/v1/auth/yape-payment-proof'
-ACTIVATE_FREE_URL = '/api/v1/auth/yape-activate-free'
+PROOF_URL = '/api/v1/auth/payment-proof'
+ACTIVATE_FREE_URL = '/api/v1/auth/activate-free-plan'
 
 
 def _register_payload(**kwargs):
@@ -69,7 +69,7 @@ def _screenshot():
 
 
 @override_settings(PASSWORD_HASHERS=_FAST_HASHERS, CACHES=_LOCMEM_CACHE)
-class YapeProofWithPromoTests(APITestCase):
+class ProofWithPromoTests(APITestCase):
     """Upload del comprobante: recálculo server-side y creación de la redemption."""
 
     def setUp(self):
@@ -92,7 +92,7 @@ class YapeProofWithPromoTests(APITestCase):
         }
         if promo_code is not None:
             data['promo_code'] = promo_code
-        with patch('apps.subscriptions.tasks.notify_yape_payment.delay') as mock_delay:
+        with patch('apps.subscriptions.tasks.notify_payment_proof.delay') as mock_delay:
             response = self.client.post(PROOF_URL, data, format='multipart')
         return response, mock_delay
 
@@ -100,7 +100,7 @@ class YapeProofWithPromoTests(APITestCase):
         token = self._register_paid()
         response, mock_delay = self._upload(token, amount='0.01')
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        proof = YapePaymentProof.objects.get(pk=response.data['proof_id'])
+        proof = PaymentProof.objects.get(pk=response.data['proof_id'])
         self.assertEqual(proof.amount, Decimal('19.00'))  # precio Plan, no el 0.01 del cliente
         self.assertFalse(PromotionRedemption.objects.exists())
         mock_delay.assert_called_once_with(str(proof.id))
@@ -109,7 +109,7 @@ class YapeProofWithPromoTests(APITestCase):
         Plan.objects.all().delete()
         token = self._register_paid()
         response, _ = self._upload(token)
-        proof = YapePaymentProof.objects.get(pk=response.data['proof_id'])
+        proof = PaymentProof.objects.get(pk=response.data['proof_id'])
         self.assertEqual(proof.amount, Decimal('29.00'))  # PLAN_CATALOG starter
 
     def test_upload_with_promo_creates_pending_redemption(self):
@@ -118,7 +118,7 @@ class YapeProofWithPromoTests(APITestCase):
         response, _ = self._upload(token, promo_code='verano20')
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
-        proof = YapePaymentProof.objects.get(pk=response.data['proof_id'])
+        proof = PaymentProof.objects.get(pk=response.data['proof_id'])
         self.assertEqual(proof.amount, Decimal('15.20'))  # 19 − 20%
 
         redemption = proof.redemption
@@ -137,7 +137,7 @@ class YapeProofWithPromoTests(APITestCase):
         response, mock_delay = self._upload(token, promo_code='VERANO20')
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(response.data.get('promo_reason'), 'depleted')
-        self.assertFalse(YapePaymentProof.objects.exists())
+        self.assertFalse(PaymentProof.objects.exists())
         mock_delay.assert_not_called()
 
         # El token sigue vivo: reintento sin cupón funciona
@@ -159,7 +159,7 @@ class YapeProofWithPromoTests(APITestCase):
 
         # Mismo tenant intenta canjear otra vez (nuevo token simulado)
         from apps.auth_app.tokens import create_payment_upload_token
-        tenant = YapePaymentProof.objects.first().subscription.tenant
+        tenant = PaymentProof.objects.first().subscription.tenant
         token2 = create_payment_upload_token(str(tenant.id))
         second, _ = self._upload(token2, promo_code='VERANO20')
         self.assertEqual(second.status_code, status.HTTP_400_BAD_REQUEST)
@@ -184,7 +184,7 @@ class RedemptionLifecycleTests(APITestCase):
         self.subscription.status = 'pending_payment'
         self.subscription.save(update_fields=['plan', 'status', 'updated_at'])
 
-        self.proof = YapePaymentProof.objects.create(
+        self.proof = PaymentProof.objects.create(
             subscription=self.subscription,
             screenshot=_screenshot(),
             plan='starter',
@@ -194,7 +194,7 @@ class RedemptionLifecycleTests(APITestCase):
         self.redemption = PromotionRedemption.objects.create(
             promotion=self.promo,
             tenant=self.tenant,
-            yape_proof=self.proof,
+            payment_proof=self.proof,
             plan='starter',
             original_amount=Decimal('19.00'),
             discount_amount=Decimal('3.80'),
@@ -202,7 +202,7 @@ class RedemptionLifecycleTests(APITestCase):
         )
 
     def test_approve_confirms_redemption_and_counts_use(self):
-        invoice = activate_yape_proof(self.proof)
+        invoice = activate_payment_proof(self.proof)
 
         self.redemption.refresh_from_db()
         self.promo.refresh_from_db()
@@ -220,7 +220,7 @@ class RedemptionLifecycleTests(APITestCase):
         self.promo.current_uses = 1
         self.promo.save(update_fields=['max_uses', 'current_uses'])
 
-        activate_yape_proof(self.proof)
+        activate_payment_proof(self.proof)
 
         self.redemption.refresh_from_db()
         self.promo.refresh_from_db()
@@ -234,7 +234,7 @@ class RedemptionLifecycleTests(APITestCase):
         )
         self.client.force_authenticate(user=staff)
         response = self.client.patch(
-            f'/api/v1/admin/yape/proofs/{self.proof.id}/review/',
+            f'/api/v1/admin/payments/proofs/{self.proof.id}/review/',
             {'status': 'rejected'}, format='json',
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -246,7 +246,7 @@ class RedemptionLifecycleTests(APITestCase):
 
     def test_public_one_click_reject_releases_redemption(self):
         response = self.client.post(
-            f'/api/v1/public/yape-payment/reject/{self.proof.admin_token}/',
+            f'/api/v1/public/payments/reject/{self.proof.admin_token}/',
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
@@ -256,12 +256,12 @@ class RedemptionLifecycleTests(APITestCase):
         self.assertEqual(self.proof.status, 'rejected')
 
     def test_notify_payload_includes_promo_breakdown(self):
-        from apps.subscriptions.tasks import notify_yape_payment
+        from apps.subscriptions.tasks import notify_payment_proof
 
-        with override_settings(N8N_YAPE_PAYMENT_WEBHOOK_URL='http://n8n.test/webhook'):
+        with override_settings(N8N_PAYMENT_WEBHOOK_URL='http://n8n.test/webhook'):
             with patch('apps.subscriptions.tasks.requests.post') as mock_post:
                 mock_post.return_value.status_code = 200
-                notify_yape_payment(str(self.proof.id))
+                notify_payment_proof(str(self.proof.id))
 
         payload = mock_post.call_args.kwargs['json']
         self.assertEqual(payload['promo'], {
@@ -273,7 +273,7 @@ class RedemptionLifecycleTests(APITestCase):
         self.assertEqual(payload['amount'], '15.20')
         # El tipo de cambio real (CurrencyConfig) viaja en el payload para que n8n
         # calcule el S/ con el mismo rate que vio el cliente
-        self.assertEqual(payload['exchange_rate'], '3.75')
+        self.assertEqual(payload['exchange_rate'], '3.7500')
         # Sin el ciclo, el mensaje de Telegram deja al revisor sin saber si el importe
         # corresponde a un mes o a un año — y aprobar concede 30 o 365 días.
         self.assertEqual(payload['billing_cycle'], 'monthly')
@@ -284,7 +284,7 @@ class RedemptionLifecycleTests(APITestCase):
             tenant=self.tenant, is_staff=True,
         )
         # Segundo proof sin cupón para verificar promo: None
-        YapePaymentProof.objects.create(
+        PaymentProof.objects.create(
             subscription=self.subscription,
             screenshot=_screenshot(),
             plan='starter',
@@ -292,7 +292,7 @@ class RedemptionLifecycleTests(APITestCase):
             admin_token=uuid.uuid4().hex,
         )
         self.client.force_authenticate(user=staff)
-        response = self.client.get('/api/v1/admin/yape/proofs/')
+        response = self.client.get('/api/v1/admin/payments/proofs/')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
         by_id = {p['id']: p for p in response.data['proofs']}
@@ -313,7 +313,7 @@ class RedemptionLifecycleTests(APITestCase):
             email='staff-annual@acme.com', name='Staff', password='pass123',
             tenant=self.tenant, is_staff=True,
         )
-        annual = YapePaymentProof.objects.create(
+        annual = PaymentProof.objects.create(
             subscription=self.subscription,
             screenshot=_screenshot(),
             plan='professional',
@@ -323,16 +323,16 @@ class RedemptionLifecycleTests(APITestCase):
         )
         self.client.force_authenticate(user=staff)
 
-        response = self.client.get('/api/v1/admin/yape/proofs/')
+        response = self.client.get('/api/v1/admin/payments/proofs/')
 
         row = next(p for p in response.data['proofs'] if p['id'] == str(annual.id))
         self.assertEqual(row['billing_cycle'], 'annual')
         self.assertEqual(row['amount'], '854.00')
 
     def test_notify_payload_carries_annual_cycle(self):
-        from apps.subscriptions.tasks import notify_yape_payment
+        from apps.subscriptions.tasks import notify_payment_proof
 
-        annual = YapePaymentProof.objects.create(
+        annual = PaymentProof.objects.create(
             subscription=self.subscription,
             screenshot=_screenshot(),
             plan='professional',
@@ -340,23 +340,23 @@ class RedemptionLifecycleTests(APITestCase):
             amount=Decimal('854.00'),
             admin_token=uuid.uuid4().hex,
         )
-        with override_settings(N8N_YAPE_PAYMENT_WEBHOOK_URL='http://n8n.test/webhook'):
+        with override_settings(N8N_PAYMENT_WEBHOOK_URL='http://n8n.test/webhook'):
             with patch('apps.subscriptions.tasks.requests.post') as mock_post:
                 mock_post.return_value.status_code = 200
-                notify_yape_payment(str(annual.id))
+                notify_payment_proof(str(annual.id))
 
         payload = mock_post.call_args.kwargs['json']
         self.assertEqual(payload['billing_cycle'], 'annual')
         self.assertEqual(payload['amount'], '854.00')
 
     def test_notify_payload_promo_is_none_without_redemption(self):
-        from apps.subscriptions.tasks import notify_yape_payment
+        from apps.subscriptions.tasks import notify_payment_proof
 
         self.redemption.delete()
-        with override_settings(N8N_YAPE_PAYMENT_WEBHOOK_URL='http://n8n.test/webhook'):
+        with override_settings(N8N_PAYMENT_WEBHOOK_URL='http://n8n.test/webhook'):
             with patch('apps.subscriptions.tasks.requests.post') as mock_post:
                 mock_post.return_value.status_code = 200
-                notify_yape_payment(str(self.proof.id))
+                notify_payment_proof(str(self.proof.id))
 
         self.assertIsNone(mock_post.call_args.kwargs['json']['promo'])
 
@@ -396,7 +396,7 @@ class ActivateFreeTests(APITestCase):
 
         redemption = PromotionRedemption.objects.get(tenant=tenant)
         self.assertEqual(redemption.status, 'confirmed')
-        self.assertIsNone(redemption.yape_proof)
+        self.assertIsNone(redemption.payment_proof)
         promo.refresh_from_db()
         self.assertEqual(promo.current_uses, 1)
 
@@ -435,7 +435,7 @@ class RegistrationBillingCycleTests(APITestCase):
 
     Sin esto, quien se registra eligiendo el plan anual pagaba el precio mensual y
     recibía 30 días: el ciclo no llegaba al comprobante ni a la activación. El resto de
-    la cadena ya lo soportaba (`activate_yape_proof` propaga `proof.billing_cycle`).
+    la cadena ya lo soportaba (`activate_payment_proof` propaga `proof.billing_cycle`).
     """
 
     def setUp(self):
@@ -460,7 +460,7 @@ class RegistrationBillingCycleTests(APITestCase):
             'amount': '1.00',  # monto falso del cliente — debe ignorarse siempre
             **extra,
         }
-        with patch('apps.subscriptions.tasks.notify_yape_payment.delay'):
+        with patch('apps.subscriptions.tasks.notify_payment_proof.delay'):
             return self.client.post(PROOF_URL, data, format='multipart')
 
     def _activate_free(self, token, plan='starter', **extra):
@@ -478,7 +478,7 @@ class RegistrationBillingCycleTests(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(response.data['billing_cycle'], 'annual')
-        proof = YapePaymentProof.objects.get(pk=response.data['proof_id'])
+        proof = PaymentProof.objects.get(pk=response.data['proof_id'])
         self.assertEqual(proof.billing_cycle, 'annual')
         self.assertEqual(proof.amount, Decimal('205.00'))
 
@@ -486,7 +486,7 @@ class RegistrationBillingCycleTests(APITestCase):
         response = self._upload(self._register_paid())
 
         self.assertEqual(response.data['billing_cycle'], 'monthly')
-        proof = YapePaymentProof.objects.get(pk=response.data['proof_id'])
+        proof = PaymentProof.objects.get(pk=response.data['proof_id'])
         self.assertEqual(proof.billing_cycle, 'monthly')
         self.assertEqual(proof.amount, Decimal('19.00'))
 
@@ -501,7 +501,7 @@ class RegistrationBillingCycleTests(APITestCase):
             with self.subTest(cycle=cycle):
                 response = self._upload(self._register_paid(), billing_cycle=cycle)
                 self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertFalse(YapePaymentProof.objects.exists())
+        self.assertFalse(PaymentProof.objects.exists())
 
     def test_invalid_cycle_does_not_burn_the_token(self):
         token = self._register_paid()
@@ -521,9 +521,9 @@ class RegistrationBillingCycleTests(APITestCase):
             self._register_paid(), billing_cycle='annual', promo_code='ANUAL20',
         )
 
-        proof = YapePaymentProof.objects.get(pk=response.data['proof_id'])
+        proof = PaymentProof.objects.get(pk=response.data['proof_id'])
         self.assertEqual(proof.amount, Decimal('164.00'))  # 205 − 20%
-        redemption = PromotionRedemption.objects.get(yape_proof=proof)
+        redemption = PromotionRedemption.objects.get(payment_proof=proof)
         self.assertEqual(redemption.original_amount, Decimal('205.00'))
 
     # ── Activación directa por cupón 100% ────────────────────────────────────────

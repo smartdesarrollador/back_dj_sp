@@ -2,7 +2,7 @@
 Tests del endpoint público POST /api/v1/public/promotions/validate/.
 
 Covers: cálculo por tipo (percentage con cap max_discount, fixed_amount con
-piso $0), conversión a PEN vía YapeConfig, normalización case-insensitive,
+piso $0), conversión a PEN vía PaymentMethodConfig, normalización case-insensitive,
 respuesta opaca 'invalid' (inexistente / pausada / aún no vigente) y razones
 específicas (expired / depleted / plan_not_applicable). Siempre 200 con
 valid: false — nunca 404.
@@ -47,7 +47,7 @@ class PromotionValidateTests(APITestCase):
         Plan.objects.create(
             id='starter', display_name='Starter', price_monthly=19, price_annual=200,
         )
-        # Fuente de verdad del tipo de cambio: CurrencyConfig (YapeConfig.exchange_rate
+        # Fuente de verdad del tipo de cambio: CurrencyConfig (PaymentMethodConfig.exchange_rate
         # es una sombra deprecada). Fijarlo aquí y no confiar en el default hace que
         # el test siga detectando regresiones si el default cambiara.
         cfg = CurrencyConfig.get()
@@ -71,7 +71,7 @@ class PromotionValidateTests(APITestCase):
             'original_price': 19.0,
             'discount_amount': 3.8,
             'final_price': 15.2,
-            'exchange_rate': '3.75',
+            'exchange_rate': '3.7500',
             'final_price_pen': 57.0,
         })
 

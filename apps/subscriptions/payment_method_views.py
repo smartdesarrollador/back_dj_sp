@@ -1,9 +1,8 @@
 """
 Métodos de pago manual: endpoint público (Hub) y administración (Admin Panel).
 
-Estos endpoints son **aditivos**: las rutas heredadas con «yape» siguen funcionando
-igual y sirven la fila `yape` de la misma tabla. El renombrado de esa superficie se hace
-cuando el Hub desplegado deje de llamarla.
+Una fila por método, editable sin desplegar: lo que se publica al cliente sale de
+aquí.
 """
 from drf_spectacular.utils import extend_schema
 from rest_framework import status

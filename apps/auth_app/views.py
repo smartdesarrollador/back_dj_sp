@@ -617,9 +617,9 @@ class PaymentTokenStatusView(APIView):
         return Response({'valid': ttl is not None, 'expires_in': ttl})
 
 
-class YapePaymentProofView(APIView):
+class PaymentProofView(APIView):
     """
-    Upload a Yape payment screenshot after registration with a paid plan.
+    Sube la captura del pago manual tras registrarse con un plan de pago.
     Uses a short-lived Redis token (payment_upload_token) from the register response
     to identify the tenant without requiring full JWT authentication.
     """
@@ -629,7 +629,7 @@ class YapePaymentProofView(APIView):
 
     @extend_schema(
         tags=['auth'],
-        summary='Upload Yape payment proof screenshot',
+        summary='Upload manual payment proof screenshot',
         responses={
             201: OpenApiResponse(description='Proof received, pending admin review'),
             400: OpenApiResponse(description='Invalid token, missing file, invalid plan or promo code'),
@@ -646,8 +646,8 @@ class YapePaymentProofView(APIView):
             find_valid_promotion,
             get_plan_price,
         )
-        from apps.subscriptions.models import Subscription, YapePaymentProof
-        from apps.subscriptions.tasks import notify_yape_payment
+        from apps.subscriptions.models import Subscription, PaymentProof
+        from apps.subscriptions.tasks import notify_payment_proof
 
         upload_token = request.data.get('payment_upload_token', '').strip()
         if not upload_token:
@@ -730,7 +730,7 @@ class YapePaymentProofView(APIView):
         else:
             exchange_rate, amount_pen = None, None
         with transaction.atomic():
-            proof = YapePaymentProof.objects.create(
+            proof = PaymentProof.objects.create(
                 subscription=subscription,
                 method=method,
                 screenshot=screenshot,
@@ -746,7 +746,7 @@ class YapePaymentProofView(APIView):
                 PromotionRedemption.objects.create(
                     promotion=promotion,
                     tenant=subscription.tenant,
-                    yape_proof=proof,
+                    payment_proof=proof,
                     plan=plan,
                     original_amount=amounts['original'],
                     discount_amount=amounts['discount'],
@@ -754,7 +754,7 @@ class YapePaymentProofView(APIView):
                 )
 
         consume_payment_upload_token(upload_token)
-        notify_yape_payment.delay(str(proof.id))
+        notify_payment_proof.delay(str(proof.id))
 
         return Response(
             {
@@ -766,7 +766,7 @@ class YapePaymentProofView(APIView):
         )
 
 
-class YapeActivateFreeView(APIView):
+class ActivateFreePlanView(APIView):
     """
     Activación directa cuando un cupón deja el monto en $0 (descuento 100%):
     no hay comprobante que subir. Revalida el cupón y el monto en servidor —
@@ -844,7 +844,7 @@ class YapeActivateFreeView(APIView):
             redemption = PromotionRedemption.objects.create(
                 promotion=promotion,
                 tenant=subscription.tenant,
-                yape_proof=None,
+                payment_proof=None,
                 plan=plan,
                 original_amount=amounts['original'],
                 discount_amount=amounts['discount'],

@@ -95,7 +95,7 @@ class TestRegisterWithPlan(APITestCase):
 
     @patch('apps.auth_app.views.send_mail', return_value=1)
     def test_plan_starter_is_applied(self, _mock_mail):
-        """On paid-plan registration, tenant starts on Free until Yape proof is approved."""
+        """On paid-plan registration, tenant starts on Free until the proof is approved."""
         from apps.subscriptions.models import Subscription
         payload = _register_payload(plan='starter')
         response = self.client.post(REGISTER_URL, payload, format='json')

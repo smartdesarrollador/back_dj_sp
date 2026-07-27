@@ -113,7 +113,7 @@ class Invoice(BaseModel):
     amount_cents = models.PositiveIntegerField(default=0)  # cents USD
     currency = models.CharField(max_length=3, default='usd')  # describe amount_cents
     # ── Testigo histórico del cobro ───────────────────────────────────────────
-    # Se HEREDAN del comprobante que originó el pago (ver YapePaymentProof), no se
+    # Se HEREDAN del comprobante que originó el pago (ver PaymentProof), no se
     # recalculan al activar: la factura debe reflejar lo que vio y pagó el cliente,
     # aunque la tasa se haya movido entre el pago y la aprobación.
     #
@@ -209,30 +209,29 @@ class PaymentMethod(BaseModel):
         return f"{self.tenant.slug} — {self.brand} ****{self.last4}"
 
 
-YAPE_PROOF_STATUS = [
+PAYMENT_PROOF_STATUS = [
     ('pending',  'Pending Review'),
     ('approved', 'Approved'),
     ('rejected', 'Rejected'),
 ]
 
 
-class YapePaymentProof(BaseModel):
+class PaymentProof(BaseModel):
     """
-    Screenshot uploaded by a user as proof of manual Yape payment.
-    status='pending' until an admin reviews via the one-click Telegram links.
-    admin_token is stored in DB (not Redis) so approve/reject links work days later.
+    Captura que el cliente sube como prueba de un pago manual (Yape, PayPal).
+    status='pending' hasta que un admin la revisa desde el panel o desde los enlaces
+    de un clic de Telegram. `admin_token` vive en BD y no en Redis para que esos
+    enlaces sigan funcionando días después.
     """
     subscription  = models.ForeignKey(
-        Subscription, on_delete=CASCADE, related_name='yape_proofs'
+        Subscription, on_delete=CASCADE, related_name='payment_proofs'
     )
-    # Método por el que se pagó. Default 'yape' para que todo lo anterior quede
-    # clasificado sin migrar datos. El nombre del modelo se generalizará en una fase
-    # posterior, junto con las rutas heredadas: hoy sigue diciendo "Yape" porque el
-    # Hub en producción llama a esos endpoints.
+    # Método por el que se pagó. Default 'yape' para que todo lo anterior al catálogo
+    # de métodos quedara clasificado sin migrar una sola fila.
     method        = models.CharField(
         max_length=20, choices=PAYMENT_METHOD_CHOICES, default='yape'
     )
-    screenshot    = models.ImageField(upload_to='yape_proofs/')
+    screenshot    = models.ImageField(upload_to='payment_proofs/')
     # Referencia verificable del pago cuando el método la da: el ID de transacción de
     # PayPal, que el revisor puede buscar en el panel. Yape no ofrece nada parecido, de
     # ahí que sea opcional.
@@ -246,44 +245,46 @@ class YapePaymentProof(BaseModel):
     )
     amount        = models.DecimalField(max_digits=8, decimal_places=2)  # USD — lo que se cobra
     # ── Testigo histórico del cobro real ──────────────────────────────────────
-    # El cliente transfiere SOLES, no dólares. La aprobación puede tardar días, y
-    # si la tasa se mueve por medio, sin estas dos columnas el importe del
-    # screenshot deja de cuadrar con lo que muestra el panel y nadie puede
-    # reconstruir por qué.
+    # Cuando el método cobra en SOLES (Yape), el cliente transfiere soles y no
+    # dólares. La aprobación puede tardar días, y si la tasa se mueve por medio, sin
+    # estas dos columnas el importe del screenshot deja de cuadrar con lo que muestra
+    # el panel y nadie puede reconstruir por qué. En los métodos que cobran en dólares
+    # (PayPal) quedan a NULL: no hubo conversión que registrar.
     #
     # NO son la fuente de verdad del cobro —esa sigue siendo `amount`, en USD—:
     # son una foto de la tasa vigente al crear el comprobante. Se capturan en
     # utils.currency.capture_pen_snapshot(), único sitio que las produce.
     #
-    # NULL = sin conversión registrada (comprobantes anteriores a estos campos).
-    # NUNCA rellenar con la tasa de hoy: sería fabricar un dato histórico.
+    # NULL = sin conversión registrada: comprobantes anteriores a estos campos, o
+    # pagos hechos en dólares. NUNCA rellenar con la tasa de hoy: sería fabricar un
+    # dato histórico.
     exchange_rate = models.DecimalField(
         max_digits=10, decimal_places=4, null=True, blank=True,
     )
     amount_pen    = models.DecimalField(
         max_digits=10, decimal_places=2, null=True, blank=True,
     )
-    status        = models.CharField(max_length=10, choices=YAPE_PROOF_STATUS, default='pending')
+    status        = models.CharField(
+        max_length=10, choices=PAYMENT_PROOF_STATUS, default='pending'
+    )
     admin_token   = models.CharField(max_length=64, unique=True, db_index=True)
     reviewed_at   = models.DateTimeField(null=True, blank=True)
 
     class Meta:
-        db_table = 'yape_payment_proofs'
+        db_table = 'payment_proofs'
         indexes = [
-            models.Index(fields=['status'], name='yape_proof_status_idx'),
+            models.Index(fields=['status'], name='payment_proof_status_idx'),
         ]
 
     def __str__(self) -> str:
-        return f"YapeProof({self.subscription.tenant.slug} — {self.plan} — {self.status})"
+        return f"PaymentProof({self.subscription.tenant.slug} — {self.method} — {self.status})"
 
 
 class PaymentMethodConfig(models.Model):
     """
     Datos de cobro de un método de pago manual: una fila por método.
 
-    Sustituye al singleton `YapeConfig`, que servía cuando Yape era el único medio.
-    Los endpoints heredados de Yape leen y escriben la fila `yape` de esta tabla, así
-    que su contrato no cambió.
+    Sustituyó al singleton que servía cuando Yape era el único medio de pago.
 
     **Los campos específicos son columnas explícitas y no un JSON** a propósito: hoy
     son dos métodos con campos conocidos y el repo prefiere columnas salvo en
@@ -323,40 +324,6 @@ class PaymentMethodConfig(models.Model):
         return f"{self.display_name} ({'enabled' if self.is_enabled else 'disabled'})"
 
 
-class YapeConfig(models.Model):
-    """
-    Singleton configuration for the manual Yape payment method.
-    Always access via YapeConfig.get() — creates the record on first use.
-
-    DEPRECADO como fuente de datos de cobro: `phone`, `holder_name`, `is_enabled` e
-    `instructions_note` viven ahora en la fila `yape` de PaymentMethodConfig. Este
-    modelo sobrevive únicamente por `exchange_rate`, que tiene su propio ticket de
-    retirada en BACKLOG.md.
-    """
-    phone             = models.CharField(max_length=30, default='')
-    holder_name       = models.CharField(max_length=255, default='')
-    is_enabled        = models.BooleanField(default=True)
-    # DEPRECADO — la fuente de verdad es CurrencyConfig.usd_to_pen. Se mantiene
-    # sincronizado por dual-write (YapeConfigView.patch y AdminCurrencyConfigView.patch)
-    # para que ninguna lectura fuera de Python (SQL, dumps, dashboards) vea un valor
-    # obsoleto. Se elimina cuando el Admin migre al endpoint de moneda.
-    # NO leer este campo: usar utils.currency.get_exchange_rate().
-    exchange_rate     = models.DecimalField(max_digits=5, decimal_places=2, default=Decimal('3.75'))
-    instructions_note = models.TextField(blank=True, default='')
-    updated_at        = models.DateTimeField(auto_now=True)
-
-    class Meta:
-        db_table = 'yape_config'
-
-    @classmethod
-    def get(cls) -> 'YapeConfig':
-        obj, _ = cls.objects.get_or_create(id=1)
-        return obj
-
-    def __str__(self) -> str:
-        return f"YapeConfig({self.phone} — {'enabled' if self.is_enabled else 'disabled'})"
-
-
 class CurrencyConfig(models.Model):
     """
     Configuración de moneda de la plataforma (singleton, pk=1).
@@ -364,11 +331,11 @@ class CurrencyConfig(models.Model):
     USD es la moneda base y la única en la que se persiste dinero. Este modelo
     solo define cómo se PRESENTA: el tipo de cambio a PEN y la moneda por
     defecto del Hub. No hereda de BaseModel a propósito — es una fila única de
-    configuración, igual que YapeConfig y FooterConfig.
+    configuración, igual que FooterConfig.
 
-    Sustituye a YapeConfig.exchange_rate, que quedó acoplado a un método de pago
-    concreto siendo en realidad configuración de plataforma (el Hub necesita el
-    tipo de cambio para mostrar precios en soles, pague por Yape o no).
+    Sustituyó al `exchange_rate` del antiguo singleton de Yape, que quedaba acoplado
+    a un método de pago concreto siendo en realidad configuración de plataforma (el
+    Hub necesita el tipo de cambio para mostrar precios en soles, pague por Yape o no).
 
     Leer SIEMPRE vía utils.currency.get_exchange_rate() — nunca estos campos
     directo, que salta la caché.

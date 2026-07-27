@@ -6,12 +6,12 @@ from apps.subscriptions.views import (
     StartTrialView,
     UpgradeSubscriptionView,
 )
-from apps.subscriptions.yape_upgrade_views import YapeUpgradeView
+from apps.subscriptions.plan_upgrade_views import PlanUpgradeView
 
 urlpatterns = [
     path('current/', CurrentSubscriptionView.as_view(), name='subscription-current'),
     path('upgrade/', UpgradeSubscriptionView.as_view(), name='subscription-upgrade'),
     path('cancel/', CancelSubscriptionView.as_view(), name='subscription-cancel'),
-    path('yape-upgrade/', YapeUpgradeView.as_view(), name='subscription-yape-upgrade'),
+    path('plan-upgrade/', PlanUpgradeView.as_view(), name='subscription-plan-upgrade'),
     path('trial/', StartTrialView.as_view(), name='subscription-trial'),
 ]

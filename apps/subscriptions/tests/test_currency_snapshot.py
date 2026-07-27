@@ -12,8 +12,8 @@ from decimal import Decimal
 from django.core.cache import cache
 from django.test import TestCase, override_settings
 
-from apps.subscriptions.models import CurrencyConfig, Subscription, YapePaymentProof
-from apps.subscriptions.services import activate_subscription_plan, activate_yape_proof
+from apps.subscriptions.models import CurrencyConfig, Subscription, PaymentProof
+from apps.subscriptions.services import activate_subscription_plan, activate_payment_proof
 from apps.tenants.models import Tenant
 from utils.currency import capture_pen_snapshot
 
@@ -74,9 +74,9 @@ class TestSnapshotSurvivesRateChanges(TestCase):
 
     def _make_proof(self, sub, amount=Decimal('199.00')):
         rate, amount_pen = capture_pen_snapshot(amount)
-        return YapePaymentProof.objects.create(
+        return PaymentProof.objects.create(
             subscription=sub,
-            screenshot='yape_proofs/x.png',
+            screenshot='payment_proofs/x.png',
             plan='enterprise',
             billing_cycle='monthly',
             amount=amount,
@@ -92,7 +92,7 @@ class TestSnapshotSurvivesRateChanges(TestCase):
         # La tasa sube ENTRE el pago y la aprobación — el caso que motiva la feature.
         _set_rate('4.2000')
 
-        invoice = activate_yape_proof(proof)
+        invoice = activate_payment_proof(proof)
 
         self.assertEqual(invoice.exchange_rate, Decimal('3.7500'))
         self.assertEqual(invoice.amount_pen_cents, 74625)
@@ -103,16 +103,16 @@ class TestSnapshotSurvivesRateChanges(TestCase):
     def test_legacy_proof_yields_an_invoice_without_conversion(self):
         # Comprobante anterior al snapshot: no se le inventa la tasa de hoy.
         sub = _make_subscription()
-        proof = YapePaymentProof.objects.create(
+        proof = PaymentProof.objects.create(
             subscription=sub,
-            screenshot='yape_proofs/x.png',
+            screenshot='payment_proofs/x.png',
             plan='professional',
             billing_cycle='monthly',
             amount=Decimal('79.00'),
             admin_token=uuid.uuid4().hex,
         )
 
-        invoice = activate_yape_proof(proof)
+        invoice = activate_payment_proof(proof)
 
         self.assertIsNone(invoice.exchange_rate)
         self.assertIsNone(invoice.amount_pen_cents)
@@ -141,7 +141,7 @@ class TestSnapshotSurvivesRateChanges(TestCase):
 
     def test_invoice_exposes_a_readable_pen_amount(self):
         sub = _make_subscription()
-        invoice = activate_yape_proof(self._make_proof(sub))
+        invoice = activate_payment_proof(self._make_proof(sub))
 
         self.assertEqual(invoice.amount_pen_display, 'S/ 746.25')
 
@@ -193,12 +193,12 @@ class TestSnapshotInSerializers(TestCase):
         self.assertIsNone(data['exchange_rate'])
 
     def test_proof_serializer_exposes_the_conversion(self):
-        from apps.subscriptions.yape_admin_views import _serialize_proof
+        from apps.subscriptions.payment_admin_views import _serialize_proof
 
         sub = _make_subscription()
         rate, amount_pen = capture_pen_snapshot(Decimal('199.00'))
-        proof = YapePaymentProof.objects.create(
-            subscription=sub, screenshot='yape_proofs/x.png', plan='enterprise',
+        proof = PaymentProof.objects.create(
+            subscription=sub, screenshot='payment_proofs/x.png', plan='enterprise',
             billing_cycle='monthly', amount=Decimal('199.00'),
             exchange_rate=rate, amount_pen=amount_pen,
             admin_token=uuid.uuid4().hex,
@@ -210,11 +210,11 @@ class TestSnapshotInSerializers(TestCase):
         self.assertEqual(data['exchange_rate'], '3.7500')
 
     def test_proof_serializer_sends_null_for_legacy_proofs(self):
-        from apps.subscriptions.yape_admin_views import _serialize_proof
+        from apps.subscriptions.payment_admin_views import _serialize_proof
 
         sub = _make_subscription()
-        proof = YapePaymentProof.objects.create(
-            subscription=sub, screenshot='yape_proofs/x.png', plan='professional',
+        proof = PaymentProof.objects.create(
+            subscription=sub, screenshot='payment_proofs/x.png', plan='professional',
             billing_cycle='monthly', amount=Decimal('79.00'),
             admin_token=uuid.uuid4().hex,
         )

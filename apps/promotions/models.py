@@ -18,7 +18,7 @@ PROMOTION_TYPES = [
 ]
 
 REDEMPTION_STATUS = [
-    ('pending', 'Pending'),      # comprobante Yape subido, pago sin revisar
+    ('pending', 'Pending'),      # comprobante subido, pago sin revisar
     ('confirmed', 'Confirmed'),  # pago aprobado — el uso cuenta contra max_uses
     ('released', 'Released'),    # pago rechazado — el uso se libera
 ]
@@ -28,7 +28,7 @@ APPLICABLE_PLANS = ['starter', 'professional', 'enterprise']
 
 class Promotion(BaseModel):
     """
-    Código de descuento canjeable en el registro (pago Yape manual).
+    Código de descuento canjeable en el registro (pago manual).
     `status` es computado (propiedad), no columna: las validaciones de canje
     evalúan las condiciones en vivo, sin tareas periódicas.
     """
@@ -78,10 +78,10 @@ class Promotion(BaseModel):
 
 class PromotionRedemption(BaseModel):
     """
-    Canje de una promoción por un tenant, atado al comprobante de pago Yape.
+    Canje de una promoción por un tenant, atado al comprobante del pago manual.
     pending → confirmed (aprobación del pago, incrementa current_uses con lock)
     pending → released  (rechazo del pago, el uso no se consume)
-    yape_proof es NULL en el caso de descuento 100% (activación directa, sin comprobante).
+    payment_proof es NULL en el caso de descuento 100% (activación directa, sin comprobante).
     """
     promotion       = models.ForeignKey(
         Promotion, on_delete=models.PROTECT, related_name='redemptions'
@@ -89,8 +89,8 @@ class PromotionRedemption(BaseModel):
     tenant          = models.ForeignKey(
         'tenants.Tenant', on_delete=models.CASCADE, related_name='promo_redemptions'
     )
-    yape_proof      = models.OneToOneField(
-        'subscriptions.YapePaymentProof', on_delete=models.CASCADE,
+    payment_proof   = models.OneToOneField(
+        'subscriptions.PaymentProof', on_delete=models.CASCADE,
         null=True, blank=True, related_name='redemption',
     )
     plan            = models.CharField(max_length=20)

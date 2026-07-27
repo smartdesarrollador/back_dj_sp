@@ -354,7 +354,7 @@ OPENAI_CHAT_MODEL = env('OPENAI_CHAT_MODEL', default='gpt-4o-mini')
 
 # ─── n8n Webhooks ─────────────────────────────────────────────────────────────
 N8N_WEBHOOK_REGISTRO_URL    = env('N8N_WEBHOOK_REGISTRO_URL', default='')
-N8N_YAPE_PAYMENT_WEBHOOK_URL = env('N8N_YAPE_PAYMENT_WEBHOOK_URL', default='')
+N8N_PAYMENT_WEBHOOK_URL = env('N8N_PAYMENT_WEBHOOK_URL', default='')
 
 # ─── Google OAuth ─────────────────────────────────────────────────────────────
 GOOGLE_CLIENT_ID = env('GOOGLE_CLIENT_ID', default='')

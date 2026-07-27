@@ -1,7 +1,7 @@
 """
 Tests de la renovación: estado de vencimiento derivado y pago del plan actual.
 
-Antes de esta fase renovar era imposible — `YapeUpgradeView` rechazaba pagar el plan
+Antes de esta fase renovar era imposible — `PlanUpgradeView` rechazaba pagar el plan
 que ya tenías, así que un Enterprise no tenía forma de volver a pagar nunca. Ver
 prd/features/renovacion-y-expiracion-de-planes.md y ADR-008, decisión 3.
 """
@@ -16,10 +16,10 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from apps.promotions.models import Promotion, PromotionRedemption
-from apps.subscriptions.models import Invoice, Plan, Subscription, YapePaymentProof
+from apps.subscriptions.models import Invoice, Plan, Subscription, PaymentProof
 from apps.subscriptions.services import (
     RENEWAL_WINDOW_DAYS,
-    activate_yape_proof,
+    activate_payment_proof,
     get_renewal_state,
     is_renewable,
 )
@@ -28,7 +28,7 @@ from core.tests.helpers import png_bytes
 
 _FAST_HASHERS = ['django.contrib.auth.hashers.MD5PasswordHasher']
 
-UPGRADE_URL = '/api/v1/admin/subscriptions/yape-upgrade/'
+UPGRADE_URL = '/api/v1/admin/subscriptions/plan-upgrade/'
 
 
 def make_tenant(plan: str = 'free'):
@@ -167,7 +167,7 @@ class TestRenewalSubmit(SubmitMixin, APITestCase):
 
         self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
         self.assertTrue(resp.data['is_renewal'])
-        proof = YapePaymentProof.objects.get(id=resp.data['proof_id'])
+        proof = PaymentProof.objects.get(id=resp.data['proof_id'])
         self.assertEqual(proof.plan, 'professional')
 
     def test_renew_during_grace(self):
@@ -188,7 +188,7 @@ class TestRenewalSubmit(SubmitMixin, APITestCase):
 
         self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn('no está próximo a vencer', resp.data['detail'])
-        self.assertFalse(YapePaymentProof.objects.exists())
+        self.assertFalse(PaymentProof.objects.exists())
 
     def test_enterprise_can_renew(self):
         """El plan máximo era el caso sin salida: no había plan superior que pagar."""
@@ -233,7 +233,7 @@ class TestRenewalBillingCycle(SubmitMixin, APITestCase):
 
         self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
         self.assertEqual(resp.data['billing_cycle'], 'annual')
-        proof = YapePaymentProof.objects.get(id=resp.data['proof_id'])
+        proof = PaymentProof.objects.get(id=resp.data['proof_id'])
         self.assertEqual(proof.billing_cycle, 'annual')
         self.assertEqual(proof.amount, Decimal('854.00'))
 
@@ -242,7 +242,7 @@ class TestRenewalBillingCycle(SubmitMixin, APITestCase):
 
         resp = self._submit(sub, 'professional')
 
-        proof = YapePaymentProof.objects.get(id=resp.data['proof_id'])
+        proof = PaymentProof.objects.get(id=resp.data['proof_id'])
         self.assertEqual(proof.billing_cycle, 'monthly')
         self.assertEqual(proof.amount, Decimal('79.00'))
 
@@ -252,7 +252,7 @@ class TestRenewalBillingCycle(SubmitMixin, APITestCase):
         resp = self._submit(sub, 'professional', billing_cycle='yearly')
 
         self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertFalse(YapePaymentProof.objects.exists())
+        self.assertFalse(PaymentProof.objects.exists())
 
     def test_annual_amount_with_promo_is_server_side(self):
         sub = setup_subscription('professional', days_left=5)
@@ -269,9 +269,9 @@ class TestRenewalBillingCycle(SubmitMixin, APITestCase):
         )
 
         self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
-        proof = YapePaymentProof.objects.get(id=resp.data['proof_id'])
+        proof = PaymentProof.objects.get(id=resp.data['proof_id'])
         self.assertEqual(proof.amount, Decimal('683.20'))  # 854 - 20%
-        redemption = PromotionRedemption.objects.get(yape_proof=proof)
+        redemption = PromotionRedemption.objects.get(payment_proof=proof)
         self.assertEqual(redemption.original_amount, Decimal('854.00'))
 
 
@@ -286,7 +286,7 @@ class TestPendingProofIdempotency(SubmitMixin, APITestCase):
 
         self.assertEqual(second.status_code, status.HTTP_409_CONFLICT)
         self.assertEqual(second.data['proof_id'], first.data['proof_id'])
-        self.assertEqual(YapePaymentProof.objects.count(), 1)
+        self.assertEqual(PaymentProof.objects.count(), 1)
 
     def test_pending_proof_blocks_a_different_plan_too(self):
         """Dos pendientes podrían aprobarse ambos y cobrar dos veces."""
@@ -296,12 +296,12 @@ class TestPendingProofIdempotency(SubmitMixin, APITestCase):
         second = self._submit(sub, 'enterprise', amount='199')
 
         self.assertEqual(second.status_code, status.HTTP_409_CONFLICT)
-        self.assertEqual(YapePaymentProof.objects.count(), 1)
+        self.assertEqual(PaymentProof.objects.count(), 1)
 
     def test_submit_allowed_again_after_approval(self):
         sub = setup_subscription('professional', days_left=5)
         first = self._submit(sub, 'professional')
-        activate_yape_proof(YapePaymentProof.objects.get(id=first.data['proof_id']))
+        activate_payment_proof(PaymentProof.objects.get(id=first.data['proof_id']))
 
         sub.refresh_from_db()
         sub.current_period_end = timezone.now() + timedelta(days=3)
@@ -309,12 +309,12 @@ class TestPendingProofIdempotency(SubmitMixin, APITestCase):
         second = self._submit(sub, 'professional')
 
         self.assertEqual(second.status_code, status.HTTP_201_CREATED)
-        self.assertEqual(YapePaymentProof.objects.count(), 2)
+        self.assertEqual(PaymentProof.objects.count(), 2)
 
     def test_rejected_proof_does_not_block(self):
         sub = setup_subscription('professional', days_left=5)
         first = self._submit(sub, 'professional')
-        proof = YapePaymentProof.objects.get(id=first.data['proof_id'])
+        proof = PaymentProof.objects.get(id=first.data['proof_id'])
         proof.status = 'rejected'
         proof.save(update_fields=['status'])
 

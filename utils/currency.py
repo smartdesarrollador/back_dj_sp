@@ -2,17 +2,16 @@
 Fuente única del tipo de cambio y de la configuración de moneda de la plataforma.
 
 USD es la moneda base: todo importe que se COBRA está y seguirá estando en USD
-(Plan.price_*, YapePaymentProof.amount, PromotionRedemption.*, Invoice.amount_cents).
+(Plan.price_*, PaymentProof.amount, PromotionRedemption.*, Invoice.amount_cents).
 
-Excepción deliberada: `YapePaymentProof.amount_pen` e `Invoice.amount_pen_cents`
+Excepción deliberada: `PaymentProof.amount_pen` e `Invoice.amount_pen_cents`
 SÍ persisten un importe en soles, pero como **testigo histórico del cobro**, no
 como fuente de verdad — quien paga por Yape transfiere soles y, si la tasa se
 mueve entre el pago y la aprobación, sin esa foto el importe del screenshot deja
 de cuadrar con el panel. Nunca se cobra, nunca se agrega, nunca se recalcula.
 Ver capture_pen_snapshot().
 
-Todo lector del tipo de cambio DEBE pasar por get_exchange_rate() (o por
-get_legacy_exchange_rate_str() si sirve un contrato heredado). Acceder a
+Todo lector del tipo de cambio DEBE pasar por get_exchange_rate(). Acceder a
 CurrencyConfig.usd_to_pen directo salta la caché y reintroduce el problema de
 lectores huérfanos que ya costó una incidencia (LL-049).
 
@@ -79,29 +78,12 @@ def get_exchange_rate(currency: str = 'PEN') -> Decimal:
     return Decimal(get_currency_config()['usd_to_pen'])
 
 
-def get_legacy_exchange_rate_str() -> str:
-    """
-    Tipo de cambio con la MISMA forma que producía str(YapeConfig.exchange_rate):
-    string de 2 decimales.
-
-    Existe solo para los tres contratos heredados que ya emitían ese formato —la
-    config pública de Yape, el payload de n8n y el validate de cupones— para que
-    la migración del tipo de cambio a CurrencyConfig sea literalmente invisible
-    para el Hub, el Admin, n8n y sus tests.
-
-    CADUCIDAD: se elimina junto con YapeConfig.exchange_rate cuando el Admin
-    migre al endpoint /admin/billing/currency/. No usar en superficies nuevas —
-    esas usan get_exchange_rate() con los 4 decimales reales.
-    """
-    return str(get_exchange_rate('PEN').quantize(Decimal('0.01')))
-
-
 def capture_pen_snapshot(amount_usd: Decimal) -> tuple[Decimal, Decimal]:
     """
     Foto de la conversión a soles en ESTE instante: `(tasa, importe_pen)`.
 
     Único sitio que produce el testigo histórico del cobro — los dos endpoints que
-    crean comprobantes Yape lo llaman, para que no haya dos fórmulas divergiendo
+    crean comprobantes lo llaman, para que no haya dos fórmulas divergiendo
     (LL-049).
 
     HALF_UP a 2 decimales a propósito: es el mismo redondeo que aplica el Hub al

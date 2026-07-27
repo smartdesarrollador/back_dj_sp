@@ -1,10 +1,9 @@
 """
 Tests de la configuración de moneda de plataforma (CurrencyConfig).
 
-Cubre el endpoint público que consumirá el Hub, el endpoint admin con su
-guardarraíl de rango, y —lo más importante de esta fase— la NO-REGRESIÓN de los
-contratos heredados que hoy sirven el tipo de cambio desde YapeConfig: mover la
-fuente de verdad tiene que ser invisible para el Hub, el Admin y n8n.
+Cubre el endpoint público que consume el Hub y el endpoint admin con su guardarraíl
+de rango. Los canarios de no-regresión de los contratos heredados de Yape se
+retiraron junto con esos endpoints: el tipo de cambio ya solo se sirve desde aquí.
 """
 from decimal import Decimal
 
@@ -15,7 +14,7 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from apps.audit.models import AuditLog
-from apps.subscriptions.models import CurrencyConfig, PaymentMethodConfig, YapeConfig
+from apps.subscriptions.models import CurrencyConfig
 from apps.tenants.models import Tenant
 from utils.currency import get_exchange_rate
 
@@ -26,8 +25,6 @@ _LOCMEM_CACHE = {'default': {'BACKEND': 'django.core.cache.backends.locmem.LocMe
 
 ADMIN_CURRENCY_URL = '/api/v1/admin/billing/currency/'
 PUBLIC_CURRENCY_URL = '/api/v1/public/currency/'
-LEGACY_YAPE_PUBLIC_URL = '/api/v1/public/yape-payment/config/'
-LEGACY_YAPE_ADMIN_URL = '/api/v1/admin/yape/config/'
 
 
 def _create_tenant(slug, plan='professional'):
@@ -226,86 +223,3 @@ class TestAdminCurrencyConfig(APITestCase):
             ADMIN_CURRENCY_URL, {'usd_to_pen': '4.0000'}, format='json', **self.headers
         )
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
-
-
-@override_settings(PASSWORD_HASHERS=_FAST_HASHERS, CACHES=_LOCMEM_CACHE)
-class TestLegacyYapeContractUnchanged(APITestCase):
-    """
-    El tipo de cambio cambió de sitio; los contratos que ya lo servían NO.
-    Estos son los canarios de "nada cambia" para el Hub, el Admin y n8n.
-    """
-
-    def setUp(self):
-        cache.clear()
-        CurrencyConfig.objects.update_or_create(
-            pk=1, defaults={'usd_to_pen': Decimal('3.7500')}
-        )
-        self.tenant = _create_tenant('yape-corp')
-        self.owner = _create_superuser(self.tenant, 'owner@yape-corp.com')
-        self.headers = {'HTTP_X_TENANT_SLUG': 'yape-corp'}
-
-    def test_public_config_shape_and_format_unchanged(self):
-        response = self.client.get(LEGACY_YAPE_PUBLIC_URL)
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        body = response.json()
-        self.assertEqual(
-            set(body.keys()),
-            {'phone', 'holder_name', 'is_enabled', 'exchange_rate', 'instructions_note'},
-        )
-        # 2 decimales, como siempre: el Hub y n8n hacen parseFloat, pero el Admin
-        # lo pinta tal cual en un input con step="0.01".
-        self.assertEqual(body['exchange_rate'], '3.75')
-
-    def test_legacy_endpoint_reads_from_currency_config(self):
-        """La columna vieja ya no manda: se ignora aunque tenga otro valor."""
-        CurrencyConfig.objects.filter(pk=1).update(usd_to_pen=Decimal('4.1000'))
-        YapeConfig.objects.update_or_create(pk=1, defaults={'exchange_rate': Decimal('3.75')})
-        cache.clear()
-
-        response = self.client.get(LEGACY_YAPE_PUBLIC_URL)
-
-        self.assertEqual(response.json()['exchange_rate'], '4.10')
-
-    def test_legacy_patch_writes_currency_config_and_shadow(self):
-        self.client.force_authenticate(user=self.owner)
-
-        response = self.client.patch(
-            LEGACY_YAPE_ADMIN_URL, {'exchange_rate': '3.90'}, format='json', **self.headers
-        )
-
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.json()['exchange_rate'], '3.90')
-        self.assertEqual(CurrencyConfig.objects.get(pk=1).usd_to_pen, Decimal('3.9000'))
-        # Dual-write: la columna heredada queda sincronizada para que ninguna
-        # lectura SQL/dump vea un valor obsoleto.
-        self.assertEqual(YapeConfig.objects.get(pk=1).exchange_rate, Decimal('3.90'))
-
-    def test_legacy_patch_rejects_out_of_range(self):
-        """El único escritor que existe hoy tampoco puede meter un 375."""
-        self.client.force_authenticate(user=self.owner)
-
-        response = self.client.patch(
-            LEGACY_YAPE_ADMIN_URL, {'exchange_rate': '375'}, format='json', **self.headers
-        )
-
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn('fuera del rango', str(response.json()))
-        self.assertEqual(CurrencyConfig.objects.get(pk=1).usd_to_pen, Decimal('3.7500'))
-
-    def test_legacy_patch_still_updates_other_fields(self):
-        self.client.force_authenticate(user=self.owner)
-
-        response = self.client.patch(
-            LEGACY_YAPE_ADMIN_URL,
-            {'phone': '955 365 043', 'holder_name': 'Juan Pérez'},
-            format='json', **self.headers,
-        )
-
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.json()['phone'], '955 365 043')
-        # Los datos de cobro viven ahora en PaymentMethodConfig; este endpoint es una
-        # fachada que escribe ahí. A diferencia del `exchange_rate`, no se duplican en
-        # YapeConfig: nada fuera de Python lee esas columnas.
-        self.assertEqual(
-            PaymentMethodConfig.objects.get(method='yape').holder_name, 'Juan Pérez',
-        )

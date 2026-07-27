@@ -1,16 +1,16 @@
 """
-YapeUpgradeView — authenticated Yape payment proof for plan upgrades and renewals.
+PlanUpgradeView — comprobante de pago manual, autenticado, para upgrade y renovación.
 
-POST /api/v1/admin/subscriptions/yape-upgrade/
+POST /api/v1/admin/subscriptions/plan-upgrade/
 
 Used when a logged-in tenant wants to **mejorar** su plan o **renovar** el que ya
-tiene, subiendo un comprobante de pago Yape. Unlike YapePaymentProofView (which uses
+tiene, subiendo un comprobante de pago manual. Unlike PaymentProofView (which uses
 a Redis token for unauthenticated tenants right after registration), this endpoint
 requires a valid JWT since the user is already logged in.
 
 Renovación y upgrade son el mismo acto para el sistema —subir un comprobante que un
 admin aprueba y que activa un período—, así que comparten endpoint y flujo de
-aprobación (`activate_yape_proof`). Lo único que cambia es si el plan pagado es igual
+aprobación (`activate_payment_proof`). Lo único que cambia es si el plan pagado es igual
 o superior al actual. Ver ADR-008, decisión 3.
 """
 import logging
@@ -32,14 +32,14 @@ from apps.promotions.services import (
     find_valid_promotion,
     get_plan_price,
 )
-from apps.subscriptions.models import Subscription, YapePaymentProof
+from apps.subscriptions.models import Subscription, PaymentProof
 from apps.subscriptions.payment_methods import (
     accepts_proofs,
     charges_in_pen,
     requires_reference,
 )
 from apps.subscriptions.services import RENEWAL_WINDOW_DAYS, is_renewable
-from apps.subscriptions.tasks import notify_yape_payment
+from apps.subscriptions.tasks import notify_payment_proof
 from utils.currency import capture_pen_snapshot
 from utils.uploads import validate_upload
 
@@ -55,13 +55,13 @@ def _get_tenant(request):
     return getattr(request.user, 'tenant', None)
 
 
-class YapeUpgradeView(APIView):
+class PlanUpgradeView(APIView):
     permission_classes = [IsAuthenticated]
     parser_classes = [MultiPartParser, FormParser]
 
     @extend_schema(
         tags=['admin-billing'],
-        summary='Submit Yape payment proof for plan upgrade or renewal (authenticated)',
+        summary='Submit manual payment proof for plan upgrade or renewal (authenticated)',
         responses={
             201: OpenApiResponse(description='Proof submitted, pending admin review'),
             400: OpenApiResponse(description='Validation error'),
@@ -100,7 +100,7 @@ class YapeUpgradeView(APIView):
         # Un solo comprobante pendiente por tenant. Sin esto, dos submits seguidos
         # crean dos proofs que un admin podría aprobar ambos, activando (y cobrando)
         # dos veces — la ventana de doble aprobación de BACKLOG.md.
-        pending = subscription.yape_proofs.filter(status='pending').first()
+        pending = subscription.payment_proofs.filter(status='pending').first()
         if pending is not None:
             return Response(
                 {
@@ -186,7 +186,7 @@ class YapeUpgradeView(APIView):
         else:
             exchange_rate, amount_pen = None, None
         with transaction.atomic():
-            proof = YapePaymentProof.objects.create(
+            proof = PaymentProof.objects.create(
                 subscription=subscription,
                 method=method,
                 screenshot=screenshot,
@@ -202,7 +202,7 @@ class YapeUpgradeView(APIView):
                 PromotionRedemption.objects.create(
                     promotion=promotion,
                     tenant=tenant,
-                    yape_proof=proof,
+                    payment_proof=proof,
                     plan=plan,
                     original_amount=amounts['original'],
                     discount_amount=amounts['discount'],
@@ -210,9 +210,9 @@ class YapeUpgradeView(APIView):
                 )
 
         try:
-            notify_yape_payment.delay(str(proof.id))
+            notify_payment_proof.delay(str(proof.id))
         except Exception:
-            logger.warning('YapeUpgradeView: could not enqueue notify_yape_payment for proof %s', proof.id)
+            logger.warning('PlanUpgradeView: could not enqueue notify_payment_proof for proof %s', proof.id)
 
         return Response(
             {

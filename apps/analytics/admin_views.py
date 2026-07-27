@@ -10,8 +10,8 @@ Endpoints:
   GET /admin/reports/vista-traffic/      → views/unique visitors/shares per public-page service
   GET /admin/reports/desktop-licenses/   → license-level sent/activated/pending/revoked funnel
 
-Payment context: the only live payment method is Yape (manual proof-of-payment,
-see apps.subscriptions.services.activate_yape_proof). There is no task that expires
+Payment context: los pagos vivos son manuales (Yape / PayPal, comprobante revisado a mano,
+see apps.subscriptions.services.activate_payment_proof). There is no task that expires
 a paid Subscription when its period lapses without renewal, so Subscription.status
 is not a reliable "currently paying" signal — a tenant who paid once and never
 renewed still shows status='active' forever. All revenue metrics here are therefore
@@ -195,7 +195,7 @@ def _compute_storage_report(own_tenant_id) -> dict:
     Consumo de almacenamiento agregado de todos los OTROS tenants (total, por plan, top y ocupación).
 
     Eficiencia: agrega en 2 queries agrupadas las fuentes con `size` en BD, que son las dominantes
-    (adjuntos de chat + imágenes de Vista). Se omiten logo/favicon/comprobantes Yape a propósito
+    (adjuntos de chat + imágenes de Vista). Se omiten logo/favicon/comprobantes de pago a propósito
     (no guardan `size` y exigirían un `stat` por archivo); su peso es marginal frente al total, así
     que el agregado puede quedar levemente por debajo del que muestra el Hub por tenant.
     """

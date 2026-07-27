@@ -8,7 +8,7 @@ from rest_framework.views import APIView
 # Import a nivel de módulo: utils.currency difiere internamente el import del
 # modelo, así que promotions no importa apps.subscriptions y se respeta la
 # dirección de imports que declara services.py.
-from utils.currency import get_exchange_rate, get_legacy_exchange_rate_str
+from utils.currency import get_exchange_rate
 from utils.throttles import CouponValidateRateThrottle
 
 from .services import BILLING_CYCLES, PAID_PLANS, compute_discount, find_valid_promotion
@@ -48,13 +48,9 @@ class PromotionValidateView(APIView):
             return Response({'valid': False, 'reason': reason})
 
         amounts = compute_discount(promotion, plan, billing_cycle)
-        # `exchange_rate` mantiene el formato heredado (2 decimales), que es el
-        # contrato que ya consume el Hub. Pero el IMPORTE se calcula con la tasa
-        # completa: el Hub prefiere este `final_price_pen` cuando hay cupón, y con
-        # una tasa de 3+ decimales el cliente vería un número distinto del que el
-        # servidor guarda como testigo del cobro — justo el descuadre que el
-        # snapshot existe para evitar.
-        rate_str = get_legacy_exchange_rate_str()
+        # La tasa completa, la misma con la que se captura el testigo del cobro: si
+        # aquí se redondeara, el cliente vería un importe distinto del que el servidor
+        # guarda — justo el descuadre que el snapshot existe para evitar.
         exchange_rate = get_exchange_rate('PEN')
         return Response({
             'valid': True,
@@ -65,6 +61,6 @@ class PromotionValidateView(APIView):
             'original_price': float(amounts['original']),
             'discount_amount': float(amounts['discount']),
             'final_price': float(amounts['final']),
-            'exchange_rate': rate_str,
+            'exchange_rate': str(exchange_rate),
             'final_price_pen': float(amounts['final'] * exchange_rate),
         })

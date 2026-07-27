@@ -13,8 +13,8 @@ from decimal import Decimal
 from django.test import TestCase, override_settings
 from django.utils import timezone
 
-from apps.subscriptions.models import Invoice, Subscription, YapePaymentProof
-from apps.subscriptions.services import activate_subscription_plan, activate_yape_proof
+from apps.subscriptions.models import Invoice, Subscription, PaymentProof
+from apps.subscriptions.services import activate_subscription_plan, activate_payment_proof
 from apps.tenants.models import Tenant
 
 _FAST_HASHERS = ['django.contrib.auth.hashers.MD5PasswordHasher']
@@ -263,12 +263,12 @@ class TestInvoicePeriod(TestCase):
 
 
 @override_settings(PASSWORD_HASHERS=_FAST_HASHERS)
-class TestYapeProofPropagatesCycle(TestCase):
-    def _make_proof(self, cycle: str) -> YapePaymentProof:
+class TestProofPropagatesCycle(TestCase):
+    def _make_proof(self, cycle: str) -> PaymentProof:
         sub = make_subscription('free')
-        return YapePaymentProof.objects.create(
+        return PaymentProof.objects.create(
             subscription=sub,
-            screenshot='yape_proofs/test.png',
+            screenshot='payment_proofs/test.png',
             plan='professional',
             billing_cycle=cycle,
             amount=Decimal('854.00') if cycle == 'annual' else Decimal('79.00'),
@@ -278,7 +278,7 @@ class TestYapeProofPropagatesCycle(TestCase):
     def test_annual_proof_activates_365_days(self):
         proof = self._make_proof('annual')
 
-        activate_yape_proof(proof)
+        activate_payment_proof(proof)
 
         sub = Subscription.objects.get(pk=proof.subscription_id)
         self.assertEqual(sub.billing_cycle, 'annual')
@@ -291,7 +291,7 @@ class TestYapeProofPropagatesCycle(TestCase):
     def test_monthly_proof_activates_30_days(self):
         proof = self._make_proof('monthly')
 
-        activate_yape_proof(proof)
+        activate_payment_proof(proof)
 
         sub = Subscription.objects.get(pk=proof.subscription_id)
         self.assertEqual(sub.billing_cycle, 'monthly')
@@ -303,16 +303,16 @@ class TestYapeProofPropagatesCycle(TestCase):
 
     def test_proof_defaults_to_monthly(self):
         sub = make_subscription('free')
-        proof = YapePaymentProof.objects.create(
+        proof = PaymentProof.objects.create(
             subscription=sub,
-            screenshot='yape_proofs/test.png',
+            screenshot='payment_proofs/test.png',
             plan='starter',
             amount=Decimal('19.00'),
             admin_token=uuid.uuid4().hex,
         )
         self.assertEqual(proof.billing_cycle, 'monthly')
 
-        activate_yape_proof(proof)
+        activate_payment_proof(proof)
 
         sub.refresh_from_db()
         self.assertAlmostEqual(

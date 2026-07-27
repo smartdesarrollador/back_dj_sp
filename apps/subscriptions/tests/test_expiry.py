@@ -22,10 +22,10 @@ from rest_framework.test import APITestCase
 
 from apps.audit.models import AuditLog
 from apps.notifications.models import Notification
-from apps.subscriptions.models import Invoice, Subscription, YapePaymentProof
+from apps.subscriptions.models import Invoice, Subscription, PaymentProof
 from apps.subscriptions.services import (
     GRACE_DAYS,
-    activate_yape_proof,
+    activate_payment_proof,
     get_renewal_state,
 )
 from apps.subscriptions.tasks import expire_paid_subscriptions, remind_subscription_expiry
@@ -67,14 +67,14 @@ def make_sub(plan='professional', days_ago=None, with_owner=True, **extra) -> Su
     return sub
 
 
-def add_pending_proof(sub, created_days_ago=0) -> YapePaymentProof:
-    proof = YapePaymentProof.objects.create(
+def add_pending_proof(sub, created_days_ago=0) -> PaymentProof:
+    proof = PaymentProof.objects.create(
         subscription=sub, plan=sub.plan,
         screenshot=SimpleUploadedFile('p.png', png_bytes(), content_type='image/png'),
         amount=Decimal('79.00'), admin_token=uuid.uuid4().hex,
     )
     if created_days_ago:
-        YapePaymentProof.objects.filter(pk=proof.pk).update(
+        PaymentProof.objects.filter(pk=proof.pk).update(
             created_at=timezone.now() - timedelta(days=created_days_ago)
         )
         proof.refresh_from_db()
@@ -346,7 +346,7 @@ class TestPendingProofProtection(TestCase):
 
     def test_approving_the_proof_removes_the_candidate(self):
         sub = self._expired_grace()
-        activate_yape_proof(add_pending_proof(sub))
+        activate_payment_proof(add_pending_proof(sub))
 
         summary = expire_paid_subscriptions()
 
@@ -461,7 +461,7 @@ class TestExpiryReminders(TestCase):
         sub.refresh_from_db()
         self.assertEqual(sub.renewal_reminders_sent, ['T-3'])
 
-        activate_yape_proof(add_pending_proof(sub))
+        activate_payment_proof(add_pending_proof(sub))
 
         sub.refresh_from_db()
         self.assertEqual(sub.renewal_reminders_sent, [])

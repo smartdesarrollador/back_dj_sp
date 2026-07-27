@@ -14,7 +14,7 @@ def get_tenant_storage_bytes(tenant) -> int:
     """Suma en bytes de todo lo que cuenta como almacenamiento del tenant."""
     from apps.chat.models import MessageAttachment
     from apps.digital_services.models import DigitalAsset
-    from apps.subscriptions.models import YapePaymentProof
+    from apps.subscriptions.models import PaymentProof
 
     total = MessageAttachment.objects.filter(
         message__sender__tenant=tenant
@@ -25,7 +25,7 @@ def get_tenant_storage_bytes(tenant) -> int:
     if tenant.favicon:
         total += tenant.favicon.size
 
-    for proof in YapePaymentProof.objects.filter(subscription__tenant=tenant).only('screenshot'):
+    for proof in PaymentProof.objects.filter(subscription__tenant=tenant).only('screenshot'):
         total += proof.screenshot.size
 
     # Imágenes de Vista: el tamaño está persistido en DigitalAsset.size, así que basta una

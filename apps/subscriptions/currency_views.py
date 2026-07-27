@@ -17,7 +17,7 @@ from apps.rbac.permissions import HasPermission, IsStaffUser
 from core.mixins import AuditMixin
 from utils.currency import BASE_CURRENCY, SUPPORTED_CURRENCIES, get_currency_config
 
-from .models import CurrencyConfig, YapeConfig
+from .models import CurrencyConfig
 from .serializers import CurrencyConfigSerializer, CurrencyConfigUpdateSerializer
 
 
@@ -82,13 +82,6 @@ class AdminCurrencyConfigView(AuditMixin, APIView):
         cfg.source     = 'manual'
         cfg.updated_by = request.user
         cfg.save()  # invalida la caché
-
-        # Dual-write a la columna heredada mientras exista: así ninguna lectura
-        # fuera de Python (SQL, dumps, dashboards) ve un valor obsoleto.
-        if 'usd_to_pen' in serializer.validated_data:
-            yape = YapeConfig.get()
-            yape.exchange_rate = cfg.usd_to_pen.quantize(Decimal('0.01'))
-            yape.save(update_fields=['exchange_rate', 'updated_at'])
 
         self.log_action(
             request, 'update', 'currency_config', '1',

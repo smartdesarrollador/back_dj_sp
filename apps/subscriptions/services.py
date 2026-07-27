@@ -3,7 +3,7 @@ Servicios compartidos entre los distintos flujos de aprobación de pagos manuale
 (Yape, PayPal) y estado de vencimiento/renovación de una suscripción.
 
 `get_renewal_state()` / `is_renewable()` son la **única** fuente del criterio de
-renovación: los consumen tanto `YapeUpgradeView` (para aceptar o rechazar el pago
+renovación: los consumen tanto `PlanUpgradeView` (para aceptar o rechazar el pago
 del plan actual) como `CurrentSubscriptionSerializer` (para que el Hub sepa si
 mostrar el CTA "Renovar"). Si divergieran, el Hub ofrecería un botón que el backend
 rechaza con 400, o al contrario.
@@ -15,7 +15,7 @@ from django.contrib.auth import get_user_model
 from django.db import transaction
 from django.utils import timezone
 
-from apps.subscriptions.models import Invoice, Subscription, YapePaymentProof
+from apps.subscriptions.models import Invoice, Subscription, PaymentProof
 
 User = get_user_model()
 
@@ -28,7 +28,7 @@ PERIOD_DAYS = {'monthly': 30, 'annual': 365}
 RENEWAL_WINDOW_DAYS = 15
 
 # Días de acceso completo tras vencer un plan pagado, antes de degradar a Free. El pago
-# por Yape es manual y lo revisa una persona: sin gracia, un retraso de revisión cortaría
+# manual y lo revisa una persona: sin gracia, un retraso de revisión cortaría
 # el servicio a quien ya pagó. Ver ADR-008, decisión 2.
 GRACE_DAYS = 7
 
@@ -103,7 +103,7 @@ def activate_subscription_plan(
     """
     Activa un plan de pago: Subscription/Tenant activos por el ciclo pagado (30 o
     365 días), usuarios reactivados e Invoice pagado. Núcleo compartido entre la
-    aprobación de un comprobante Yape y la activación directa por cupón 100%
+    aprobación de un comprobante de pago manual y la activación directa por cupón 100%
     (amount=0). Corre dentro de transaction.atomic() (la abre si no hay una activa).
 
     Si el período vigente aún no venció, el nuevo se **suma** a lo que quedaba: pagar
@@ -188,13 +188,13 @@ def activate_subscription_plan(
     return invoice
 
 
-def activate_payment_proof(proof: YapePaymentProof) -> Invoice:
+def activate_payment_proof(proof: PaymentProof) -> Invoice:
     """
-    Aprueba un YapePaymentProof: activa Subscription/Tenant, registra el
+    Aprueba un PaymentProof: activa Subscription/Tenant, registra el
     Invoice pagado y confirma el canje de cupón si lo hay (incrementa
     current_uses con lock). Usado tanto por el panel admin
-    (YapeProofReviewView) como por los links de un click enviados por
-    Telegram (YapeActivateView) — ver LL-005/gap de Invoice.
+    (ProofReviewView) como por los links de un click enviados por
+    Telegram (ProofActivateView) — ver LL-005/gap de Invoice.
     """
     from apps.promotions.services import confirm_redemption
 
@@ -202,7 +202,7 @@ def activate_payment_proof(proof: YapePaymentProof) -> Invoice:
         invoice = activate_subscription_plan(
             proof.subscription, proof.plan,
             amount=proof.amount,
-            invoice_ref=f'yape_{proof.id}',
+            invoice_ref=f'manual_{proof.id}',
             billing_cycle=proof.billing_cycle,
             # Se heredan del comprobante tal cual, aunque la tasa vigente HOY sea
             # otra: la factura debe reflejar lo que vio y pagó el cliente. Los
@@ -219,8 +219,3 @@ def activate_payment_proof(proof: YapePaymentProof) -> Invoice:
         if redemption is not None and redemption.status == 'pending':
             confirm_redemption(redemption)
     return invoice
-
-
-# Alias del nombre anterior: lo usan yape_admin_views y yape_public_views, y varios
-# tests. Se retira cuando se renombre la superficie con «yape», no antes.
-activate_yape_proof = activate_payment_proof
