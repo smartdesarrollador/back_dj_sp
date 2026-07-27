@@ -107,6 +107,12 @@ def notify_yape_payment(proof_id: str) -> None:
 
     payload = {
         'proof_id':      str(proof.id),
+        # Método de pago: permite al workflow ramificar. Un recibo de PayPal no se
+        # parece a una captura de Yape, así que el prompt de Vision no sirve para
+        # ambos. n8n ignora las claves que no conoce, así que enviarlo es seguro
+        # aunque el workflow desplegado aún no lo mire.
+        'method':        proof.method,
+        'transaction_reference': proof.transaction_reference,
         'plan':          proof.plan,
         # Sin el ciclo, quien aprueba desde Telegram ve "$854" para un plan que sabe
         # que cuesta $79/mes y no puede distinguir un pago anual legítimo de un error

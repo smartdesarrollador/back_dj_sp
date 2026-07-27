@@ -7,6 +7,7 @@ from rest_framework import serializers
 from apps.services.models import TenantService
 from apps.subscriptions.models import (
     CurrencyConfig,
+    PaymentMethodConfig,
     Invoice,
     PaymentMethod,
     Plan,
@@ -417,5 +418,81 @@ class CurrencyConfigUpdateSerializer(serializers.Serializer):
         if not data:
             raise serializers.ValidationError({
                 'non_field_errors': ['Debes enviar al menos un campo a actualizar.']
+            })
+        return data
+
+
+class PaymentMethodConfigSerializer(serializers.ModelSerializer):
+    """Lectura admin: incluye los métodos apagados y si están configurados."""
+
+    is_configured = serializers.SerializerMethodField()
+
+    class Meta:
+        model = PaymentMethodConfig
+        fields = [
+            'method', 'display_name', 'is_enabled', 'is_configured', 'sort_order',
+            'holder_name', 'phone', 'checkout_url', 'account_email',
+            'instructions_note', 'updated_at',
+        ]
+        read_only_fields = ['method', 'is_configured', 'updated_at']
+
+    def get_is_configured(self, obj) -> bool:
+        from apps.subscriptions.payment_methods import is_configured
+        return is_configured(obj)
+
+
+class PaymentMethodConfigUpdateSerializer(serializers.Serializer):
+    """
+    Escritura admin. `method` no es editable: identifica la fila.
+
+    El guardarraíl importante es `validate`: **no se puede habilitar un método sin su
+    dato identificador**. Publicar un método al que el cliente no puede pagar lo lleva
+    hasta el final del flujo para dejarlo sin destino de pago, y es el error más fácil
+    de cometer aquí.
+    """
+
+    display_name      = serializers.CharField(max_length=50, required=False)
+    is_enabled        = serializers.BooleanField(required=False)
+    sort_order        = serializers.IntegerField(min_value=0, required=False)
+    holder_name       = serializers.CharField(max_length=255, required=False, allow_blank=True)
+    phone             = serializers.CharField(max_length=30, required=False, allow_blank=True)
+    checkout_url      = serializers.URLField(required=False, allow_blank=True)
+    account_email     = serializers.EmailField(required=False, allow_blank=True)
+    instructions_note = serializers.CharField(required=False, allow_blank=True)
+
+    def validate(self, data):
+        if not data:
+            raise serializers.ValidationError({
+                'non_field_errors': ['Debes enviar al menos un campo a actualizar.']
+            })
+
+        from apps.subscriptions.payment_methods import REQUIRED_FIELDS
+
+        config = self.context.get('config')
+        if config is None:
+            return data
+
+        # Se evalúa sobre el estado RESULTANTE, no sobre el payload: habilitar en un
+        # PATCH y borrar el teléfono en otro dejaría el método publicado y sin destino.
+        will_be_enabled = data.get('is_enabled', config.is_enabled)
+        if not will_be_enabled:
+            return data
+
+        required = REQUIRED_FIELDS.get(config.method, ())
+        if required and not any(
+            data.get(field, getattr(config, field, '')) for field in required
+        ):
+            labels = {
+                'phone':         'un número de teléfono',
+                'checkout_url':  'un enlace de pago',
+                'account_email': 'un correo de la cuenta',
+            }
+            needed = ' o '.join(labels.get(f, f) for f in required)
+            # Detalle en LISTA (LL-104).
+            raise serializers.ValidationError({
+                'is_enabled': [
+                    f'No se puede habilitar {config.display_name} sin {needed}: '
+                    f'el cliente llegaría al paso de pago sin saber a dónde pagar.'
+                ]
             })
         return data

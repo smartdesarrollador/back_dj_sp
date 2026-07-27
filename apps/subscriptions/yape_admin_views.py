@@ -18,7 +18,8 @@ from rest_framework.views import APIView
 from core.mixins import AuditMixin
 from utils.currency import get_legacy_exchange_rate_str
 
-from .models import CurrencyConfig, YapeConfig, YapePaymentProof
+from .models import CurrencyConfig, PaymentMethodConfig, YapeConfig, YapePaymentProof
+from .payment_methods import PAYMENT_METHODS, charge_currency
 from .serializers import CurrencyConfigUpdateSerializer
 from .services import activate_yape_proof
 
@@ -26,13 +27,30 @@ logger = logging.getLogger(__name__)
 User = get_user_model()
 
 
-def _serialize_config(cfg: YapeConfig) -> dict:
+def _yape_config() -> PaymentMethodConfig:
+    """
+    Fila `yape` de PaymentMethodConfig, que es donde viven ahora los datos de cobro.
+    `get_or_create` por si alguien despliega sobre una BD que no pasó por la data
+    migration; el caso normal es que la fila ya exista.
+    """
+    config, _ = PaymentMethodConfig.objects.get_or_create(
+        method='yape', defaults={'display_name': 'Yape', 'is_enabled': True, 'sort_order': 10},
+    )
+    return config
+
+
+def _serialize_config(cfg: PaymentMethodConfig) -> dict:
+    """
+    Contrato heredado del endpoint de Yape: **exactamente estas claves**. El Hub y el
+    Admin en producción lo consumen, así que no se amplía ni se renombra aquí — los
+    datos nuevos (métodos, PayPal) viven en /payment-methods/.
+    """
     return {
         'phone':             cfg.phone,
         'holder_name':       cfg.holder_name,
         'is_enabled':        cfg.is_enabled,
-        # La fuente de verdad es CurrencyConfig; cfg.exchange_rate es una sombra
-        # dual-escrita que se elimina cuando el Admin migre al endpoint de moneda.
+        # La fuente de verdad es CurrencyConfig; el `exchange_rate` de YapeConfig es una
+        # sombra dual-escrita que se elimina cuando el Admin migre al endpoint de moneda.
         'exchange_rate':     get_legacy_exchange_rate_str(),
         'instructions_note': cfg.instructions_note,
         'updated_at':        cfg.updated_at.isoformat() if cfg.updated_at else None,
@@ -57,6 +75,12 @@ def _serialize_proof(proof: YapePaymentProof) -> dict:
 
     return {
         'id':             str(proof.id),
+        'method':         proof.method,
+        # Distingue «no hay conversión porque se pagó en dólares» de «no la hay porque
+        # el comprobante es anterior al registro de tasa»: los dos llegan con
+        # `amount_pen` a null y el panel los explicaría igual, que es engañoso.
+        'charge_currency': charge_currency(proof.method),
+        'transaction_reference': proof.transaction_reference,
         'screenshot_url': f"{base_url}/media/{proof.screenshot.name}" if proof.screenshot else '',
         'plan':           proof.plan,
         # Sin el ciclo, el revisor no distingue un pago anual legítimo de un importe
@@ -92,7 +116,7 @@ class YapeConfigPublicView(APIView):
         # del mismo contrato y solo una leía la fuente de verdad nueva.
         # `updated_at` se descarta a propósito — el contrato público son 5 claves
         # y ampliarlo aquí no aporta nada al Hub.
-        data = _serialize_config(YapeConfig.get())
+        data = _serialize_config(_yape_config())
         data.pop('updated_at', None)
         return Response(data)
 
@@ -119,12 +143,12 @@ class YapeConfigView(AuditMixin, APIView):
     def get(self, request):
         if err := self._check_staff(request):
             return err
-        return Response(_serialize_config(YapeConfig.get()))
+        return Response(_serialize_config(_yape_config()))
 
     def patch(self, request):
         if err := self._check_staff(request):
             return err
-        cfg = YapeConfig.get()
+        cfg = _yape_config()
         allowed = {'phone', 'holder_name', 'is_enabled', 'instructions_note'}
         for field, value in request.data.items():
             if field in allowed:
@@ -150,7 +174,11 @@ class YapeConfigView(AuditMixin, APIView):
             currency.source     = 'manual'
             currency.updated_by = request.user
             currency.save()
-            cfg.exchange_rate = currency.usd_to_pen.quantize(Decimal('0.01'))  # sombra
+            # Sombra en YapeConfig, que ya no guarda datos de cobro pero sigue siendo
+            # el hogar del `exchange_rate` heredado hasta su retirada.
+            yape_legacy = YapeConfig.get()
+            yape_legacy.exchange_rate = currency.usd_to_pen.quantize(Decimal('0.01'))
+            yape_legacy.save(update_fields=['exchange_rate', 'updated_at'])
             self.log_action(
                 request, 'update', 'currency_config', '1',
                 extra={
@@ -181,6 +209,7 @@ class YapeProofListView(APIView):
         # Filters
         proof_status = request.query_params.get('status', '').strip()
         plan         = request.query_params.get('plan', '').strip()
+        method       = request.query_params.get('method', '').strip()
         date_from    = request.query_params.get('date_from', '').strip()
         date_to      = request.query_params.get('date_to', '').strip()
 
@@ -188,6 +217,11 @@ class YapeProofListView(APIView):
             qs = qs.filter(status=proof_status)
         if plan in ('starter', 'professional', 'enterprise'):
             qs = qs.filter(plan=plan)
+        # Una sola cola para todos los métodos, con filtro — no una pestaña por método:
+        # lo que el revisor necesita saber es cuántos pagos esperan revisión, vengan
+        # de donde vengan.
+        if method in PAYMENT_METHODS:
+            qs = qs.filter(method=method)
         if date_from:
             qs = qs.filter(created_at__date__gte=date_from)
         if date_to:

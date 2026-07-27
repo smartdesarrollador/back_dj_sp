@@ -15,7 +15,7 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from apps.audit.models import AuditLog
-from apps.subscriptions.models import CurrencyConfig, YapeConfig
+from apps.subscriptions.models import CurrencyConfig, PaymentMethodConfig, YapeConfig
 from apps.tenants.models import Tenant
 from utils.currency import get_exchange_rate
 
@@ -303,4 +303,9 @@ class TestLegacyYapeContractUnchanged(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.json()['phone'], '955 365 043')
-        self.assertEqual(YapeConfig.objects.get(pk=1).holder_name, 'Juan Pérez')
+        # Los datos de cobro viven ahora en PaymentMethodConfig; este endpoint es una
+        # fachada que escribe ahí. A diferencia del `exchange_rate`, no se duplican en
+        # YapeConfig: nada fuera de Python lee esas columnas.
+        self.assertEqual(
+            PaymentMethodConfig.objects.get(method='yape').holder_name, 'Juan Pérez',
+        )

@@ -30,6 +30,11 @@ from utils.throttles import (
     MFARateThrottle,
     RegisterRateThrottle,
 )
+from apps.subscriptions.payment_methods import (
+    accepts_proofs,
+    charges_in_pen,
+    requires_reference,
+)
 from utils.currency import capture_pen_snapshot
 from utils.uploads import validate_upload
 from .models import MFARecoveryCode
@@ -666,6 +671,28 @@ class YapePaymentProofView(APIView):
                 {'detail': 'Invalid billing cycle. Must be monthly or annual.'}, status=400
             )
 
+        # El método se valida antes que la imagen, por el mismo motivo que el ciclo:
+        # no gastar el procesado de un archivo en un request que se va a rechazar.
+        # Rechazar los métodos no habilitados no es cosmético: impide que llegue un
+        # comprobante de un método que el resto del sistema (verificación automática,
+        # panel) aún no sabe tratar.
+        method = str(request.data.get('method', 'yape')).strip() or 'yape'
+        if not accepts_proofs(method):
+            return Response(
+                {'detail': 'Método de pago no disponible.'}, status=400
+            )
+
+        # La referencia es lo que hace verificable el pago contra el panel del proveedor.
+        # Se exige aquí y no solo en el formulario del Hub: un guardarraíl que vive en el
+        # cliente se salta llamando al endpoint directamente.
+        transaction_reference = str(
+            request.data.get('transaction_reference', '')
+        ).strip()[:100]
+        if requires_reference(method) and not transaction_reference:
+            return Response(
+                {'detail': 'Se requiere el ID de transacción del pago.'}, status=400
+            )
+
         screenshot = request.FILES.get('screenshot')
         if not screenshot:
             return Response({'detail': 'screenshot file is required.'}, status=400)
@@ -695,12 +722,19 @@ class YapePaymentProofView(APIView):
 
         admin_token = secrets.token_urlsafe(48)
         # Foto de la tasa en el momento del pago: el cliente transfirió soles y la
-        # aprobación puede tardar días, con la tasa moviéndose por medio.
-        exchange_rate, amount_pen = capture_pen_snapshot(amounts['final'])
+        # aprobación puede tardar días, con la tasa moviéndose por medio. Solo aplica a
+        # los métodos que cobran en soles — anotarle una conversión a un pago hecho en
+        # dólares sería inventarle al comprobante un importe que nadie transfirió.
+        if charges_in_pen(method):
+            exchange_rate, amount_pen = capture_pen_snapshot(amounts['final'])
+        else:
+            exchange_rate, amount_pen = None, None
         with transaction.atomic():
             proof = YapePaymentProof.objects.create(
                 subscription=subscription,
+                method=method,
                 screenshot=screenshot,
+                transaction_reference=transaction_reference,
                 plan=plan,
                 billing_cycle=billing_cycle,
                 amount=amounts['final'],

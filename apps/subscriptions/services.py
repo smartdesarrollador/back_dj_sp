@@ -1,6 +1,6 @@
 """
-Servicios compartidos entre los distintos flujos de aprobación de pagos Yape, y
-estado de vencimiento/renovación de una suscripción.
+Servicios compartidos entre los distintos flujos de aprobación de pagos manuales
+(Yape, PayPal) y estado de vencimiento/renovación de una suscripción.
 
 `get_renewal_state()` / `is_renewable()` son la **única** fuente del criterio de
 renovación: los consumen tanto `YapeUpgradeView` (para aceptar o rechazar el pago
@@ -188,7 +188,7 @@ def activate_subscription_plan(
     return invoice
 
 
-def activate_yape_proof(proof: YapePaymentProof) -> Invoice:
+def activate_payment_proof(proof: YapePaymentProof) -> Invoice:
     """
     Aprueba un YapePaymentProof: activa Subscription/Tenant, registra el
     Invoice pagado y confirma el canje de cupón si lo hay (incrementa
@@ -219,3 +219,8 @@ def activate_yape_proof(proof: YapePaymentProof) -> Invoice:
         if redemption is not None and redemption.status == 'pending':
             confirm_redemption(redemption)
     return invoice
+
+
+# Alias del nombre anterior: lo usan yape_admin_views y yape_public_views, y varios
+# tests. Se retira cuando se renombre la superficie con «yape», no antes.
+activate_yape_proof = activate_payment_proof

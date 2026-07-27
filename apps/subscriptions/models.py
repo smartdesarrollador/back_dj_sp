@@ -18,6 +18,15 @@ from apps.tenants.models import PLAN_CHOICES
 
 LATAM_PAYMENT_TYPES = ['paypal', 'mercadopago', 'yape', 'plin', 'nequi', 'daviplata']
 
+# Métodos de cobro manual que la plataforma ofrece al cliente: el cliente paga por su
+# cuenta y sube un comprobante que un admin revisa. No confundir con
+# LATAM_PAYMENT_TYPES, que describe los métodos guardados POR el cliente en
+# PaymentMethod.
+PAYMENT_METHOD_CHOICES = [
+    ('yape',   'Yape'),
+    ('paypal', 'PayPal'),
+]
+
 
 STATUS_CHOICES = [
     ('trialing',        'Trialing'),
@@ -216,7 +225,18 @@ class YapePaymentProof(BaseModel):
     subscription  = models.ForeignKey(
         Subscription, on_delete=CASCADE, related_name='yape_proofs'
     )
+    # Método por el que se pagó. Default 'yape' para que todo lo anterior quede
+    # clasificado sin migrar datos. El nombre del modelo se generalizará en una fase
+    # posterior, junto con las rutas heredadas: hoy sigue diciendo "Yape" porque el
+    # Hub en producción llama a esos endpoints.
+    method        = models.CharField(
+        max_length=20, choices=PAYMENT_METHOD_CHOICES, default='yape'
+    )
     screenshot    = models.ImageField(upload_to='yape_proofs/')
+    # Referencia verificable del pago cuando el método la da: el ID de transacción de
+    # PayPal, que el revisor puede buscar en el panel. Yape no ofrece nada parecido, de
+    # ahí que sea opcional.
+    transaction_reference = models.CharField(max_length=100, blank=True, default='')
     plan          = models.CharField(max_length=20, choices=PLAN_CHOICES)
     # Ciclo pagado: determina precio y duración del período al aprobar el comprobante
     # (30 vs. 365 días). Vive aquí y no solo en Subscription porque la aprobación es
@@ -257,10 +277,61 @@ class YapePaymentProof(BaseModel):
         return f"YapeProof({self.subscription.tenant.slug} — {self.plan} — {self.status})"
 
 
+class PaymentMethodConfig(models.Model):
+    """
+    Datos de cobro de un método de pago manual: una fila por método.
+
+    Sustituye al singleton `YapeConfig`, que servía cuando Yape era el único medio.
+    Los endpoints heredados de Yape leen y escriben la fila `yape` de esta tabla, así
+    que su contrato no cambió.
+
+    **Los campos específicos son columnas explícitas y no un JSON** a propósito: hoy
+    son dos métodos con campos conocidos y el repo prefiere columnas salvo en
+    catálogos abiertos (`Plan.limits`, `Plan.highlights`). Si algún día entra un
+    método con una forma muy distinta —una transferencia bancaria con CCI, SWIFT y
+    banco intermediario—, ese es el momento de replantearlo, no antes.
+
+    | Campo               | Yape | PayPal |
+    |---------------------|------|--------|
+    | `holder_name`       |  ✔   |   ✔    |
+    | `phone`             |  ✔   |        |
+    | `checkout_url`      |      |   ✔    |
+    | `account_email`     |      |   ✔    |
+
+    Leer SIEMPRE vía `payment_methods.get_method_config()` / `get_enabled_methods()`.
+    """
+    method            = models.CharField(
+        max_length=20, unique=True, choices=PAYMENT_METHOD_CHOICES
+    )
+    display_name      = models.CharField(max_length=50)
+    # Nace apagado: un método sin configurar no debe ofrecerse al cliente. El
+    # serializer además impide habilitarlo sin su dato identificador.
+    is_enabled        = models.BooleanField(default=False)
+    sort_order        = models.PositiveSmallIntegerField(default=0)
+    instructions_note = models.TextField(blank=True, default='')
+    holder_name       = models.CharField(max_length=255, blank=True, default='')
+    phone             = models.CharField(max_length=30, blank=True, default='')
+    checkout_url      = models.URLField(blank=True, default='')
+    account_email     = models.EmailField(blank=True, default='')
+    updated_at        = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'payment_method_configs'
+        ordering = ['sort_order', 'method']
+
+    def __str__(self) -> str:
+        return f"{self.display_name} ({'enabled' if self.is_enabled else 'disabled'})"
+
+
 class YapeConfig(models.Model):
     """
     Singleton configuration for the manual Yape payment method.
     Always access via YapeConfig.get() — creates the record on first use.
+
+    DEPRECADO como fuente de datos de cobro: `phone`, `holder_name`, `is_enabled` e
+    `instructions_note` viven ahora en la fila `yape` de PaymentMethodConfig. Este
+    modelo sobrevive únicamente por `exchange_rate`, que tiene su propio ticket de
+    retirada en BACKLOG.md.
     """
     phone             = models.CharField(max_length=30, default='')
     holder_name       = models.CharField(max_length=255, default='')
